@@ -1,0 +1,463 @@
+{
+    "block": {
+        "height": 0,
+        "slices": [
+            "17f35da5654fe3e813227486c6feff4ae063d563e14f56c67b05f8622e299cbb"
+        ],
+        "transactionsCount": 15,
+        "version": "2",
+        "chain": "testnet",
+        "from": "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705",
+        "created": 1674845221,
+        "lastHash": "0000000000000000000000000000000000000000000000000000000000000000",
+        "hash": "cb12fa2e3c93783599e38cca3f3a63e9dabc460ed4713bf91c31941998662fb9",
+        "sign": "0x406802187c88feac20984d9acb5aa632cff53278c0eb351b30a190bd3097990671a5d54da053eb3402154f1e9884e5bf9eaed36061563e93c929c9bb44c19d9c1b",
+        "externalTxID": []
+    },
+    "slices": [
+        {
+            "height": 0,
+            "blockHeight": 0,
+            "transactions": [
+                "ff563813abaed6840bc5c6231750544a929212cc85df95198501db1f81e31b2c",
+                "667858454ca1cc409383abb1f45f9207b71356dff61367d3bbb7c4966d2161c6",
+                "d3cc6065390c4e24c0859ebaa0060cfcc0a819788f7bba00dcf7ba28fe1260b1",
+                "76456d0698f64a29a8b3534b08a53584d57d00f920bce6d04e3bd562334fb5a0",
+                "ded29af1257cd8ece1213f610629205789aee083f3eb754918d5a256838505c7",
+                "18f1896b04da4f3887eae5a59c21cfc19c0f6067cf5772b320fdab764f41fc00",
+                "74df7c5f4a21df208a86e08e54e3643cdd7c75d2a1f106f8965a2e2f5a47cc0e",
+                "d927cfd5aa284d296f554c668c8900218090aa2c8772353760ed3f7902895bb9",
+                "54739302da9470123948cf5d828472a5f25da5c3157e99c8f8213d2fdfe832ad",
+                "4220f3642f1f1dcd8eaaef3177220b1817ba929d9347a9505d7138d6976a9439",
+                "99ad99dd478dc268d4aef0f446ba4e7d3f907c7e99ddeb102eb619d1529d3c8c",
+                "5e9dcb38be720f39bbda1c7e8f0961d1af052480263f090de9615e6beaf1814f",
+                "c8fa6f10a3af4726a4de578c03750f96334acbfe9bbf72065ac5b9078cab62bb",
+                "f1052bbd5b4cfa2a4faf88bc78ac2e8b2fca29c56644b6de08f303ff2e784b95",
+                "3359f645e2dfbd894ff7bf58cb72605884f33d7edf98dd4fb916e8f6dc6a2b00"
+            ],
+            "transactionsCount": 15,
+            "version": "2",
+            "chain": "testnet",
+            "from": "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705",
+            "created": 1674845223,
+            "end": true,
+            "hash": "17f35da5654fe3e813227486c6feff4ae063d563e14f56c67b05f8622e299cbb",
+            "sign": "0xa9a56e7b1ce77103a15d551c9967477357739910ce3ab04f3d699903adb017ca19bdca86f2b448496d43dc6c984bf6df52773b5fc9e350a06ced8f50fc1127951b"
+        }
+    ],
+    "txs": [
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "blockchain-command",
+            "foreignKeys": [],
+            "data": {
+                "name": "start-slice",
+                "input": [
+                    "0"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "ff563813abaed6840bc5c6231750544a929212cc85df95198501db1f81e31b2c",
+            "sign": [
+                "0xeae9e804a5312ffc0e618ade743f332308a867ab45c9d10209deedbef420a0c423637e9ae99341821f5f4e9d40047d04717fcb613115ca6991743d988a5b5c161c"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "addAdmin",
+                "input": [
+                    "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "667858454ca1cc409383abb1f45f9207b71356dff61367d3bbb7c4966d2161c6",
+            "sign": [
+                "0xdb05fcf9b4a4d860d2e4c2fa6835cc3b4fab8d3232145e86cb50ef86a433f8c44ca09107c1ae7c1655b6f28a4e389efb8a6124295defa4ef2f4b71eb6daba7e91b"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "addValidator",
+                "input": [
+                    "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "d3cc6065390c4e24c0859ebaa0060cfcc0a819788f7bba00dcf7ba28fe1260b1",
+            "sign": [
+                "0x83cedaabaedcde9a67f00014686a92ad5bac4eb7fda7f99798e602c6457b195310df4e860136b878b2ff8ca10b25a0e7d363bc7b5e42831f3479e8a4f461da9e1c"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "setBalance",
+                "input": [
+                    "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705",
+                    "20000"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "76456d0698f64a29a8b3534b08a53584d57d00f920bce6d04e3bd562334fb5a0",
+            "sign": [
+                "0x56336577d0f52ad22dd240a0bfa803b6a695fdb8bdcd8b37b6439d69d6fe1e470447a23cc571de3a623b98a4da449784db5a77aeed0ee7c4124bc6f9e5468fa01b"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "addAdmin",
+                "input": [
+                    "BWS1MUBf038b1e27628CDa9c0509C1d8558Cb24F3fB4fd62d"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "ded29af1257cd8ece1213f610629205789aee083f3eb754918d5a256838505c7",
+            "sign": [
+                "0x34d39e365ceb359f520b3d2e1ac1849c888b4919f483b4adea6e38dbc08b66576f41009d7cc46879cccad1bb288b76039f7b818be205535288dfdd4e872f1a5d1b"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "addValidator",
+                "input": [
+                    "BWS1MUBf038b1e27628CDa9c0509C1d8558Cb24F3fB4fd62d"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "18f1896b04da4f3887eae5a59c21cfc19c0f6067cf5772b320fdab764f41fc00",
+            "sign": [
+                "0x47bb4473c2e159cda649e66a4f705c726b3410bec2305eacb16cab466014ca643ff4487f205f546ca2df0614949d0934ba266af169f29834671700eb1e49dce61c"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "setBalance",
+                "input": [
+                    "BWS1MUBf038b1e27628CDa9c0509C1d8558Cb24F3fB4fd62d",
+                    "20000"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "74df7c5f4a21df208a86e08e54e3643cdd7c75d2a1f106f8965a2e2f5a47cc0e",
+            "sign": [
+                "0x2a80143dfb11d16371352ded58b3d6fac9c46035f83f6e2e25b15a7e62fdfe244eb175dc6deed20aff81a82af787daf50002af09af3deb741f7af30edee2e14c1b"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "addAdmin",
+                "input": [
+                    "BWS1MU664C1DA92800069DDF0c2aB8dAc286F9f7d84Cc4326"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "d927cfd5aa284d296f554c668c8900218090aa2c8772353760ed3f7902895bb9",
+            "sign": [
+                "0xf8f1230672c3c93e36791d5ff170ebbe4bf914928962d425124fc2eceba0d8cd723f5ef92c14d3f811887ae50c0a5dc6ffea28f78176da7e1469d0ba3dbb7a6b1b"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "addValidator",
+                "input": [
+                    "BWS1MU664C1DA92800069DDF0c2aB8dAc286F9f7d84Cc4326"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "54739302da9470123948cf5d828472a5f25da5c3157e99c8f8213d2fdfe832ad",
+            "sign": [
+                "0x4a2e91d851e29b90183b966f335a0dd2dac90083330656a49f005c257eedbde46b3c0bb2fadd8cb6ce280525cb5973b9967f8a88036e99ae49125c8a93dddccd1c"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "setBalance",
+                "input": [
+                    "BWS1MU664C1DA92800069DDF0c2aB8dAc286F9f7d84Cc4326",
+                    "20000"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "4220f3642f1f1dcd8eaaef3177220b1817ba929d9347a9505d7138d6976a9439",
+            "sign": [
+                "0xa248b045274e2bcf641cca3cf1025ef24f9bedba4a3ad3702d2adde387ed44dc40420640b2ca12cc89f6ffd90ac32ff25be22f277e2c8164343fb093037b06651c"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "setConfig",
+                "input": [
+                    "blockTime",
+                    "600"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "99ad99dd478dc268d4aef0f446ba4e7d3f907c7e99ddeb102eb619d1529d3c8c",
+            "sign": [
+                "0xfaba070b65ac738f0518d69f98ae4ee81b657c875de1093ddfc0c27c59f3a009718b5686c7bcb7a412da3973f2a36c682bb65f582bf376a2e753674ace43ad071b"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "setConfig",
+                "input": [
+                    "feeBasic",
+                    "0.1"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "5e9dcb38be720f39bbda1c7e8f0961d1af052480263f090de9615e6beaf1814f",
+            "sign": [
+                "0xfc8bd4b28927ca703e7b80a8a32d1e45547fd8ff2cbe5fd2bb373f196ce4128d34164c41e286416721176ed6a2f88b37bd04383253d6ed15b4e42c88e96d3d081c"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "setConfig",
+                "input": [
+                    "feeCoefAmount",
+                    "0.1"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "c8fa6f10a3af4726a4de578c03750f96334acbfe9bbf72065ac5b9078cab62bb",
+            "sign": [
+                "0x817fc2ca3542ea06ee322c00598139185fb10abcb7a9995f397661b4eba03efe193f567809a7f1cd7ade730f05171eba18039c0fd2db93a6b38201511d6872991c"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "setConfig",
+                "input": [
+                    "feeCoefSize",
+                    "0.001"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "f1052bbd5b4cfa2a4faf88bc78ac2e8b2fca29c56644b6de08f303ff2e784b95",
+            "sign": [
+                "0xa5099d0f631ffa6605a3d9b2c2d59132ea1dcab7e48d4622cff4d24a711d84fc5c8f8bb15a91775a7db37cea63c787db51a878a50d327a0c48fb656f3a4935791b"
+            ]
+        },
+        {
+            "version": "2",
+            "chain": "testnet",
+            "from": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "to": [
+                "BWS1MU973F5fC50eB376aeb04C9FBeda6aD3E41211c3D2705"
+            ],
+            "amount": [
+                "0"
+            ],
+            "fee": "0",
+            "type": "command",
+            "foreignKeys": [],
+            "data": {
+                "name": "setConfig",
+                "input": [
+                    "feeCoefCost",
+                    "0.001"
+                ]
+            },
+            "created": 1674845223,
+            "hash": "3359f645e2dfbd894ff7bf58cb72605884f33d7edf98dd4fb916e8f6dc6a2b00",
+            "sign": [
+                "0xe2a44a9673743915c8e35183aa635dc77529ae090967819ef5707cf0e775748c67a973ab4513897cced153ac99eb0efb71df120cb21669c3227cbb46a05b57501b"
+            ]
+        }
+    ]
+}

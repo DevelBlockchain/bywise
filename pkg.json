@@ -1,0 +1,20 @@
+{
+    "pkg": {
+        "scripts": [
+            "dist/worker.js"
+        ],
+        "assets": [
+            "public/**/*",
+            "imports/*",
+            "node_modules/classic-level/*",
+            "node_modules/classic-level/**/*",
+            "node_modules/express-status-monitor/**/*"
+        ],
+        "targets": [
+            "node18-linux-x64",
+            "node18-macos-x64",
+            "node18-win-x64"
+        ],
+        "outputPath": "dist"
+    }
+}

@@ -1,0 +1,29 @@
+<svg width="190" height="49" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="vector-effect: non-scaling-stroke;" stroke="null" preserveAspectRatio="xMidYMid meet">
+ <defs stroke="null">
+  <path style="vector-effect: non-scaling-stroke;" stroke="null" id="e3kw9sQR" d="m170.67,85.33l-170.67,85.34l0,170.66l170.67,85.34l170.66,-85.34l0,-170.66l-170.66,-85.34z"/>
+  <path style="vector-effect: non-scaling-stroke;" stroke="null" id="c5rRVkbYzw" d="m341.34,170.67l-170.67,85.33l0,170.67l170.67,85.33l170.66,-85.33l0,-170.67l-170.66,-85.33z"/>
+  <path style="vector-effect: non-scaling-stroke;" stroke="null" id="b5iMEtVBGw" d="m341.34,0l-170.67,85.33l0,170.67l170.67,85.33l170.66,-85.33l0,-170.67l-170.66,-85.33z"/>
+ </defs>
+ <g stroke="null">
+  <title stroke="null">background</title>
+  <rect stroke="null" fill="none" id="canvas_background" height="51" width="187" y="-1" x="-1"/>
+ </g>
+ <g stroke="null">
+  <title stroke="null">Layer 1</title>
+  <g stroke="null" id="svg_1">
+   <g stroke="null" id="svg_2">
+    <g stroke="null" id="svg_3">
+     <use stroke="null" x="-90.76115" y="-90.14342" transform="matrix(0.08283024676897546,0,0,0.08283024676897546,12.563224214172777,11.012053654008017) " id="svg_4" fill="#43c59e" xlink:href="#e3kw9sQR"/>
+    </g>
+    <g stroke="null" id="svg_5">
+     <use stroke="null" x="-90.76115" y="-90.14342" transform="matrix(0.08283024676897546,0,0,0.08283024676897546,12.563224214172777,11.012053654008017) " id="svg_6" fill="#17183b" xlink:href="#c5rRVkbYzw"/>
+    </g>
+    <g stroke="null" id="svg_7">
+     <use stroke="null" x="-90.76115" y="-90.14342" transform="matrix(0.08283024676897546,0,0,0.08283024676897546,12.563224214172777,11.012053654008017) " id="svg_8" fill="#4e56d4" xlink:href="#b5iMEtVBGw"/>
+    </g>
+   </g>
+  </g>
+  <text stroke="#000" transform="matrix(0.44843987791808926,0,0,0.44843987791808926,-1.828266974845338,-13.588243827797656) " font-weight="bold" xml:space="preserve" text-anchor="start" font-family="'Trebuchet MS', Gadget, sans-serif" font-size="24" id="svg_10" y="65.74112" x="123.66541" stroke-opacity="null" stroke-width="0" fill="#17183b">DEVEL</text>
+  <text stroke="#000" transform="matrix(0.8523033703632646,0,0,0.8523033703632646,0.1570002368164951,-33.27884607979135) " font-weight="bold" xml:space="preserve" text-anchor="start" font-family="'Trebuchet MS', Gadget, sans-serif" font-size="24" id="svg_11" y="77.74849" x="61.41495" stroke-opacity="null" stroke-width="0" fill="#17183b">BLOCKCHAIN</text>
+ </g>
+</svg>
