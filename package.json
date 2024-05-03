@@ -16,7 +16,7 @@
     "lint": "tslint -p tsconfig.json",
     "test": "jest --watch true --maxWorkers=1 --config jestconfig.json",
     "test:all": "BYWISE_TEST=1 jest --verbose true --maxWorkers=5 --config jestconfig.json",
-    "test:single": "npm run test:clear && npm test -- blockchain.test.ts",
+    "test:single": "npm run test:clear && npm test -- transactions.test.ts",
     "test:clear": "jest --clearCache"
   },
   "author": "",

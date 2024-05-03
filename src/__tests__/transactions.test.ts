@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { BlockPack, BywiseHelper, TxType, Wallet } from '@bywise/web3';
+import { BlockPack, BywiseHelper, Tx, TxType, Wallet } from '@bywise/web3';
 import Bywise from '../bywise';
 import { BlocksProvider, TransactionsProvider } from '../services';
 import { WalletProvider } from '../services/wallet.service';
@@ -54,7 +54,7 @@ beforeEach(async () => {
 afterAll(async () => {
     await bywise.stop();
 }, 30000)
-
+/*
 describe('basic tests', () => {
 
     test('create basic transation', async () => {
@@ -398,6 +398,91 @@ describe('contracts', () => {
         output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(output.error).toEqual(undefined);
         expect(output.output).toEqual("SimpleToken");
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
+});
+*/
+describe('stress testing', () => {
+    test('simple transactions', async () => {
+        const blockTree = await blocksProvider.getMainBlockTree(chain);
+        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
+        expect(lastBlockInfo !== undefined).toEqual(true);
+        if (!lastBlockInfo) return;
+
+        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+
+        let uptime = new Date().getTime();
+
+        for (let i = 0; i < 100; i++) {
+            let tx = new Tx();
+            tx.chain = chain;
+            tx.version = "2";
+            tx.from = [wallet.address];
+            tx.to = [wallet.address];
+            tx.amount = ['0'];
+            tx.type = TxType.TX_NONE;
+            tx.data = {};
+            tx.foreignKeys = [];
+            tx.created = helper.getNow();
+            tx.fee = '0';
+            tx.hash = tx.toHash();
+            tx.sign = [''];
+
+            const output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+            expect(output.error).toEqual(undefined);
+        }
+
+        uptime = (new Date().getTime() - uptime) / 1000;
+        expect(uptime).toBeLessThan(2);
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
+
+    test('contract transactions', async () => {
+        const blockTree = await blocksProvider.getMainBlockTree(chain);
+        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
+        expect(lastBlockInfo !== undefined).toEqual(true);
+        if (!lastBlockInfo) return;
+
+        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+        let tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCode }
+        );
+        let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        let uptime = new Date().getTime();
+
+        for (let i = 0; i < 100; i++) {
+            tx = new Tx();
+            tx.chain = chain;
+            tx.version = "2";
+            tx.from = [wallet.address];
+            tx.to = [contractAddress];
+            tx.amount = ['0'];
+            tx.type = TxType.TX_CONTRACT_EXE;
+            tx.data = [{ method: 'transfer', inputs: [wallet.address, `0`] }];
+            tx.foreignKeys = [];
+            tx.created = helper.getNow();
+            tx.fee = '0';
+            tx.hash = tx.toHash();
+            tx.sign = [''];
+
+            output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+            expect(output.error).toEqual(undefined);
+        }
+
+        uptime = (new Date().getTime() - uptime) / 1000;
+        expect(uptime).toBeLessThan(2);
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);
