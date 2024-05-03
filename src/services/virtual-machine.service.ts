@@ -125,7 +125,6 @@ export class VirtualMachineProvider {
           const contract = await getContract(to, tx.data[i].method, tx.data[i].inputs);
 
           if (!contract.payable && !(new BigNumber(tx.amount[i])).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
-          console.log('contract.payable', contract.payable, tx.amount[i])
           ctx.output.output = await BywiseRuntime.execInContract(this.blockchainBywise, getContract, ctx, to, contract.bcc, tx.from[0], tx.amount[i], contract.code);
         }
       }
