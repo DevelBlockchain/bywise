@@ -54,7 +54,7 @@ beforeEach(async () => {
 afterAll(async () => {
     await bywise.stop();
 }, 30000)
-/*
+
 describe('basic tests', () => {
 
     test('create basic transation', async () => {
@@ -402,7 +402,7 @@ describe('contracts', () => {
         await transactionsProvider.disposeContext(ctx);
     }, 30000);
 });
-*/
+
 describe('stress testing', () => {
     test('simple transactions', async () => {
         const blockTree = await blocksProvider.getMainBlockTree(chain);
@@ -434,7 +434,7 @@ describe('stress testing', () => {
         }
 
         uptime = (new Date().getTime() - uptime) / 1000;
-        expect(uptime).toBeLessThan(2);
+        expect(uptime).toBeLessThan(1);
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);

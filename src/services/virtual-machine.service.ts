@@ -228,7 +228,6 @@ export class VirtualMachineProvider {
   async blockchainCommand(ctx: SimulateDTO, cmd: CommandDTO): Promise<void> {
     if (!ctx.tx) throw new Error(`Blockchain Command Forbidden`);
     ctx.tx = new Tx(ctx.tx);
-    ctx.tx.isValid();
 
     if (cmd.name == 'vote-block') {
       if (cmd.input.length !== 2) throw new Error(`vote-block expected 2 inputs`);
