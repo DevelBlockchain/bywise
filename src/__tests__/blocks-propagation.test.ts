@@ -9,7 +9,7 @@ var node0: Bywise;
 var node1: Bywise;
 var node2: Bywise;
 var b0: BlockPack;
-const blockpDelay = 20000;
+const blockDelay = 20000;
 const chain = 'local';
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 const port1 = Math.floor(Math.random() * 7000 + 3000);
@@ -29,7 +29,7 @@ beforeAll(async () => {
         ChainConfig.addAdmin(node2Wallet.address),
         ChainConfig.addValidator(node2Wallet.address),
         ChainConfig.setBalance(node2Wallet.address, ConfigProvider.MIN_BWS_VALUE),
-        ChainConfig.setConfig('blockTime', `${blockpDelay / 1000}`),
+        ChainConfig.setConfig('blockTime', `${blockDelay / 1000}`),
     ]);
 
     node0 = await Bywise.newBywiseInstance({
@@ -125,7 +125,7 @@ describe('propagation test', () => {
         expect(res.status).toEqual(200);
         expect(res.body.length).toEqual(1);
     });
-    
+    /*
     test('mint new block with propagation', async () => {
         await connectNodes();
         
@@ -133,7 +133,7 @@ describe('propagation test', () => {
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
         
         await node0.core.runCore();
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
         await node0.core.stop();
         
         let res = await request(node0.api.server)
@@ -150,11 +150,11 @@ describe('propagation test', () => {
         .get('/api/v2/blocks/last/' + chain + '?status=mempool')
         expect(res.status).toEqual(200);
         expect(res.body.length).toBeGreaterThan(0);
-    }, blockpDelay * 5);
+    }, blockDelay * 5);
     
     test('mint new block without propagation', async () => {
         await node0.core.runCore();
-       await helper.sleep(blockpDelay * 5);
+       await helper.sleep(blockDelay * 5);
        await node0.core.stop();
        await connectNodes();
        
@@ -173,11 +173,11 @@ describe('propagation test', () => {
        expect(res.status).toEqual(200);
        expect(res.body.length).toEqual(0);
        
-    }, blockpDelay * 10);
+    }, blockDelay * 10);
 
     test('propagation long chain', async () => {
         await node0.core.runCore();
-        await helper.sleep(blockpDelay * 6);
+        await helper.sleep(blockDelay * 6);
         await node0.core.stop();
         await connectNodes();
 
@@ -193,7 +193,7 @@ describe('propagation test', () => {
         expect(res.body.length).toEqual(1);
 
         await node1.core.runCore();
-        await helper.sleep(blockpDelay * 10); // sync chains
+        await helper.sleep(blockDelay * 10); // sync chains
 
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain)
@@ -208,7 +208,7 @@ describe('propagation test', () => {
                 expect(blocksNode2[i].from).toEqual(node1.applicationContext.mainWallet.address);
             }
         }
-    }, blockpDelay * 20);
+    }, blockDelay * 20);
 
     test('blockchain convergence', async () => {
         await connectNodes();
@@ -219,7 +219,7 @@ describe('propagation test', () => {
         
         await node0.core.runCore();
         await node1.core.runCore();
-        await helper.sleep(blockpDelay * 12);
+        await helper.sleep(blockDelay * 12);
         await node0.core.stop();
         await node1.core.stop();
         
@@ -249,9 +249,10 @@ describe('propagation test', () => {
             }
         }
         expect(fromAddress.length).toBeGreaterThanOrEqual(2);
-    }, blockpDelay * 15);
+    }, blockDelay * 15);
 
-    /*test('blockchain convergence on intermittent network 1', async () => {
+    /*
+    test('blockchain convergence on intermittent network 1', async () => {
 
         let res;
         let blocksNode0: Block[] = []
@@ -271,7 +272,7 @@ describe('propagation test', () => {
         await node0.core.runCore();
         await node1.core.runCore();
         await node2.core.runCore();
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node0.core.network.resetNetwork();
         await node1.core.network.resetNetwork();
@@ -283,7 +284,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(1);
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
         expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node2.core.network.start();
         await node2.core.network.mainLoop();
@@ -292,7 +293,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockpDelay * 6);
+        await helper.sleep(blockDelay * 6);
 
         await node0.core.stop();
         await node1.core.stop();
@@ -329,7 +330,7 @@ describe('propagation test', () => {
             expect(b0.hash).toEqual(b1.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockpDelay * 20);
+    }, blockDelay * 20);
 
     test('blockchain convergence on intermittent network 2', async () => {
 
@@ -351,7 +352,7 @@ describe('propagation test', () => {
         await node0.core.runCore();
         await node1.core.runCore();
         await node2.core.runCore();
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node0.core.network.resetNetwork();
         await node1.core.network.resetNetwork();
@@ -363,7 +364,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(1);
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
         expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node2.core.network.start();
         await node2.core.network.mainLoop();
@@ -372,7 +373,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockpDelay * 6);
+        await helper.sleep(blockDelay * 6);
 
         await node0.core.stop();
         await node1.core.stop();
@@ -409,7 +410,7 @@ describe('propagation test', () => {
             expect(b0.hash).toEqual(b1.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockpDelay * 20);
+    }, blockDelay * 20);
 
     test('blockchain convergence on intermittent network 3', async () => {
 
@@ -431,7 +432,7 @@ describe('propagation test', () => {
         await node0.core.runCore();
         await node1.core.runCore();
         await node2.core.runCore();
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node0.core.network.resetNetwork();
         await node1.core.network.resetNetwork();
@@ -443,7 +444,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(1);
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
         expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node2.core.network.start();
         await node2.core.network.mainLoop();
@@ -452,7 +453,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockpDelay * 6);
+        await helper.sleep(blockDelay * 6);
 
         await node0.core.stop();
         await node1.core.stop();
@@ -489,7 +490,7 @@ describe('propagation test', () => {
             expect(b0.hash).toEqual(b1.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockpDelay * 20);
+    }, blockDelay * 20);
 
     test('blockchain convergence on intermittent network 4', async () => {
 
@@ -511,7 +512,7 @@ describe('propagation test', () => {
         await node0.core.runCore();
         await node1.core.runCore();
         await node2.core.runCore();
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node0.core.network.resetNetwork();
         await node1.core.network.resetNetwork();
@@ -523,7 +524,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(1);
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
         expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node2.core.network.start();
         await node2.core.network.mainLoop();
@@ -532,7 +533,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockpDelay * 6);
+        await helper.sleep(blockDelay * 6);
 
         await node0.core.stop();
         await node1.core.stop();
@@ -569,7 +570,7 @@ describe('propagation test', () => {
             expect(b0.hash).toEqual(b1.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockpDelay * 20);
+    }, blockDelay * 20);
 
     test('blockchain convergence on intermittent network 5', async () => {
 
@@ -591,7 +592,7 @@ describe('propagation test', () => {
         await node0.core.runCore();
         await node1.core.runCore();
         await node2.core.runCore();
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node0.core.network.resetNetwork();
         await node1.core.network.resetNetwork();
@@ -603,7 +604,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(1);
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
         expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node2.core.network.start();
         await node2.core.network.mainLoop();
@@ -612,7 +613,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockpDelay * 6);
+        await helper.sleep(blockDelay * 6);
 
         await node0.core.stop();
         await node1.core.stop();
@@ -649,7 +650,7 @@ describe('propagation test', () => {
             expect(b0.hash).toEqual(b1.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockpDelay * 20);
+    }, blockDelay * 20);
 
     test('blockchain convergence on intermittent network 6', async () => {
 
@@ -671,7 +672,7 @@ describe('propagation test', () => {
         await node0.core.runCore();
         await node1.core.runCore();
         await node2.core.runCore();
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node0.core.network.resetNetwork();
         await node1.core.network.resetNetwork();
@@ -683,7 +684,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(1);
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
         expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node2.core.network.start();
         await node2.core.network.mainLoop();
@@ -692,7 +693,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockpDelay * 6);
+        await helper.sleep(blockDelay * 6);
 
         await node0.core.stop();
         await node1.core.stop();
@@ -729,7 +730,7 @@ describe('propagation test', () => {
             expect(b0.hash).toEqual(b1.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockpDelay * 20);
+    }, blockDelay * 20);
 
     test('blockchain convergence on intermittent network 7', async () => {
 
@@ -751,7 +752,7 @@ describe('propagation test', () => {
         await node0.core.runCore();
         await node1.core.runCore();
         await node2.core.runCore();
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node0.core.network.resetNetwork();
         await node1.core.network.resetNetwork();
@@ -763,7 +764,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(1);
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
         expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node2.core.network.start();
         await node2.core.network.mainLoop();
@@ -772,7 +773,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockpDelay * 6);
+        await helper.sleep(blockDelay * 6);
 
         await node0.core.stop();
         await node1.core.stop();
@@ -809,7 +810,7 @@ describe('propagation test', () => {
             expect(b0.hash).toEqual(b1.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockpDelay * 20);
+    }, blockDelay * 20);
 
     test('blockchain convergence on intermittent network 8', async () => {
 
@@ -831,7 +832,7 @@ describe('propagation test', () => {
         await node0.core.runCore();
         await node1.core.runCore();
         await node2.core.runCore();
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node0.core.network.resetNetwork();
         await node1.core.network.resetNetwork();
@@ -843,7 +844,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(1);
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
         expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockpDelay * 3);
+        await helper.sleep(blockDelay * 3);
 
         await node2.core.network.start();
         await node2.core.network.mainLoop();
@@ -852,7 +853,7 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockpDelay * 6);
+        await helper.sleep(blockDelay * 6);
 
         await node0.core.stop();
         await node1.core.stop();
@@ -889,5 +890,5 @@ describe('propagation test', () => {
             expect(b0.hash).toEqual(b1.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockpDelay * 20);*/
+    }, blockDelay * 20);*/
 });

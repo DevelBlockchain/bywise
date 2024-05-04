@@ -317,7 +317,6 @@ export default async function transactionsController(app: express.Express, apiCo
             tx.fee = output.feeUsed;
             tx.hash = tx.toHash();
             tx.sign = [await mainWallet.signHash(tx.hash)];
-            tx.isValid();
 
             output = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, simulateWallet: false });
 

@@ -125,7 +125,6 @@ export class VirtualMachineProvider {
           const contract = await getContract(to, tx.data[i].method, tx.data[i].inputs);
 
           if (!contract.payable && !(new BigNumber(tx.amount[i])).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
-          console.log('contract.payable', contract.payable, tx.amount[i])
           ctx.output.output = await BywiseRuntime.execInContract(this.blockchainBywise, getContract, ctx, to, contract.bcc, tx.from[0], tx.amount[i], contract.code);
         }
       }
@@ -229,7 +228,6 @@ export class VirtualMachineProvider {
   async blockchainCommand(ctx: SimulateDTO, cmd: CommandDTO): Promise<void> {
     if (!ctx.tx) throw new Error(`Blockchain Command Forbidden`);
     ctx.tx = new Tx(ctx.tx);
-    ctx.tx.isValid();
 
     if (cmd.name == 'vote-block') {
       if (cmd.input.length !== 2) throw new Error(`vote-block expected 2 inputs`);
