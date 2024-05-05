@@ -40,7 +40,7 @@
     "randomstring": "^1.2.2",
     "seedrandom": "^3.0.5",
     "sha256": "^0.2.0",
-    "web3": "^1.8.0",
+    "web3": "^4.8.0",
     "web3-eth-contract": "^1.8.0",
     "web3-utils": "^1.8.0",
     "winston": "^3.8.2",
