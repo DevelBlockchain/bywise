@@ -19,7 +19,7 @@ beforeAll(async () => {
         ChainConfig.addAdmin(wallet.address),
         ChainConfig.addValidator(wallet.address),
         ChainConfig.setBalance(wallet.address, ConfigProvider.MIN_BWS_VALUE),
-        ChainConfig.setConfig('blockTime', `600`),
+        ChainConfig.setConfig('blockTime', `10000`),
     ]);
     node0 = await Bywise.newBywiseInstance({
         name: `test${port0}`,
@@ -46,7 +46,6 @@ afterAll(async () => {
 }, 30000)
 
 describe('simple transactions', () => {
-
     test('send transaction', async () => {
         let tx = new Tx();
         tx.version = '2';
@@ -63,8 +62,8 @@ describe('simple transactions', () => {
         tx.sign = [await wallet.signHash(tx.hash)];
         tx.isValid();
 
-        let error = await web3.transactions.sendTransaction(tx);
-        expect(error).toEqual(undefined);
+        let success = await web3.transactions.sendTransaction(tx);
+        expect(success).toEqual(true);
 
         let res = await web3.transactions.getTransactionByHash(tx.hash);
         expect(res !== undefined).toEqual(true);
@@ -321,7 +320,7 @@ describe('simple transactions', () => {
             contractAddress,
             '0',
             TxType.TX_CONTRACT_EXE,
-            [{ method: 'transfer', inputs: [addr1, '10000000'] }]
+            { method: 'transfer', inputs: [addr1, '10000000'] }
         );
         await web3.transactions.sendTransactionSync(tx);
 
@@ -344,7 +343,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('10000000');
-    }, 60000);
+    }, 30000);
 
     test('vm-tests', async () => {
         const tests = fs.readdirSync('./assets/vm-tests');
@@ -378,7 +377,7 @@ describe('simple transactions', () => {
             expect(output.error).toEqual(undefined);
         }
 
-    }, 10000);
+    }, 30000);
 
     test('ERC20 many transactions', async () => {
         const addr1 = (new Wallet()).address;
@@ -396,14 +395,14 @@ describe('simple transactions', () => {
         expect(output.output.contractAddress).toEqual(contractAddress);
 
         let total = 0;
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 30; i++) {
             const tx = await web3.transactions.buildSimpleTx(
                 wallet,
                 chain,
                 contractAddress,
                 '0',
                 TxType.TX_CONTRACT_EXE,
-                [{ method: 'transfer', inputs: [addr1, `${i}`] }]
+                { method: 'transfer', inputs: [addr1, `${i}`] }
             );
             total += i;
             await web3.transactions.sendTransaction(tx);
@@ -415,7 +414,7 @@ describe('simple transactions', () => {
             contractAddress,
             '0',
             TxType.TX_CONTRACT_EXE,
-            [{ method: 'transfer', inputs: [addr1, `1`] }]
+            { method: 'transfer', inputs: [addr1, `1`] }
         );
         total++;
         await web3.transactions.sendTransactionSync(tx);
