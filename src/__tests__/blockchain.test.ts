@@ -19,7 +19,7 @@ beforeAll(async () => {
         ChainConfig.addAdmin(wallet.address),
         ChainConfig.addValidator(wallet.address),
         ChainConfig.setBalance(wallet.address, ConfigProvider.MIN_BWS_VALUE),
-        ChainConfig.setConfig('blockTime', `10000`),
+        ChainConfig.setConfig('blockTime', `600`),
     ]);
     node0 = await Bywise.newBywiseInstance({
         name: `test${port0}`,
@@ -46,6 +46,7 @@ afterAll(async () => {
 }, 30000)
 
 describe('simple transactions', () => {
+    
     test('send transaction', async () => {
         let tx = new Tx();
         tx.version = '2';
@@ -62,8 +63,8 @@ describe('simple transactions', () => {
         tx.sign = [await wallet.signHash(tx.hash)];
         tx.isValid();
 
-        let success = await web3.transactions.sendTransaction(tx);
-        expect(success).toEqual(true);
+        let error = await web3.transactions.sendTransaction(tx);
+        expect(error).toEqual(undefined);
 
         let res = await web3.transactions.getTransactionByHash(tx.hash);
         expect(res !== undefined).toEqual(true);
@@ -262,7 +263,7 @@ describe('simple transactions', () => {
         );
         const output = await web3.transactions.sendTransactionSync(tx);
         expect(output.output.contractAddress).toEqual(contractAddress);
-
+        
         // check name of contract
         let result = await web3.contracts.readContract(
             chain,
@@ -272,7 +273,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('SimpleToken');
-
+        
         // check total supply of contract
         result = await web3.contracts.readContract(
             chain,
@@ -282,7 +283,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('5000000000000000000000');
-
+        
         // get balance of deploy address
         result = await web3.contracts.readContract(
             chain,
@@ -292,7 +293,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('5000000000000000000000');
-
+        
         // get balance of deploy address
         result = await web3.contracts.readContract(
             chain,
@@ -302,7 +303,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('0');
-
+        
         // get balance of addr1
         result = await web3.contracts.readContract(
             chain,
@@ -312,7 +313,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('0');
-
+        
         // make transfer to addr1
         tx = await web3.transactions.buildSimpleTx(
             wallet,
@@ -320,10 +321,10 @@ describe('simple transactions', () => {
             contractAddress,
             '0',
             TxType.TX_CONTRACT_EXE,
-            { method: 'transfer', inputs: [addr1, '10000000'] }
+            [{ method: 'transfer', inputs: [addr1, '10000000'] }]
         );
         await web3.transactions.sendTransactionSync(tx);
-
+        
         // get balance of deploy address
         result = await web3.contracts.readContract(
             chain,
@@ -333,7 +334,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('4999999999999990000000');
-
+        
         // get balance of addr1
         result = await web3.contracts.readContract(
             chain,
@@ -402,7 +403,7 @@ describe('simple transactions', () => {
                 contractAddress,
                 '0',
                 TxType.TX_CONTRACT_EXE,
-                { method: 'transfer', inputs: [addr1, `${i}`] }
+                [{ method: 'transfer', inputs: [addr1, `${i}`] }]
             );
             total += i;
             await web3.transactions.sendTransaction(tx);
@@ -414,10 +415,11 @@ describe('simple transactions', () => {
             contractAddress,
             '0',
             TxType.TX_CONTRACT_EXE,
-            { method: 'transfer', inputs: [addr1, `1`] }
+            [{ method: 'transfer', inputs: [addr1, `1`] }]
         );
         total++;
         await web3.transactions.sendTransactionSync(tx);
+        await helper.sleep(10000);
 
         // get balance of addr1
         let result = await web3.contracts.readContract(
