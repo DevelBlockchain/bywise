@@ -22,7 +22,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@bywise/web3": "^0.9.99",
+    "@bywise/web3": "^1.0.0",
     "abort-controller": "^3.0.0",
     "body-parser": "^1.20.0",
     "cors": "^2.8.5",
