@@ -1,5 +1,5 @@
+import { ContractAbi } from "web3";
 import { ETHChain } from "../models"
-import { AbiItem } from 'web3-utils';
 
 // const bywiseContractAddress = "BWS1MUf3fE542466114436c184ad1936CD72D3baeEA06c366";
 // TESTNET
@@ -26,7 +26,7 @@ export const ETHChains: ETHChain[] = [
 	{ proxy: '0x0000000000000000000000000000000000000000', cost: 100, name: 'Celo Testnet', symbol: 'tCELO', chainID: 44787, provider: 'https://alfajores-forno.celo-testnet.org' },
 ]
 
-export const PROXY_API: AbiItem = [
+export const PROXY_API: ContractAbi = [
 	{
 		"inputs": [
 			{
