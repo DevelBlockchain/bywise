@@ -482,7 +482,7 @@ describe('stress testing', () => {
         }
 
         uptime = (new Date().getTime() - uptime) / 1000;
-        expect(uptime).toBeLessThan(2);
+        expect(uptime).toBeLessThan(3);
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);

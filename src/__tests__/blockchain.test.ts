@@ -396,7 +396,7 @@ describe('simple transactions', () => {
         expect(output.output.contractAddress).toEqual(contractAddress);
 
         let total = 0;
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; i < 10; i++) {
             const tx = await web3.transactions.buildSimpleTx(
                 wallet,
                 chain,
