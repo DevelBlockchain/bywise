@@ -1,5 +1,9 @@
 name: 🚀 Test And Build
 
+on:
+  push:
+    branches: [ feature/tests ]
+
 jobs:
   test-and-build:
     name: 🎉 Test and Build
