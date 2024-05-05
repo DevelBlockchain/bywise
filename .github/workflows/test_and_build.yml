@@ -23,7 +23,7 @@ jobs:
       
       - name: 🥳 Run All Tests
         run: |
-          npm run test:all=
+          npm run test:all
 
       - name: 🔨 Build Project
         run: |
