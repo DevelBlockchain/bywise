@@ -80,7 +80,7 @@ export class ETHProvider {
     }
     
     const mainWallet = await this.walletProvider.getMainWallet();
-    const account = await ethers.Wallet.fromMnemonic(mainWallet.seed);
+    const account = await ethers.Wallet.fromPhrase(mainWallet.seed);
     
     const hasPrivilege = await proxy.contract.methods.hasPrivilege(account.address).call();
     if (`${hasPrivilege}`.toLowerCase() === 'false') {
@@ -144,7 +144,7 @@ export class ETHProvider {
     }
 
     const mainWallet = await this.walletProvider.getMainWallet();
-    const account = await ethers.Wallet.fromMnemonic(mainWallet.seed);
+    const account = await ethers.Wallet.fromPhrase(mainWallet.seed);
 
     const isValidFrom = await proxy.contract.methods.actionIsValidFrom(action.proxyAction, action.from).call();
     if (`${isValidFrom}`.toLowerCase() !== 'true') {
