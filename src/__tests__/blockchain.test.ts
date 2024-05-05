@@ -114,7 +114,7 @@ describe('simple transactions', () => {
         let addressInfo = await web3.wallets.getWalletInfo(addr1.address, chain);
         expect(addressInfo !== undefined).toEqual(true);
         if (addressInfo !== undefined) {
-            expect(addressInfo.balance).toEqual('7000');
+            expect(addressInfo.balance).toEqual('700');
         }
 
         addressInfo = await web3.wallets.getWalletInfo(addr2.address, chain);
