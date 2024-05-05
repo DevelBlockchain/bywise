@@ -17,8 +17,14 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: 🔨 Build Project
+      - name: 📂 Install Dependencies
         run: |
           npm i
-          npm run test:all
+      
+      - name: 🥳 Run All Tests
+        run: |
+          npm run test:all=
+
+      - name: 🔨 Build Project
+        run: |
           npm run build
