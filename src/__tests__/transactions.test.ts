@@ -1,5 +1,5 @@
-import request from 'supertest';
-import { BlockPack, TxType, Wallet } from '@bywise/web3';
+import fs from 'fs';
+import { BlockPack, BywiseHelper, Tx, TxType, Wallet } from '@bywise/web3';
 import Bywise from '../bywise';
 import { BlocksProvider, TransactionsProvider } from '../services';
 import { WalletProvider } from '../services/wallet.service';
@@ -12,15 +12,17 @@ var transactionsProvider: TransactionsProvider;
 var blocksProvider: BlocksProvider;
 var walletProvider: WalletProvider;
 var b0: BlockPack;
+
 const chain = 'local';
 const port0 = Math.floor(Math.random() * 7000 + 3000);
-
 const wallet = new Wallet();
+
+const ERCCode = fs.readFileSync('./assets/ERC20.js', 'utf8');
 
 beforeAll(async () => {
     const nodeWallet = new Wallet();
     b0 = await helper.createNewBlockZero(chain, nodeWallet, [
-        ChainConfig.setConfig('blockTime', `600`),
+        ChainConfig.setConfig('blockTime', `30`),
         ChainConfig.addAdmin(wallet.address),
         ChainConfig.addAdmin(nodeWallet.address),
         ChainConfig.addValidator(nodeWallet.address),
@@ -357,142 +359,131 @@ describe('set configs', () => {
     }, 30000);
 });
 
-describe('api transactions', () => {
+describe('contracts', () => {
+    test('deploy contract', async () => {
+        const contractAddress = BywiseHelper.getBWSAddressContract();
 
-    test('post transaction', async () => {
         let tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
             wallet.address,
             '0',
             '0',
-            TxType.TX_COMMAND,
-            {
-                name: "setBalance",
-                input: [
-                    wallet.address,
-                    "100"
-                ]
-            }
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCode }
         );
+        tx.isValid();
 
-        let res = await request(bywise.api.server)
-            .post('/api/v2/transactions')
-            .send(tx);
-        expect(res.status).toEqual(200);
-    });
+        const blockTree = await blocksProvider.getMainBlockTree(chain);
+        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
+        expect(lastBlockInfo !== undefined).toEqual(true);
+        if (!lastBlockInfo) return;
 
-    test('count transactions', async () => {
+        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+
+        let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "name", inputs: [] }]
+        );
+        tx.isValid();
+
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("SimpleToken");
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
+});
+
+describe('stress testing', () => {
+    test('simple transactions', async () => {
+        const blockTree = await blocksProvider.getMainBlockTree(chain);
+        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
+        expect(lastBlockInfo !== undefined).toEqual(true);
+        if (!lastBlockInfo) return;
+
+        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+
+        let uptime = new Date().getTime();
+
+        for (let i = 0; i < 100; i++) {
+            let tx = new Tx();
+            tx.chain = chain;
+            tx.version = "2";
+            tx.from = [wallet.address];
+            tx.to = [wallet.address];
+            tx.amount = ['0'];
+            tx.type = TxType.TX_NONE;
+            tx.data = {};
+            tx.foreignKeys = [];
+            tx.created = helper.getNow();
+            tx.fee = '0';
+            tx.hash = tx.toHash();
+            tx.sign = [''];
+
+            const output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+            expect(output.error).toEqual(undefined);
+        }
+
+        uptime = (new Date().getTime() - uptime) / 1000;
+        expect(uptime).toBeLessThan(1);
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
+
+    test('contract transactions', async () => {
+        const blockTree = await blocksProvider.getMainBlockTree(chain);
+        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
+        expect(lastBlockInfo !== undefined).toEqual(true);
+        if (!lastBlockInfo) return;
+
+        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+
+        const contractAddress = BywiseHelper.getBWSAddressContract();
         let tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
             wallet.address,
             '0',
             '0',
-            TxType.TX_COMMAND,
-            {
-                name: "setBalance",
-                input: [
-                    wallet.address,
-                    "100"
-                ]
-            }
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCode }
         );
+        let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
 
-        let res = await request(bywise.api.server)
-            .post('/api/v2/transactions')
-            .send(tx);
-        expect(res.status).toEqual(200);
+        let uptime = new Date().getTime();
 
-        res = await request(bywise.api.server)
-            .get('/api/v2/transactions/count?status=mempool');
-        expect(res.status).toEqual(200);
-        const expected = {
-            "count": b0.txs.length + 1
-        };
-        expect(res.body).toEqual(expected);
+        for (let i = 0; i < 100; i++) {
+            tx = new Tx();
+            tx.chain = chain;
+            tx.version = "2";
+            tx.from = [wallet.address];
+            tx.to = [contractAddress];
+            tx.amount = ['0'];
+            tx.type = TxType.TX_CONTRACT_EXE;
+            tx.data = [{ method: 'transfer', inputs: [wallet.address, `0`] }];
+            tx.foreignKeys = [];
+            tx.created = helper.getNow();
+            tx.fee = '0';
+            tx.hash = tx.toHash();
+            tx.sign = [''];
 
-    });
+            output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+            expect(output.error).toEqual(undefined);
+        }
 
-    test('find transactions', async () => {
-        let res = await request(bywise.api.server)
-            .post('/api/v2/transactions')
-            .send(await transactionsProvider.createNewTransactionFromWallet(
-                wallet,
-                chain,
-                wallet.address,
-                '0',
-                '0',
-                TxType.TX_COMMAND,
-                {
-                    name: "setBalance",
-                    input: [
-                        wallet.address,
-                        "100"
-                    ]
-                }
-            ));
-        expect(res.status).toEqual(200);
+        uptime = (new Date().getTime() - uptime) / 1000;
+        expect(uptime).toBeLessThan(3);
 
-        res = await request(bywise.api.server)
-            .post('/api/v2/transactions')
-            .send(await transactionsProvider.createNewTransactionFromWallet(
-                wallet,
-                chain,
-                wallet.address,
-                '0',
-                '0',
-                TxType.TX_COMMAND,
-                {
-                    name: "setBalance",
-                    input: [
-                        wallet.address,
-                        "200"
-                    ]
-                }
-            ));
-        expect(res.status).toEqual(200);
-
-        res = await request(bywise.api.server)
-            .post('/api/v2/transactions')
-            .send(await transactionsProvider.createNewTransactionFromWallet(
-                wallet,
-                chain,
-                wallet.address,
-                '0',
-                '0',
-                TxType.TX_COMMAND,
-                {
-                    name: "setBalance",
-                    input: [
-                        wallet.address,
-                        "300"
-                    ]
-                }
-            ));
-        expect(res.status).toEqual(200);
-
-        res = await request(bywise.api.server)
-            .get('/api/v2/transactions/count?status=mempool');
-        expect(res.status).toEqual(200);
-        let expected = {
-            "count": b0.txs.length + 3
-        };
-        expect(res.body).toEqual(expected);
-
-        res = await request(bywise.api.server)
-            .get('/api/v2/transactions/last/' + chain + '?status=mempool');
-        expect(res.status).toEqual(200);
-        expect(res.body.length).toEqual(b0.txs.length + 3);
-
-        res = await request(bywise.api.server)
-            .get('/api/v2/transactions/last/' + chain + '?status=mempool&limit=2');
-        expect(res.status).toEqual(200);
-        expect(res.body.length).toEqual(2);
-
-        res = await request(bywise.api.server)
-            .get('/api/v2/transactions/last/' + chain + '?status=mempool&offset=3');
-        expect(res.status).toEqual(200);
-        expect(res.body.length).toEqual(b0.txs.length);
-    });
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
 });

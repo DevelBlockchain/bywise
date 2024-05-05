@@ -1,4 +1,4 @@
-import { BywiseNode, Wallet, Web3, BlockPack } from '@bywise/web3';
+import { BywiseNode, Wallet, Web3 } from '@bywise/web3';
 import request from 'supertest';
 import Bywise from '../bywise';
 import AuthProvider from '../services/auth.service';
