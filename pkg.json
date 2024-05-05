@@ -14,6 +14,6 @@
             "node20-macos-x64",
             "node20-win-x64"
         ],
-        "outputPath": "dist"
+        "outputPath": "dist/bin"
     }
 }

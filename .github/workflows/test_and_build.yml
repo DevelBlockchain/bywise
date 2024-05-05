@@ -11,10 +11,10 @@ jobs:
       - name: 🚚 Get latest code
         uses: actions/checkout@v3
       
-      - name: 🤖 Use Node.js 22
+      - name: 🤖 Use Node.js 20
         uses: actions/setup-node@v1
         with:
-          node-version: '22.x'
+          node-version: '20.x'
 
       - name: 📂 Install Dependencies
         run: |
@@ -27,3 +27,10 @@ jobs:
       - name: 🔨 Build Project
         run: |
           npm run build
+      
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-without-markdown
+          path: |
+            dist/bin
