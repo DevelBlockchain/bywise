@@ -18,8 +18,8 @@
     "test:single": "npm run test:clear && npm test -- transactions.test.ts",
     "test:clear": "jest --clearCache"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Devel Blockchain <contact@develblockchain.com>",
+  "license": "MIT",
   "dependencies": {
     "@bywise/web3": "^1.0.3",
     "bignumber.js": "^9.1.2",
