@@ -47,7 +47,7 @@ describe('Tests before signup', () => {
     test('Token error', async () => {
         const res = await request(bywise.api.server)
             .get('/api/v2/auth/me')
-            .set('authorization', 'asdfasdfasdfdsf');
+            .set('authorization', 'XXXXXXXXXXXXXXXXX');
         expect(res.status).toEqual(401);
         const expected = {
             error: "Token error",
@@ -58,7 +58,7 @@ describe('Tests before signup', () => {
     test('Token malformatted', async () => {
         const res = await request(bywise.api.server)
             .get('/api/v2/auth/me')
-            .set('authorization', 'asdfas dfasdfdsf');
+            .set('authorization', 'XXXXXXX XXXXXXXXXX');
         expect(res.status).toEqual(401);
         const expected = {
             error: "Token malformatted",
@@ -69,7 +69,7 @@ describe('Tests before signup', () => {
     test('Token invalid', async () => {
         const res = await request(bywise.api.server)
             .get('/api/v2/auth/me')
-            .set('authorization', 'Bearer dfasdfdsf');
+            .set('authorization', 'Bearer XXXXXXXXXXXXXXXXX');
         expect(res.status).toEqual(401);
         const expected = {
             error: "Token invalid",
