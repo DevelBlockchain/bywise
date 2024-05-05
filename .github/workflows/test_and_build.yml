@@ -1,17 +1,17 @@
 name: 🚀 Test And Build
 
 jobs:
-  test-and-deploy:
-    name: 🎉 Test and Deploy
+  test-and-build:
+    name: 🎉 Test and Build
     runs-on: ubuntu-latest 
     steps:
       - name: 🚚 Get latest code
         uses: actions/checkout@v3
       
       - name: 🤖 Use Node.js 22
-      uses: actions/setup-node@v1
-      with:
-        node-version: '22.x'
+        uses: actions/setup-node@v1
+        with:
+          node-version: '22.x'
 
       - name: 🔨 Build Project
         run: |
