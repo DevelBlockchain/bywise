@@ -71,7 +71,7 @@ export default async function servicesController(app: express.Express, apiContex
             const hash = BywiseHelper.makeHash(bytes);
             if (!BywiseHelper.isValidSign(service.sign, service.address, hash)) throw new Error('invalid sign');
 
-            return res.send(service);
+            return res.send();
         } catch (err: any) {
             return res.status(400).send({ error: err.message });
         }
@@ -113,7 +113,7 @@ export default async function servicesController(app: express.Express, apiContex
             const hash = BywiseHelper.makeHash(bytes);
             if (!BywiseHelper.isValidSign(service.sign, service.address, hash)) throw new Error('invalid sign');
 
-            return res.send(service);
+            return res.send();
         } catch (err: any) {
             return res.status(400).send({ error: err.message });
         }
