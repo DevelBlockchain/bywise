@@ -170,7 +170,7 @@ describe('client connect', () => {
     test('tryToken invalid token', async () => {
         let res = await request(bywise.api.server)
             .get('/api/v2/nodes/try-token')
-            .set('authorization', `Node asdfasdfasdfdsf`);
+            .set('authorization', `Node ${helper.getRandomString()}`);
         expect(res.status).toEqual(401);
     });
 })
