@@ -9,7 +9,7 @@ var node0: Bywise;
 var node1: Bywise;
 var node2: Bywise;
 var b0: BlockPack;
-const blockDelay = 20000;
+const blockDelay = 10000;
 const chain = 'local';
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 const port1 = Math.floor(Math.random() * 7000 + 3000);
@@ -125,7 +125,7 @@ describe('propagation test', () => {
         expect(res.status).toEqual(200);
         expect(res.body.length).toEqual(1);
     });
-    /*
+
     test('mint new block with propagation', async () => {
         await connectNodes();
         
@@ -154,53 +154,53 @@ describe('propagation test', () => {
     
     test('mint new block without propagation', async () => {
         await node0.core.runCore();
-       await helper.sleep(blockDelay * 5);
-       await node0.core.stop();
-       await connectNodes();
-       
-       let res = await request(node0.api.server)
-       .get('/api/v2/blocks/last/' + chain)
-       expect(res.status).toEqual(200);
-       expect(res.body.length).toBeGreaterThan(1);
-       
-       res = await request(node1.api.server)
-       .get('/api/v2/blocks/last/' + chain)
-       expect(res.status).toEqual(200);
-       expect(res.body.length).toEqual(1);
-       
-       res = await request(node1.api.server)
-       .get('/api/v2/blocks/last/' + chain + '?status=mempool')
-       expect(res.status).toEqual(200);
-       expect(res.body.length).toEqual(0);
-       
-    }, blockDelay * 10);
-
-    test('propagation long chain', async () => {
-        await node0.core.runCore();
-        await helper.sleep(blockDelay * 6);
+        await helper.sleep(blockDelay * 3);
         await node0.core.stop();
         await connectNodes();
-
+        
         let res = await request(node0.api.server)
-            .get('/api/v2/blocks/last/' + chain)
+        .get('/api/v2/blocks/last/' + chain)
         expect(res.status).toEqual(200);
-        expect(res.body.length).toBeGreaterThanOrEqual(5);
-        const blocksNode1 = res.body;
-
+        expect(res.body.length).toBeGreaterThan(1);
+        
         res = await request(node1.api.server)
-            .get('/api/v2/blocks/last/' + chain)
+        .get('/api/v2/blocks/last/' + chain)
         expect(res.status).toEqual(200);
         expect(res.body.length).toEqual(1);
-
-        await node1.core.runCore();
-        await helper.sleep(blockDelay * 10); // sync chains
-
+        
         res = await request(node1.api.server)
-            .get('/api/v2/blocks/last/' + chain)
+        .get('/api/v2/blocks/last/' + chain + '?status=mempool')
+        expect(res.status).toEqual(200);
+        expect(res.body.length).toEqual(0);
+        
+    }, blockDelay * 10);
+    
+    test('propagation long chain', async () => {
+        await node0.core.runCore();
+        await helper.sleep(blockDelay * 3);
+        await node0.core.stop();
+        await connectNodes();
+        
+        let res = await request(node0.api.server)
+        .get('/api/v2/blocks/last/' + chain)
+        expect(res.status).toEqual(200);
+        expect(res.body.length).toBeGreaterThanOrEqual(2);
+        const blocksNode1 = res.body;
+        
+        res = await request(node1.api.server)
+        .get('/api/v2/blocks/last/' + chain)
+        expect(res.status).toEqual(200);
+        expect(res.body.length).toEqual(1);
+        
+        await node1.core.runCore();
+        await helper.sleep(blockDelay * 5); // sync chains
+        
+        res = await request(node1.api.server)
+        .get('/api/v2/blocks/last/' + chain)
         expect(res.status).toEqual(200);
         expect(res.body.length).toBeGreaterThan(blocksNode1.length);
         const blocksNode2 = res.body.reverse();
-
+        
         for (let i = 1; i < blocksNode2.length; i++) {
             if (i < blocksNode1.length) {
                 expect(blocksNode2[i].from).toEqual(node0.applicationContext.mainWallet.address);
@@ -208,8 +208,8 @@ describe('propagation test', () => {
                 expect(blocksNode2[i].from).toEqual(node1.applicationContext.mainWallet.address);
             }
         }
-    }, blockDelay * 20);
-
+    }, blockDelay * 10);
+    
     test('blockchain convergence', async () => {
         await connectNodes();
         
@@ -250,567 +250,6 @@ describe('propagation test', () => {
         }
         expect(fromAddress.length).toBeGreaterThanOrEqual(2);
     }, blockDelay * 15);
-
-    /*
-    test('blockchain convergence on intermittent network 1', async () => {
-
-        let res;
-        let blocksNode0: Block[] = []
-        let blocksNode1: Block[] = []
-        let blocksNode2: Block[] = []
-
-        await node1.core.network.start();
-        await node2.core.network.start();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await node0.core.runCore();
-        await node1.core.runCore();
-        await node2.core.runCore();
-        await helper.sleep(blockDelay * 3);
-
-        await node0.core.network.resetNetwork();
-        await node1.core.network.resetNetwork();
-        await node2.core.network.resetNetwork();
-        await node0.core.network.start();
-        await node1.core.network.start();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(1);
-        expect(node1.core.network.connectedNodesSize()).toEqual(1);
-        expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockDelay * 3);
-
-        await node2.core.network.start();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockDelay * 6);
-
-        await node0.core.stop();
-        await node1.core.stop();
-        await node2.core.stop();
-
-        res = await request(node0.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode0 = res.body.reverse();
-
-        res = await request(node1.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode1 = res.body.reverse();
-
-        res = await request(node2.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode2 = res.body.reverse();
-
-        //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode1', blocksNode1.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        
-        expect(blocksNode0.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-
-        for (let i = 0; i < blocksNode0.length - 2; i++) {
-            const b0 = blocksNode0[i];
-            const b1 = blocksNode1[i];
-            const b2 = blocksNode2[i];
-            //console.log('test', i, b1.height, b2.height, b1.from === b2.from)
-            expect(b0.hash).toEqual(b1.hash);
-            expect(b0.hash).toEqual(b2.hash);
-        }
-    }, blockDelay * 20);
-
-    test('blockchain convergence on intermittent network 2', async () => {
-
-        let res;
-        let blocksNode0: Block[] = []
-        let blocksNode1: Block[] = []
-        let blocksNode2: Block[] = []
-
-        await node1.core.network.start();
-        await node2.core.network.start();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await node0.core.runCore();
-        await node1.core.runCore();
-        await node2.core.runCore();
-        await helper.sleep(blockDelay * 3);
-
-        await node0.core.network.resetNetwork();
-        await node1.core.network.resetNetwork();
-        await node2.core.network.resetNetwork();
-        await node0.core.network.start();
-        await node1.core.network.start();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(1);
-        expect(node1.core.network.connectedNodesSize()).toEqual(1);
-        expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockDelay * 3);
-
-        await node2.core.network.start();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockDelay * 6);
-
-        await node0.core.stop();
-        await node1.core.stop();
-        await node2.core.stop();
-
-        res = await request(node0.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode0 = res.body.reverse();
-
-        res = await request(node1.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode1 = res.body.reverse();
-
-        res = await request(node2.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode2 = res.body.reverse();
-
-        //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode1', blocksNode1.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        
-        expect(blocksNode0.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-
-        for (let i = 0; i < blocksNode0.length - 2; i++) {
-            const b0 = blocksNode0[i];
-            const b1 = blocksNode1[i];
-            const b2 = blocksNode2[i];
-            //console.log('test', i, b1.height, b2.height, b1.from === b2.from)
-            expect(b0.hash).toEqual(b1.hash);
-            expect(b0.hash).toEqual(b2.hash);
-        }
-    }, blockDelay * 20);
-
-    test('blockchain convergence on intermittent network 3', async () => {
-
-        let res;
-        let blocksNode0: Block[] = []
-        let blocksNode1: Block[] = []
-        let blocksNode2: Block[] = []
-
-        await node1.core.network.start();
-        await node2.core.network.start();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await node0.core.runCore();
-        await node1.core.runCore();
-        await node2.core.runCore();
-        await helper.sleep(blockDelay * 3);
-
-        await node0.core.network.resetNetwork();
-        await node1.core.network.resetNetwork();
-        await node2.core.network.resetNetwork();
-        await node0.core.network.start();
-        await node1.core.network.start();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(1);
-        expect(node1.core.network.connectedNodesSize()).toEqual(1);
-        expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockDelay * 3);
-
-        await node2.core.network.start();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockDelay * 6);
-
-        await node0.core.stop();
-        await node1.core.stop();
-        await node2.core.stop();
-
-        res = await request(node0.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode0 = res.body.reverse();
-
-        res = await request(node1.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode1 = res.body.reverse();
-
-        res = await request(node2.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode2 = res.body.reverse();
-
-        //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode1', blocksNode1.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        
-        expect(blocksNode0.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-
-        for (let i = 0; i < blocksNode0.length - 2; i++) {
-            const b0 = blocksNode0[i];
-            const b1 = blocksNode1[i];
-            const b2 = blocksNode2[i];
-            //console.log('test', i, b1.height, b2.height, b1.from === b2.from)
-            expect(b0.hash).toEqual(b1.hash);
-            expect(b0.hash).toEqual(b2.hash);
-        }
-    }, blockDelay * 20);
-
-    test('blockchain convergence on intermittent network 4', async () => {
-
-        let res;
-        let blocksNode0: Block[] = []
-        let blocksNode1: Block[] = []
-        let blocksNode2: Block[] = []
-
-        await node1.core.network.start();
-        await node2.core.network.start();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await node0.core.runCore();
-        await node1.core.runCore();
-        await node2.core.runCore();
-        await helper.sleep(blockDelay * 3);
-
-        await node0.core.network.resetNetwork();
-        await node1.core.network.resetNetwork();
-        await node2.core.network.resetNetwork();
-        await node0.core.network.start();
-        await node1.core.network.start();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(1);
-        expect(node1.core.network.connectedNodesSize()).toEqual(1);
-        expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockDelay * 3);
-
-        await node2.core.network.start();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockDelay * 6);
-
-        await node0.core.stop();
-        await node1.core.stop();
-        await node2.core.stop();
-
-        res = await request(node0.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode0 = res.body.reverse();
-
-        res = await request(node1.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode1 = res.body.reverse();
-
-        res = await request(node2.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode2 = res.body.reverse();
-
-        //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode1', blocksNode1.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        
-        expect(blocksNode0.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-
-        for (let i = 0; i < blocksNode0.length - 2; i++) {
-            const b0 = blocksNode0[i];
-            const b1 = blocksNode1[i];
-            const b2 = blocksNode2[i];
-            //console.log('test', i, b1.height, b2.height, b1.from === b2.from)
-            expect(b0.hash).toEqual(b1.hash);
-            expect(b0.hash).toEqual(b2.hash);
-        }
-    }, blockDelay * 20);
-
-    test('blockchain convergence on intermittent network 5', async () => {
-
-        let res;
-        let blocksNode0: Block[] = []
-        let blocksNode1: Block[] = []
-        let blocksNode2: Block[] = []
-
-        await node1.core.network.start();
-        await node2.core.network.start();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await node0.core.runCore();
-        await node1.core.runCore();
-        await node2.core.runCore();
-        await helper.sleep(blockDelay * 3);
-
-        await node0.core.network.resetNetwork();
-        await node1.core.network.resetNetwork();
-        await node2.core.network.resetNetwork();
-        await node0.core.network.start();
-        await node1.core.network.start();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(1);
-        expect(node1.core.network.connectedNodesSize()).toEqual(1);
-        expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockDelay * 3);
-
-        await node2.core.network.start();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockDelay * 6);
-
-        await node0.core.stop();
-        await node1.core.stop();
-        await node2.core.stop();
-
-        res = await request(node0.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode0 = res.body.reverse();
-
-        res = await request(node1.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode1 = res.body.reverse();
-
-        res = await request(node2.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode2 = res.body.reverse();
-
-        //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode1', blocksNode1.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        
-        expect(blocksNode0.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-
-        for (let i = 0; i < blocksNode0.length - 2; i++) {
-            const b0 = blocksNode0[i];
-            const b1 = blocksNode1[i];
-            const b2 = blocksNode2[i];
-            //console.log('test', i, b1.height, b2.height, b1.from === b2.from)
-            expect(b0.hash).toEqual(b1.hash);
-            expect(b0.hash).toEqual(b2.hash);
-        }
-    }, blockDelay * 20);
-
-    test('blockchain convergence on intermittent network 6', async () => {
-
-        let res;
-        let blocksNode0: Block[] = []
-        let blocksNode1: Block[] = []
-        let blocksNode2: Block[] = []
-
-        await node1.core.network.start();
-        await node2.core.network.start();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await node0.core.runCore();
-        await node1.core.runCore();
-        await node2.core.runCore();
-        await helper.sleep(blockDelay * 3);
-
-        await node0.core.network.resetNetwork();
-        await node1.core.network.resetNetwork();
-        await node2.core.network.resetNetwork();
-        await node0.core.network.start();
-        await node1.core.network.start();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(1);
-        expect(node1.core.network.connectedNodesSize()).toEqual(1);
-        expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockDelay * 3);
-
-        await node2.core.network.start();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockDelay * 6);
-
-        await node0.core.stop();
-        await node1.core.stop();
-        await node2.core.stop();
-
-        res = await request(node0.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode0 = res.body.reverse();
-
-        res = await request(node1.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode1 = res.body.reverse();
-
-        res = await request(node2.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode2 = res.body.reverse();
-
-        //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode1', blocksNode1.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        
-        expect(blocksNode0.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-
-        for (let i = 0; i < blocksNode0.length - 2; i++) {
-            const b0 = blocksNode0[i];
-            const b1 = blocksNode1[i];
-            const b2 = blocksNode2[i];
-            //console.log('test', i, b1.height, b2.height, b1.from === b2.from)
-            expect(b0.hash).toEqual(b1.hash);
-            expect(b0.hash).toEqual(b2.hash);
-        }
-    }, blockDelay * 20);
-
-    test('blockchain convergence on intermittent network 7', async () => {
-
-        let res;
-        let blocksNode0: Block[] = []
-        let blocksNode1: Block[] = []
-        let blocksNode2: Block[] = []
-
-        await node1.core.network.start();
-        await node2.core.network.start();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        await node2.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await node0.core.runCore();
-        await node1.core.runCore();
-        await node2.core.runCore();
-        await helper.sleep(blockDelay * 3);
-
-        await node0.core.network.resetNetwork();
-        await node1.core.network.resetNetwork();
-        await node2.core.network.resetNetwork();
-        await node0.core.network.start();
-        await node1.core.network.start();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(1);
-        expect(node1.core.network.connectedNodesSize()).toEqual(1);
-        expect(node2.core.network.connectedNodesSize()).toEqual(0);
-        await helper.sleep(blockDelay * 3);
-
-        await node2.core.network.start();
-        await node2.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node1.core.network.mainLoop();
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        await helper.sleep(blockDelay * 6);
-
-        await node0.core.stop();
-        await node1.core.stop();
-        await node2.core.stop();
-
-        res = await request(node0.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode0 = res.body.reverse();
-
-        res = await request(node1.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode1 = res.body.reverse();
-
-        res = await request(node2.api.server)
-            .get('/api/v2/blocks/last/' + chain)
-        expect(res.status).toEqual(200);
-        blocksNode2 = res.body.reverse();
-
-        //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode1', blocksNode1.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        
-        expect(blocksNode0.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-        expect(blocksNode2.length).toBeGreaterThan(6);
-
-        for (let i = 0; i < blocksNode0.length - 2; i++) {
-            const b0 = blocksNode0[i];
-            const b1 = blocksNode1[i];
-            const b2 = blocksNode2[i];
-            //console.log('test', i, b1.height, b2.height, b1.from === b2.from)
-            expect(b0.hash).toEqual(b1.hash);
-            expect(b0.hash).toEqual(b2.hash);
-        }
-    }, blockDelay * 20);
 
     test('blockchain convergence on intermittent network 8', async () => {
 
@@ -890,5 +329,5 @@ describe('propagation test', () => {
             expect(b0.hash).toEqual(b1.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockDelay * 20);*/
+    }, blockDelay * 20);
 });
