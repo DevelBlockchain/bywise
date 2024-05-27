@@ -158,6 +158,9 @@ export default class MintSlices {
         }
 
         let mint = true;
+        let uptime = new Date().getTime();
+        let addTransactions = 0;
+        const LIMIT_BY_NEW_SLICE = 1000;
         do {
             const mempool = await this.coreContext.applicationContext.database.TransactionRepository.findByChainAndStatus(lastBlock.block.chain, BlockchainStatus.TX_MEMPOOL);
             const now = helper.getNow();
@@ -165,9 +168,11 @@ export default class MintSlices {
             if (now >= lastBlock.block.created + this.coreContext.blockTime) {
                 end = true;
                 mint = true;
+                this.coreContext.applicationContext.logger.debug(`mint slice - mint by END`)
             }
-
-            for (let i = 0; i < mempool.length; i++) {
+            let countSimulatedTransactions = 0;
+            let simulateUptime = new Date().getTime();
+            for (let i = 0; i < mempool.length && (new Date().getTime() - simulateUptime) < 1000; i++) {
                 const txInfo = mempool[i];
                 if (!transactions.includes(txInfo.tx.hash)) {
                     if (txInfo.tx.created < now - 60) {
@@ -177,6 +182,7 @@ export default class MintSlices {
                         txInfo.output.error = 'TIMEOUT';
                         await this.coreContext.transactionsProvider.updateTransaction(txInfo);
                     } else {
+                        countSimulatedTransactions++;
                         await this.coreContext.transactionsProvider.createSubContext(ctx);
                         let output = await this.coreContext.transactionsProvider.simulateTransaction(txInfo.tx, {
                             from: mainWallet.address,
@@ -205,10 +211,21 @@ export default class MintSlices {
                                 });
                             }
                             transactions.push(txInfo.tx.hash);
-                            mint = true;
+                            addTransactions++;
                         }
                     }
                 }
+            }
+            simulateUptime = new Date().getTime() - simulateUptime;
+            if (countSimulatedTransactions > 0)
+                this.coreContext.applicationContext.logger.debug(`mint slice - ${(countSimulatedTransactions / (simulateUptime / 1000)).toFixed(2)} TPS - simulate ${countSimulatedTransactions} transactions in ${simulateUptime / 1000}`)
+
+            if (new Date().getTime() - uptime > 5000 && addTransactions > 0) {
+                mint = true;
+            }
+
+            if (addTransactions >= LIMIT_BY_NEW_SLICE) {
+                mint = true;
             }
 
             if (now >= lastBlock.block.created + this.coreContext.blockTime * 1.5) {
@@ -219,9 +236,11 @@ export default class MintSlices {
 
             if (mint) {
                 await this.mintSlice(transactions, transactionsData, lastBlock.block, end);
+                uptime = new Date().getTime();
+                addTransactions = 0;
                 mint = false;
             }
-            await helper.sleep(10000);
+            await helper.sleep(1000);
         } while (!end && this.isRun);
         await this.coreContext.transactionsProvider.disposeContext(ctx);
         this.isRunStream = false;

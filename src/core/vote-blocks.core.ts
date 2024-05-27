@@ -66,7 +66,7 @@ export default class VoteBlocks {
     }
 
     async makePOI(block: Block) {
-        if(block.chain === 'mainnet' || block.chain === 'testnet') {
+        if (block.chain === 'mainnet' || block.chain === 'testnet' || block.chain === 'local') {
             return;
         }
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
@@ -91,9 +91,13 @@ export default class VoteBlocks {
         tx.created = Math.floor(Date.now() / 1000);
         tx.hash = tx.toHash();
         tx.sign = [await mainWallet.signHash(tx.hash)];
-        
+
         await web3.network.tryConnection();
-        await web3.transactions.sendTransactionSync(tx);
-        this.coreContext.applicationContext.logger.info(`create poi in ${block.height} - hash: ${tx.hash}`);
+        try {
+            await web3.transactions.sendTransactionSync(tx);
+            this.coreContext.applicationContext.logger.info(`create poi in ${block.height} - hash: ${tx.hash}`);
+        } catch (err: any) {
+            this.coreContext.applicationContext.logger.error(`cant create poi in ${block.height} - error: ${err.message}`);
+        }
     }
 }

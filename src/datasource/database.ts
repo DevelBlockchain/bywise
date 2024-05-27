@@ -4,7 +4,6 @@ import { Level } from 'level';
 import * as repositories from '../repositories';
 import MessageQueue, { RequestKeys } from './message-queue';
 import helper from '../utils/helper';
-import { Transaction } from '../models';
 
 export type SaveRequest = {
     key: string,
@@ -100,27 +99,26 @@ class DatabaseWorker {
 
     async find(fr: FindRequest): Promise<any[]> {
         const values = [];
-        let count = 0;
         if (fr.gt) {
-            for await (const [key, value] of this.db.iterator({ gt: `${fr.key}-${fr.gt}`, lt: `${fr.key}.`, keys: false, limit: fr.offset + fr.limit, reverse: fr.reverse })) {
-                if (count >= fr.offset) {
-                    values.push(value);
+            const vs = await this.db.values({ gt: `${fr.key}-${fr.gt}`, lt: `${fr.key}.`, limit: fr.offset + fr.limit, reverse: fr.reverse }).all();
+            for (let i = 0; i < vs.length; i++) {
+                if (i >= fr.offset) {
+                    values.push(vs[i]);
                 }
-                count++;
             }
         } else if (fr.lt) {
-            for await (const [key, value] of this.db.iterator({ gt: `${fr.key}-`, lt: `${fr.key}-${fr.lt}`, keys: false, limit: fr.offset + fr.limit, reverse: fr.reverse })) {
-                if (count >= fr.offset) {
-                    values.push(value);
+            const vs = await this.db.values({ gt: `${fr.key}-`, lt: `${fr.key}-${fr.lt}`, limit: fr.offset + fr.limit, reverse: fr.reverse }).all();
+            for (let i = 0; i < vs.length; i++) {
+                if (i >= fr.offset) {
+                    values.push(vs[i]);
                 }
-                count++;
             }
         } else {
-            for await (const [key, value] of this.db.iterator({ gt: `${fr.key}-`, lt: `${fr.key}.`, keys: false, limit: fr.offset + fr.limit, reverse: fr.reverse })) {
-                if (count >= fr.offset) {
-                    values.push(value);
+            const vs = await this.db.values({ gt: `${fr.key}-`, lt: `${fr.key}.`, limit: fr.offset + fr.limit, reverse: fr.reverse }).all();
+            for (let i = 0; i < vs.length; i++) {
+                if (i >= fr.offset) {
+                    values.push(vs[i]);
                 }
-                count++;
             }
         }
         return values
