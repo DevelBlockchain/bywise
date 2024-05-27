@@ -251,7 +251,7 @@ describe('propagation test', () => {
         expect(fromAddress.length).toBeGreaterThanOrEqual(2);
     }, blockDelay * 15);
 
-    test('blockchain convergence on intermittent network 8', async () => {
+    test('blockchain convergence on intermittent', async () => {
 
         let res;
         let blocksNode0: Block[] = []
