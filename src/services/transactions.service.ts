@@ -32,7 +32,7 @@ export class TransactionsProvider {
     block.height = lastBlock.block.height + 1;
     block.chain = blockTree.chain;
     block.version = '2';
-    block.created = Math.floor(Date.now()/1000);
+    block.created = Math.floor(Date.now() / 1000);
     block.lastHash = lastBlock.block.hash;
     block.hash = simulationId;
 
@@ -83,7 +83,7 @@ export class TransactionsProvider {
     tx.type = type;
     tx.data = data;
     tx.foreignKeys = foreignKeys;
-    tx.created = Math.floor(Date.now()/1000);
+    tx.created = Math.floor(Date.now() / 1000);
     tx.hash = tx.toHash();
     tx.sign = [await wallet.signHash(tx.hash)];
     return this.createNewTransactionFromWallet(wallet, chain, to, amount, fee, type, data, foreignKeys);
@@ -100,7 +100,7 @@ export class TransactionsProvider {
     tx.type = type;
     tx.data = data;
     tx.foreignKeys = foreignKeys;
-    tx.created = Math.floor(Date.now()/1000);
+    tx.created = Math.floor(Date.now() / 1000);
     tx.hash = tx.toHash();
     tx.sign = [await wallet.signHash(tx.hash)];
     return tx;
@@ -116,11 +116,13 @@ export class TransactionsProvider {
     return ctx.output;
   }
 
-  async saveNewTransaction(tx: Tx, notify = true) {
-    
+  async saveNewTransaction(tx: Tx, isSync = false) {
+
     const registeredTx = await this.TransactionRepository.findByHash(tx.hash);
     if (!registeredTx) {
-      tx.isValid();
+      if (!isSync) {
+        tx.isValid();
+      }
 
       const newTx = {
         tx: tx,
@@ -131,7 +133,7 @@ export class TransactionsProvider {
         status: BlockchainStatus.TX_MEMPOOL
       }
       await this.TransactionRepository.save(newTx);
-      if (notify) {
+      if (!isSync) {
         this.mq.send(RoutingKeys.new_tx, tx);
       }
       return newTx;
@@ -158,7 +160,7 @@ export class TransactionsProvider {
   async getMempool(chain: string) {
     return await this.TransactionRepository.findByChainAndStatus(chain, BlockchainStatus.TX_MEMPOOL);
   }
-  
+
   async getTransactions(TXHashs: string[]) {
     return await this.TransactionRepository.findByHashs(TXHashs);
   }

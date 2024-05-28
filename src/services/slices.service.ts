@@ -20,10 +20,12 @@ export class SlicesProvider {
     this.transactionsProvider = new TransactionsProvider(applicationContext);
   }
 
-  async saveNewSlice(slice: Slice, notify = true) {
+  async saveNewSlice(slice: Slice, isSync = false) {
     let bSlice = await this.SliceRepository.findByHash(slice.hash);
     if (!bSlice) {
-      slice.isValid();
+      if(!isSync) {
+        slice.isValid();
+      }
 
       bSlice = {
         slice: slice,
@@ -34,7 +36,7 @@ export class SlicesProvider {
         outputs: []
       }
       await this.SliceRepository.save(bSlice);
-      if (notify) {
+      if (!isSync) {
         this.mq.send(RoutingKeys.new_slice, slice);
       }
     }

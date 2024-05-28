@@ -62,12 +62,14 @@ export class BlocksProvider {
     return false;
   }
 
-  async saveNewBlock(block: Block, notify = true) {
+  async saveNewBlock(block: Block, isSync = false) {
     if (block.height === 0) return null;
 
     let bBlock = await this.BlockRepository.findByHash(block.hash);
     if (!bBlock) {
-      block.isValid();
+      if (!isSync) {
+        block.isValid();
+      }
 
       const newBlock: Blocks = {
         block: block,
@@ -79,7 +81,7 @@ export class BlocksProvider {
         distance: '',
       }
       await this.BlockRepository.save(newBlock);
-      if (notify) {
+      if (!isSync) {
         this.mq.send(RoutingKeys.new_block, block);
       }
     }
@@ -165,7 +167,7 @@ export class BlocksProvider {
     }
   }
 
-  async processVotes(blockTree: BlockTree) {
+  async processVotes(blockTree: BlockTree, isSync = false) {
     const unprocessedVotes = await this.VotesRepository.findByChainAndProcessed(blockTree.chain, false);
     for (let i = 0; i < unprocessedVotes.length; i++) {
       const unprocessedVote = unprocessedVotes[i];
@@ -189,7 +191,7 @@ export class BlocksProvider {
             unprocessedVote.add = false;
           }
         }
-      } else {
+      } else if (!isSync) {
         await this.mq.send(RoutingKeys.find_block, unprocessedVote.blockHash);
       }
     }
@@ -313,7 +315,7 @@ export class BlocksProvider {
       for (let z = 0; z < sliceInfo.slice.transactions.length; z++) {
         const txHash = sliceInfo.slice.transactions[z];
         let txInfo = blockTree.getTxInfo(txHash);
-        if(!txInfo) {
+        if (!txInfo) {
           this.transactionsProvider.populateTxInfo(blockTree, txHash);
           txInfo = blockTree.getTxInfo(txHash);
         }
@@ -430,25 +432,25 @@ export class BlocksProvider {
     await this.applicationContext.mq.send(RoutingKeys.selected_new_block, blockPack.block.chain);
   }
 
-  async setNewBlockPack(blockTree: BlockTree, blockPack: BlockPack): Promise<void> {
+  async setNewBlockPack(blockTree: BlockTree, blockPack: BlockPack, isSync = false): Promise<void> {
     blockPack.block.isValid();
     for (let i = 0; i < blockPack.txs.length; i++) {
       const tx = blockPack.txs[i];
-      await this.transactionsProvider.saveNewTransaction(tx, false);
+      await this.transactionsProvider.saveNewTransaction(tx, isSync);
       await this.transactionsProvider.populateTxInfo(blockTree, tx.hash);
     }
     for (let i = 0; i < blockPack.slices.length; i++) {
       const slice = blockPack.slices[i];
-      await this.slicesProvider.saveNewSlice(slice, false);
+      await this.slicesProvider.saveNewSlice(slice, isSync);
       await this.slicesProvider.populateSliceInfo(blockTree, slice.hash);
     }
 
-    await this.saveNewBlock(blockPack.block, false);
+    await this.saveNewBlock(blockPack.block, isSync);
     await this.populateBlockInfo(blockTree, blockPack.block.hash);
 
     await this.slicesProvider.syncSlices(blockTree);
     await this.slicesProvider.executeCompleteSlices(blockTree);
-    await this.processVotes(blockTree);
+    await this.processVotes(blockTree, isSync);
     await this.syncBlocks(blockTree);
     await this.executeCompleteBlocks(blockTree);
     await this.selectMinedBlock(blockTree, blockPack.block.hash);
