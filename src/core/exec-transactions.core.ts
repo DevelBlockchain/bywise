@@ -40,7 +40,7 @@ export default class ExecuteTransactions {
         if (this.lastHash !== currentHash) {
             this.lastHash = currentHash;
 
-            this.coreContext.applicationContext.logger.info(`update main context`);
+            this.coreContext.applicationContext.logger.verbose(`update main context`);
 
 
             if (bestSlice) {

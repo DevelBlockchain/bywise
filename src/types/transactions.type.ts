@@ -1,4 +1,3 @@
-
 import { TxType, Slice, Tx, Block } from '@bywise/web3';
 import BigNumber from "bignumber.js";
 import { BlockTree } from './environment.types';

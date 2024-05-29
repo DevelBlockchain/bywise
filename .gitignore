@@ -64,6 +64,11 @@ dist/
 # Cache used by TypeScript's incremental build
 tsconfig.tsbuildinfo
 
+# .DS_Store
+.DS_Store
+./*/.DS_Store
+./**/.DS_Store
+
 # Build Path
 build/
 deploy/
@@ -74,4 +79,5 @@ output.json
 local.json
 chains/
 data/
+test/
 

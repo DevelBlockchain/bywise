@@ -23,9 +23,9 @@ export default class ETHProxySync {
             if (tx) {
                 if (tx.status === BlockchainStatus.TX_MINED || tx.status === BlockchainStatus.TX_CONFIRMED) {
                     try {
-                        this.coreContext.applicationContext.logger.debug(`ETHProxySync: try execute action ${action.proposalId}`);
+                        this.coreContext.applicationContext.logger.verbose(`ETHProxySync: try execute action ${action.proposalId}`);
                         await this.ethProvider.voteAction(action);
-                        this.coreContext.applicationContext.logger.debug(`ETHProxySync: voted action ${action.proposalId} - voteHash: ${action.voteHash}`);
+                        this.coreContext.applicationContext.logger.verbose(`ETHProxySync: voted action ${action.proposalId} - voteHash: ${action.voteHash}`);
                         action.done = true;
                     } catch (err: any) {
                         console.log(`ETHProxySync: failed action ${action.proposalId} - Error: ${err.message}`)
@@ -38,7 +38,7 @@ export default class ETHProxySync {
                     await this.ETHRepository.save(action);
                 }
                 if (tx.status === BlockchainStatus.TX_FAILED) {
-                    this.coreContext.applicationContext.logger.info(`ETHProxySync: failed action ${action.proposalId} - Error: Bywise transaction failed`)
+                    this.coreContext.applicationContext.logger.verbose(`ETHProxySync: failed action ${action.proposalId} - Error: Bywise transaction failed`)
                     action.error.push('Bywise transaction failed');
                     action.done = true;
                     await this.ETHRepository.save(action);

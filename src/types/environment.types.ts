@@ -1,5 +1,4 @@
 import { Blocks, Slices, Transaction } from "../models"
-import { SimulateDTO } from "./transactions.type";
 
 export class BlockTree {
 
@@ -42,14 +41,6 @@ export class BlockTree {
             this.treeMap.delete(hash);
         }
         this.hashesMap.delete(hash);
-        //let lastHash = this.getLastHash(hash)
-        //let list = this.treeMap.get(lastHash);
-        //if (list !== undefined) {
-        //    list = list.filter(h => h !== hash);
-        //    this.treeMap.set(lastHash, list);
-        //}
-        //this.hashesMap.delete(hash);
-
     }
 
     setTxInfo(info: Transaction) {

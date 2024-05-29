@@ -1,5 +1,5 @@
 import { RequestKeys, RoutingKeys } from "../datasource/message-queue";
-import { Blocks, Slices, Votes } from "../models";
+import { Blocks, Votes } from "../models";
 import { BlockchainStatus, CoreContext } from "../types";
 import helper from "../utils/helper";
 import PipelineChain from "./pipeline-chain.core";
@@ -69,8 +69,8 @@ export default class ConsensusAlgorithm {
             const isConnected = await this.coreContext.applicationContext.mq.request(RequestKeys.test_connection, {
                 chain: this.coreContext.chain
             })
-            if(!isConnected) {
-                this.coreContext.applicationContext.logger.info(`ConsensusAlgorithm: Node has disconnected!`)
+            if (!isConnected) {
+                this.coreContext.applicationContext.logger.verbose(`ConsensusAlgorithm: Node has disconnected!`)
                 this.pipelineChain.stop().then(() => {
                     this.pipelineChain.start();
                 });
@@ -78,8 +78,8 @@ export default class ConsensusAlgorithm {
             }
 
             const mainWallet = await this.coreContext.walletProvider.getMainWallet();
-            this.coreContext.applicationContext.logger.info(`ConsensusAlgorithm: consolide - ${lastBlockInfo.block.from === mainWallet.address ? 'my' : 'other'} wallet - height: ${lastBlockInfo.block.height} - votes: ${votes}/${lastVotes.length} - ${countBlockVotes}/${maxVotes} - ${(100 * countBlockVotes / maxVotes).toFixed(2)}% - hash: ${lastBlockInfo.block.hash.substring(0, 10)}`)
-            this.coreContext.applicationContext.logger.info(`ConsensusAlgorithm: selected new block by height ${bestBlock.block.height} - ${newBlocks.length} choices`)
+            this.coreContext.applicationContext.logger.verbose(`ConsensusAlgorithm: consolide - ${lastBlockInfo.block.from === mainWallet.address ? 'my' : 'other'} wallet - height: ${lastBlockInfo.block.height} - votes: ${votes}/${lastVotes.length} - ${countBlockVotes}/${maxVotes} - ${(100 * countBlockVotes / maxVotes).toFixed(2)}% - hash: ${lastBlockInfo.block.hash.substring(0, 10)}`)
+            this.coreContext.applicationContext.logger.verbose(`ConsensusAlgorithm: selected new block by height ${bestBlock.block.height} - ${newBlocks.length} choices`)
             await this.selectNewMinedBlock(bestBlock);
             await this.coreContext.blockProvider.updateConsolidatedBlockTree(this.coreContext.blockTree, 10);
         }
@@ -101,7 +101,7 @@ export default class ConsensusAlgorithm {
         }
         if (bestBlock) {
             if (lastBlockInfo.block.hash !== bestBlock.block.hash) {
-                this.coreContext.applicationContext.logger.info(`ConsensusAlgorithm: selected block by distance ${bestBlock.block.height} - ${currentBlocks.length} choices`)
+                this.coreContext.applicationContext.logger.verbose(`ConsensusAlgorithm: selected block by distance ${bestBlock.block.height} - ${currentBlocks.length} choices`)
                 await this.selectNewMinedBlock(bestBlock);
             }
         }
@@ -130,6 +130,8 @@ export default class ConsensusAlgorithm {
         }
         const lastVotes = await this.coreContext.applicationContext.database.VotesRepository.findByChainAndGreaterHeight(lastBlockInfo.block.chain, oldHeight);
 
+
+        
         let bestHash = '';
         let bestHashVotes = -1;
         const counter = new Map<string, number>();
@@ -147,7 +149,17 @@ export default class ConsensusAlgorithm {
                 }
             }
         }
+
         if (bestHashVotes > 0) {
+            let bestHashes: string[] = [];
+            counter.forEach((count, hash) => {
+                if (count == bestHashVotes) {
+                    bestHashes.push(hash);
+                }
+            })
+            bestHashes = bestHashes.sort((hashA, hashB) => hashA.localeCompare(hashB));
+            bestHash = bestHashes[0];
+
             const bestBlock = this.coreContext.blockTree.getBlockInfo(bestHash);
             if (bestBlock && bestBlock.isExecuted) {
                 let countBlockVotes = 0;
@@ -162,7 +174,7 @@ export default class ConsensusAlgorithm {
                     }
                 }
                 if (lastBlockInfo.block.hash !== bestBlock.block.hash) {
-                    this.coreContext.applicationContext.logger.info(`ConsensusAlgorithm: selected block by votes - ${bestHashVotes} votes - ${countBlockVotes}/${maxVotes} - ${(100 * countBlockVotes / maxVotes).toFixed(2)}%`)
+                    this.coreContext.applicationContext.logger.verbose(`ConsensusAlgorithm: selected block by votes - ${bestHashVotes} votes - ${countBlockVotes}/${maxVotes} - ${(100 * countBlockVotes / maxVotes).toFixed(2)}%`)
                     await this.selectNewMinedBlock(bestBlock);
                 }
             }

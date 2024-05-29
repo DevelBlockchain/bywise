@@ -62,7 +62,7 @@ export class BlocksProvider {
     return false;
   }
 
-  async saveNewBlock(block: Block, notify = true) {
+  async saveNewBlock(block: Block) {
     if (block.height === 0) return null;
 
     let bBlock = await this.BlockRepository.findByHash(block.hash);
@@ -79,9 +79,7 @@ export class BlocksProvider {
         distance: '',
       }
       await this.BlockRepository.save(newBlock);
-      if (notify) {
-        this.mq.send(RoutingKeys.new_block, block);
-      }
+      this.mq.send(RoutingKeys.new_block, block);
     }
     return bBlock;
   }
@@ -118,51 +116,58 @@ export class BlocksProvider {
     for (let i = 0; i < blockInfoList.length; i++) {
       const blockInfo = blockInfoList[i];
 
-      let isComplete = true;
-      const lastBlockInfo = blockTree.getBlockInfo(blockInfo.block.lastHash);
+      await this.syncBlockByHash(blockTree, blockInfo.block.hash);
+    }
+  }
 
-      if (!lastBlockInfo && blockInfo.block.lastHash !== BlockTree.ZERO_HASH) {
+  async syncBlockByHash(blockTree: BlockTree, hash: string) {
+    const blockInfo = blockTree.getBlockInfo(hash);
+    if (!blockInfo) throw new Error(`block not found - ${hash}`);
+
+    let isComplete = true;
+    const lastBlockInfo = blockTree.getBlockInfo(blockInfo.block.lastHash);
+
+    if (!lastBlockInfo && blockInfo.block.lastHash !== BlockTree.ZERO_HASH) {
+      isComplete = false;
+      let found = await this.populateBlockInfo(blockTree, blockInfo.block.lastHash);
+      if (!found) {
+        await this.mq.send(RoutingKeys.find_block, blockInfo.block.lastHash);
+      }
+    }
+    for (let j = 0; j < blockInfo.block.slices.length; j++) {
+      const sliceHash = blockInfo.block.slices[j];
+
+      const sliceInfo = blockTree.getSliceInfo(sliceHash);
+      if (!sliceInfo) {
         isComplete = false;
-        let found = await this.populateBlockInfo(blockTree, blockInfo.block.lastHash);
+        let found = await this.slicesProvider.populateSliceInfo(blockTree, sliceHash);
         if (!found) {
-          await this.mq.send(RoutingKeys.find_block, blockInfo.block.lastHash);
-        }
-      }
-      for (let j = 0; j < blockInfo.block.slices.length; j++) {
-        const sliceHash = blockInfo.block.slices[j];
-
-        const sliceInfo = blockTree.getSliceInfo(sliceHash);
-        if (!sliceInfo) {
-          isComplete = false;
-          let found = await this.slicesProvider.populateSliceInfo(blockTree, sliceHash);
-          if (!found) {
-            await this.mq.send(RoutingKeys.find_slice, sliceHash);
-          }
-        } else {
-          if (!sliceInfo.isComplete) {
-            isComplete = false;
-          }
-        }
-      }
-
-      if (!isComplete) {
-        blockInfo.countTrys++;
-        if (blockInfo.countTrys > 100) {
-          this.applicationContext.logger.error(`Block reached max countTrys - ${blockInfo.block.hash}`)
-          blockInfo.status = BlockchainStatus.TX_FAILED;
+          await this.mq.send(RoutingKeys.find_slice, sliceHash);
         }
       } else {
-        if (blockInfo.block.lastHash === BlockTree.ZERO_HASH) {
-          blockInfo.distance = '0';
-        } else {
-          if (!lastBlockInfo) throw new Error('syncBlocks - lastBlock not found');
-          blockInfo.distance = this.calcBlockModule(lastBlockInfo.block, blockInfo.block, lastBlockInfo.distance);
+        if (!sliceInfo.isComplete) {
+          isComplete = false;
         }
-        this.applicationContext.logger.info(`sync-blocks: complete - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
-        blockInfo.isComplete = true;
       }
-      await this.updateBlock(blockInfo);
     }
+
+    if (!isComplete) {
+      blockInfo.countTrys++;
+      if (blockInfo.countTrys > 100) {
+        this.applicationContext.logger.error(`Block reached max countTrys - ${blockInfo.block.hash}`)
+        blockInfo.status = BlockchainStatus.TX_FAILED;
+      }
+    } else {
+      if (blockInfo.block.lastHash === BlockTree.ZERO_HASH) {
+        blockInfo.distance = '0';
+      } else {
+        if (!lastBlockInfo) throw new Error('syncBlocks - lastBlock not found');
+        blockInfo.distance = this.calcBlockModule(lastBlockInfo.block, blockInfo.block, lastBlockInfo.distance);
+      }
+      this.applicationContext.logger.verbose(`sync-blocks: complete - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
+      blockInfo.isComplete = true;
+    }
+    await this.updateBlock(blockInfo);
   }
 
   async processVotes(blockTree: BlockTree) {
@@ -182,10 +187,10 @@ export class BlocksProvider {
           if (userVotes.length === 1) {
             if (!unprocessedVote.add) {
               unprocessedVote.add = true;
-              this.applicationContext.logger.info(`compute vote in ${unprocessedVote.height} - hash: ${unprocessedVote.blockHash.substring(0, 10)}... - from: ${unprocessedVote.from.substring(0, 10)}...`);
+              this.applicationContext.logger.verbose(`compute vote in ${unprocessedVote.height} - hash: ${unprocessedVote.blockHash.substring(0, 10)}... - from: ${unprocessedVote.from.substring(0, 10)}...`);
             }
           } else if (unprocessedVote.add) {
-            this.applicationContext.logger.info(`remove vote in ${unprocessedVote.height} - hash: ${unprocessedVote.blockHash.substring(0, 10)}... - from: ${unprocessedVote.from.substring(0, 10)}...`);
+            this.applicationContext.logger.verbose(`remove vote in ${unprocessedVote.height} - hash: ${unprocessedVote.blockHash.substring(0, 10)}... - from: ${unprocessedVote.from.substring(0, 10)}...`);
             unprocessedVote.add = false;
           }
         }
@@ -201,65 +206,77 @@ export class BlocksProvider {
 
     for (let i = 0; i < blockInfoList.length; i++) {
       const blockInfo = blockInfoList[i];
-      let lastBlockInfo = blockTree.getBlockInfo(blockInfo.block.lastHash);
-      if (blockInfo.block.lastHash !== BlockTree.ZERO_HASH) {
+
+      await this.executeCompleteBlockByHash(blockTree, blockInfo.block.hash);
+    }
+  }
+
+  async executeCompleteBlockByHash(blockTree: BlockTree, hash: string) {
+    const blockInfo = blockTree.getBlockInfo(hash);
+    if (!blockInfo) throw new Error(`block not found - ${hash}`);
+
+    let lastBlockInfo = blockTree.getBlockInfo(blockInfo.block.lastHash);
+    if (blockInfo.block.lastHash !== BlockTree.ZERO_HASH) {
+      if (!lastBlockInfo) {
+        this.populateBlockInfo(blockTree, blockInfo.block.lastHash);
+        lastBlockInfo = blockTree.getBlockInfo(blockInfo.block.lastHash);
         if (!lastBlockInfo) {
-          this.populateBlockInfo(blockTree, blockInfo.block.lastHash);
+          await this.populateBlockInfo(blockTree, blockInfo.block.lastHash);
           lastBlockInfo = blockTree.getBlockInfo(blockInfo.block.lastHash);
           if (!lastBlockInfo) throw new Error('tryExecBlock - last block not found');
         }
       }
-      if (blockInfo.block.lastHash === BlockTree.ZERO_HASH || lastBlockInfo && lastBlockInfo.isExecuted) {
-        try {
-          const ctx = new SimulateDTO(blockTree, blockInfo.block);
-          let isExecuted = true;
-          for (let j = 0; j < blockInfo.block.slices.length; j++) {
-            const sliceHash = blockInfo.block.slices[j];
-            const sliceInfo = blockTree.getSliceInfo(sliceHash);
-            if (!sliceInfo) throw new Error('tryExecBlock - last slice not found');
+    }
+    if (blockInfo.block.lastHash === BlockTree.ZERO_HASH || lastBlockInfo && lastBlockInfo.isExecuted) {
+      try {
+        const ctx = new SimulateDTO(blockTree, blockInfo.block);
+        let isExecuted = true;
+        for (let j = 0; j < blockInfo.block.slices.length; j++) {
+          const sliceHash = blockInfo.block.slices[j];
+          const sliceInfo = blockTree.getSliceInfo(sliceHash);
+          if (!sliceInfo) throw new Error('tryExecBlock - last slice not found');
 
-            if (!sliceInfo.isExecuted) {
-              isExecuted = false;
-            } else {
-              if (blockInfo.block.height !== sliceInfo.slice.blockHeight) throw new Error(`tryExecBlock - wrong blockHeight ${blockInfo.block.height}/${sliceInfo.slice.blockHeight}`);
-              if (lastBlockInfo) {
-                const lastlastBlockInfo = blockTree.getBlockInfo(lastBlockInfo.block.lastHash);
-                if (lastlastBlockInfo) {
-                  if (lastlastBlockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
-                } else {
-                  if (lastBlockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
-                }
+          if (!sliceInfo.isExecuted) {
+            isExecuted = false;
+          } else {
+            if (blockInfo.block.height !== sliceInfo.slice.blockHeight) throw new Error(`tryExecBlock - wrong blockHeight ${blockInfo.block.height}/${sliceInfo.slice.blockHeight}`);
+            if (lastBlockInfo) {
+              const lastlastBlockInfo = blockTree.getBlockInfo(lastBlockInfo.block.lastHash);
+              if (lastlastBlockInfo) {
+                if (lastlastBlockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
               } else {
-                if (blockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
+                if (lastBlockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
               }
-              for (let z = 0; z < sliceInfo.slice.transactions.length; z++) {
-                const txHash = sliceInfo.slice.transactions[z];
+            } else {
+              if (blockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
+            }
+            for (let z = 0; z < sliceInfo.slice.transactions.length; z++) {
+              const txHash = sliceInfo.slice.transactions[z];
 
-                const txInfo = blockTree.getTxInfo(txHash);
-                if (!txInfo) throw new Error('tryExecBlock - last tx not found');
+              const txInfo = blockTree.getTxInfo(txHash);
+              if (!txInfo) throw new Error('tryExecBlock - last tx not found');
 
-                try {
-                  await this.virtualMachineProvider.executeTransaction(txInfo.tx, sliceInfo.slice, ctx);
-                } catch (err: any) {
-                  ctx.output.error = err.message;
-                  this.applicationContext.logger.error(err.message, err);
-                }
-                if (ctx.output.error) throw new Error(`tryExecBlock - execute tx error - hash ${txHash}`);
+              try {
+                await this.virtualMachineProvider.executeTransaction(txInfo.tx, sliceInfo.slice, ctx);
+              } catch (err: any) {
+                ctx.output.error = err.message;
+                this.applicationContext.logger.error(err.message, err);
               }
+              if (ctx.output.error) throw new Error(`tryExecBlock - execute tx error - hash ${txHash}`);
             }
           }
-          if (isExecuted) {
-            blockInfo.isExecuted = true;
-            this.applicationContext.logger.info(`sync-blocks: exec block - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
-            await this.updateBlock(blockInfo);
-          }
-        } catch (err: any) {
-          blockInfo.isExecuted = false;
-          await this.environmentProvider.deleteSimulation(blockTree, blockInfo.block.hash);
-          this.applicationContext.logger.error(`Error: ${err.message}`, err);
-          blockInfo.status = BlockchainStatus.TX_FAILED;
+        }
+        if (isExecuted) {
+          blockInfo.isExecuted = true;
+          this.applicationContext.logger.verbose(`sync-blocks: exec block - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
           await this.updateBlock(blockInfo);
         }
+      } catch (err: any) {
+        blockInfo.isExecuted = false;
+        await this.environmentProvider.deleteSimulation(blockTree, blockInfo.block.hash);
+        this.applicationContext.logger.error(`Error: ${err.message}`, err);
+        blockInfo.status = BlockchainStatus.TX_FAILED;
+        await this.updateBlock(blockInfo);
       }
     }
   }
@@ -313,13 +330,11 @@ export class BlocksProvider {
       for (let z = 0; z < sliceInfo.slice.transactions.length; z++) {
         const txHash = sliceInfo.slice.transactions[z];
         let txInfo = blockTree.getTxInfo(txHash);
-        if(!txInfo) {
+        if (!txInfo) {
           this.transactionsProvider.populateTxInfo(blockTree, txHash);
           txInfo = blockTree.getTxInfo(txHash);
         }
         if (!txInfo) throw new Error('selectMinedBlock - last tx not found');
-
-        //if (txInfo.status === BlockchainStatus.TX_MINED) throw new Error(`selectMinedBlock - tx already added - hash: ${txHash}`);
 
         txInfo.status = BlockchainStatus.TX_MINED;
         txInfo.slicesHash = sliceInfo.slice.hash;
@@ -411,7 +426,7 @@ export class BlocksProvider {
 
     if (blockPack.block.height !== 0) throw new Error(`expected height = 0`);
     if (blockPack.block.lastHash !== BlockTree.ZERO_HASH) throw new Error(`invalid lastHash ${blockPack.block.lastHash}`);
-    this.applicationContext.logger.info(`select new zero block`)
+    this.applicationContext.logger.verbose(`select new zero block`)
 
     const newBlock: Blocks = {
       block: blockPack.block,
@@ -431,26 +446,26 @@ export class BlocksProvider {
   }
 
   async setNewBlockPack(blockTree: BlockTree, blockPack: BlockPack): Promise<void> {
-    blockPack.block.isValid();
     for (let i = 0; i < blockPack.txs.length; i++) {
       const tx = blockPack.txs[i];
-      await this.transactionsProvider.saveNewTransaction(tx, false);
+      await this.transactionsProvider.saveNewTransaction(tx);
       await this.transactionsProvider.populateTxInfo(blockTree, tx.hash);
     }
     for (let i = 0; i < blockPack.slices.length; i++) {
       const slice = blockPack.slices[i];
-      await this.slicesProvider.saveNewSlice(slice, false);
+      await this.slicesProvider.saveNewSlice(slice);
       await this.slicesProvider.populateSliceInfo(blockTree, slice.hash);
+
+      await this.slicesProvider.syncSliceByHash(blockTree, slice.hash);
+      await this.slicesProvider.executeCompleteSliceByHash(blockTree, slice.hash);
     }
 
-    await this.saveNewBlock(blockPack.block, false);
+    await this.saveNewBlock(blockPack.block);
     await this.populateBlockInfo(blockTree, blockPack.block.hash);
 
-    await this.slicesProvider.syncSlices(blockTree);
-    await this.slicesProvider.executeCompleteSlices(blockTree);
     await this.processVotes(blockTree);
-    await this.syncBlocks(blockTree);
-    await this.executeCompleteBlocks(blockTree);
+    await this.syncBlockByHash(blockTree, blockPack.block.hash);
+    await this.executeCompleteBlockByHash(blockTree, blockPack.block.hash);
     await this.selectMinedBlock(blockTree, blockPack.block.hash);
     await this.updateConsolidatedBlockTree(blockTree, 60);
   }

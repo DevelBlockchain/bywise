@@ -39,7 +39,7 @@ export default class Network implements Task {
         }));
         await this.applicationContext.mq.send(RoutingKeys.know_nodes, knowNodes);
         if (nodesSize !== connectedNodes) {
-            this.applicationContext.logger.info(`connected ${connectedNodes} nodes`);
+            this.applicationContext.logger.verbose(`connected ${connectedNodes} nodes`);
         }
         await helper.sleep(100);
     }
@@ -62,14 +62,14 @@ export default class Network implements Task {
     }
 
     async start() {
-        this.applicationContext.logger.info(`start web3 - initialNodes: ${this.applicationContext.initialNodes.join(", ")}`)
-        this.applicationContext.logger.info(`start web3 - host: ${this.applicationContext.myHost}`)
+        this.applicationContext.logger.verbose(`start web3 - initialNodes: ${this.applicationContext.initialNodes.join(", ")}`)
+        this.applicationContext.logger.verbose(`start web3 - host: ${this.applicationContext.myHost}`)
         this.applicationContext.mq.addMessageListener(RoutingKeys.started_api, async (message: any) => {
             await this.web3.network.tryConnection();
         });
         this.applicationContext.mq.addMessageListener(RoutingKeys.new_node, async (message: any) => {
             const node = new BywiseNode(message);
-            this.applicationContext.logger.info(`added new node`)
+            this.applicationContext.logger.verbose(`added new node`)
             this.web3.network.addNode(node);
         });
         this.mainLoopInterval = setInterval(this.mainLoop, 60000);

@@ -182,6 +182,21 @@ const main = async () => {
             ]);
             fs.writeFileSync(`${lastParam}.json`, JSON.stringify(zeroBlock), 'utf8');
         }
+        if (getCmd('-new-chain-local')) {
+            const deployWallet = new Wallet({ seed: wallet });
+            const zeroBlock = await helper.createNewBlockZero('local', deployWallet, [
+                ChainConfig.addAdmin(deployWallet.address),
+                ChainConfig.addValidator(deployWallet.address),
+                ChainConfig.setBalance(deployWallet.address, '1000000'),
+                ChainConfig.setConfig('blockTime', '30'),
+                ChainConfig.setConfig('feeBasic', '1'),
+                ChainConfig.setConfig('feeCoefAmount', '0'),
+                ChainConfig.setConfig('feeCoefSize', '0'),
+                ChainConfig.setConfig('feeCoefCost', '0'),
+            ]);
+            fs.writeFileSync(`local.json`, JSON.stringify(zeroBlock, null, 4), 'utf8');
+
+        }
         if (getCmd('-chain', /^.+$/)) {
             if (fs.existsSync(lastParam)) {
                 zeroBlocks = lastParam.split(',').map(file => fs.readFileSync(file, 'utf8'));

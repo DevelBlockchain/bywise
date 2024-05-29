@@ -326,16 +326,16 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     readProxyAction = async (tx: TransactionMessage, proxyChain: string, proxyAction: string, proxyData: string): Promise<string> => {
-        //if (tx.ctx.enableReadProxy) {
+        if (tx.ctx.enableReadProxy) {
             const proxyParans: ETHProxyData = JSON.parse(proxyData);
             const returnStr = await this.ethProvider.readAction(proxyChain, proxyAction, proxyParans);
             tx.ctx.proxyMock = [returnStr, ...tx.ctx.proxyMock];
             return returnStr;
-        //} else {
-        //    const returnStr = tx.ctx.proxyMock.pop();
-        //    if (returnStr === undefined) throw new Error('BVM: invalid readProxyAction');
-        //    return returnStr;
-        //}
+        } else {
+            const returnStr = tx.ctx.proxyMock.pop();
+            if (returnStr === undefined) throw new Error('BVM: invalid readProxyAction');
+            return returnStr;
+        }
     }
 
     getRandom = async (tx: TransactionMessage, type: string): Promise<string> => {

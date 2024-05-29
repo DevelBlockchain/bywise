@@ -77,9 +77,8 @@ export default class Bywise {
     stop = async () => {
         await this.api.stop();
         await this.core.stop();
-        await helper.sleep(3000);
         await this.applicationContext.mq.stop();
-        await helper.sleep(3000);
         await this.applicationContext.database.stop();
+        await helper.sleep(500);
     }
 }
