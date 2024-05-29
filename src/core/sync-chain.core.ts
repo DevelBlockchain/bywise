@@ -16,7 +16,7 @@ export default class SyncChain {
 
             const nextBlock = await this.coreContext.network.web3.blocks.getBlockPackByHeight(lastBlockInfo.block.chain, lastBlockInfo.block.height + 1);
             if (nextBlock) {
-                await this.coreContext.blockProvider.setNewBlockPack(this.coreContext.blockTree, nextBlock, true);
+                await this.coreContext.blockProvider.setNewBlockPack(this.coreContext.blockTree, nextBlock);
             } else {
                 await this.coreContext.blockProvider.selectMinedBlock(this.coreContext.blockTree, lastBlockInfo.block.hash);
                 this.coreContext.blockTime = parseInt((await this.coreContext.configsProvider.getByName(this.coreContext.blockTree, lastBlockInfo.block.hash, lastBlockInfo.block.height, 'blockTime')).value);

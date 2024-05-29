@@ -1,5 +1,5 @@
 import { RequestKeys, RoutingKeys } from "../datasource/message-queue";
-import { Blocks, Slices, Votes } from "../models";
+import { Blocks, Votes } from "../models";
 import { BlockchainStatus, CoreContext } from "../types";
 import helper from "../utils/helper";
 import PipelineChain from "./pipeline-chain.core";

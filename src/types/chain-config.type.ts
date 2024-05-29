@@ -1,5 +1,3 @@
-import { Slice, Tx, Block } from '@bywise/web3';
-
 export type ZeroBlockConfig = {
     name: string;
     input: string[];

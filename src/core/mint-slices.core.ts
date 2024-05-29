@@ -1,6 +1,6 @@
 import { Block, Slice, SliceData, Tx, TxType } from "@bywise/web3";
 import { RequestKeys } from "../datasource/message-queue";
-import { Blocks, Slices, Transaction } from "../models";
+import { Blocks, Slices } from "../models";
 import { BlockchainStatus, CoreContext, TransactionOutputDTO } from "../types";
 import { BlockTree } from "../types/environment.types";
 import helper from "../utils/helper";

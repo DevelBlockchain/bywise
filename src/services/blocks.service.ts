@@ -62,14 +62,12 @@ export class BlocksProvider {
     return false;
   }
 
-  async saveNewBlock(block: Block, isSync = false) {
+  async saveNewBlock(block: Block) {
     if (block.height === 0) return null;
 
     let bBlock = await this.BlockRepository.findByHash(block.hash);
     if (!bBlock) {
-      if (!isSync) {
-        block.isValid();
-      }
+      block.isValid();
 
       const newBlock: Blocks = {
         block: block,
@@ -81,9 +79,7 @@ export class BlocksProvider {
         distance: '',
       }
       await this.BlockRepository.save(newBlock);
-      if (!isSync) {
-        this.mq.send(RoutingKeys.new_block, block);
-      }
+      this.mq.send(RoutingKeys.new_block, block);
     }
     return bBlock;
   }
@@ -167,7 +163,7 @@ export class BlocksProvider {
     }
   }
 
-  async processVotes(blockTree: BlockTree, isSync = false) {
+  async processVotes(blockTree: BlockTree) {
     const unprocessedVotes = await this.VotesRepository.findByChainAndProcessed(blockTree.chain, false);
     for (let i = 0; i < unprocessedVotes.length; i++) {
       const unprocessedVote = unprocessedVotes[i];
@@ -191,7 +187,7 @@ export class BlocksProvider {
             unprocessedVote.add = false;
           }
         }
-      } else if (!isSync) {
+      } else {
         await this.mq.send(RoutingKeys.find_block, unprocessedVote.blockHash);
       }
     }
@@ -208,7 +204,11 @@ export class BlocksProvider {
         if (!lastBlockInfo) {
           this.populateBlockInfo(blockTree, blockInfo.block.lastHash);
           lastBlockInfo = blockTree.getBlockInfo(blockInfo.block.lastHash);
-          if (!lastBlockInfo) throw new Error('tryExecBlock - last block not found');
+          if (!lastBlockInfo) {
+            await this.populateBlockInfo(blockTree, blockInfo.block.lastHash);
+            lastBlockInfo = blockTree.getBlockInfo(blockInfo.block.lastHash);
+            if (!lastBlockInfo) throw new Error('tryExecBlock - last block not found');
+          }
         }
       }
       if (blockInfo.block.lastHash === BlockTree.ZERO_HASH || lastBlockInfo && lastBlockInfo.isExecuted) {
@@ -321,8 +321,6 @@ export class BlocksProvider {
         }
         if (!txInfo) throw new Error('selectMinedBlock - last tx not found');
 
-        //if (txInfo.status === BlockchainStatus.TX_MINED) throw new Error(`selectMinedBlock - tx already added - hash: ${txHash}`);
-
         txInfo.status = BlockchainStatus.TX_MINED;
         txInfo.slicesHash = sliceInfo.slice.hash;
         txInfo.blockHash = blockInfo.block.hash;
@@ -432,25 +430,25 @@ export class BlocksProvider {
     await this.applicationContext.mq.send(RoutingKeys.selected_new_block, blockPack.block.chain);
   }
 
-  async setNewBlockPack(blockTree: BlockTree, blockPack: BlockPack, isSync = false): Promise<void> {
+  async setNewBlockPack(blockTree: BlockTree, blockPack: BlockPack): Promise<void> {
     blockPack.block.isValid();
     for (let i = 0; i < blockPack.txs.length; i++) {
       const tx = blockPack.txs[i];
-      await this.transactionsProvider.saveNewTransaction(tx, isSync);
+      await this.transactionsProvider.saveNewTransaction(tx);
       await this.transactionsProvider.populateTxInfo(blockTree, tx.hash);
     }
     for (let i = 0; i < blockPack.slices.length; i++) {
       const slice = blockPack.slices[i];
-      await this.slicesProvider.saveNewSlice(slice, isSync);
+      await this.slicesProvider.saveNewSlice(slice);
       await this.slicesProvider.populateSliceInfo(blockTree, slice.hash);
     }
 
-    await this.saveNewBlock(blockPack.block, isSync);
+    await this.saveNewBlock(blockPack.block);
     await this.populateBlockInfo(blockTree, blockPack.block.hash);
 
     await this.slicesProvider.syncSlices(blockTree);
     await this.slicesProvider.executeCompleteSlices(blockTree);
-    await this.processVotes(blockTree, isSync);
+    await this.processVotes(blockTree);
     await this.syncBlocks(blockTree);
     await this.executeCompleteBlocks(blockTree);
     await this.selectMinedBlock(blockTree, blockPack.block.hash);

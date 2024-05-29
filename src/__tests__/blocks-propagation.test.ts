@@ -1,6 +1,6 @@
 import request from 'supertest';
 import helper from '../utils/helper';
-import { Block, BlockPack, Wallet, Web3 } from '@bywise/web3';
+import { Block, BlockPack, Wallet } from '@bywise/web3';
 import { ChainConfig } from '../types';
 import Bywise from '../bywise';
 import { ConfigProvider } from '../services/configs.service';

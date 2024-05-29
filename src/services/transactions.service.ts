@@ -1,6 +1,6 @@
 import { SimulateDTO, TransactionOutputDTO, BlockchainStatus } from '../types/transactions.type';
 import { VirtualMachineProvider } from './virtual-machine.service';
-import { Tx, TxType, BywiseHelper, Block, Wallet, Slice, SliceData } from '@bywise/web3';
+import { Tx, TxType, Block, Wallet, SliceData } from '@bywise/web3';
 import { ApplicationContext } from '../types/task.type';
 import { WalletProvider } from './wallet.service';
 import { BlockTree } from '../types/environment.types';
@@ -116,13 +116,11 @@ export class TransactionsProvider {
     return ctx.output;
   }
 
-  async saveNewTransaction(tx: Tx, isSync = false) {
+  async saveNewTransaction(tx: Tx) {
 
     const registeredTx = await this.TransactionRepository.findByHash(tx.hash);
     if (!registeredTx) {
-      if (!isSync) {
-        tx.isValid();
-      }
+      tx.isValid();
 
       const newTx = {
         tx: tx,
@@ -133,9 +131,7 @@ export class TransactionsProvider {
         status: BlockchainStatus.TX_MEMPOOL
       }
       await this.TransactionRepository.save(newTx);
-      if (!isSync) {
-        this.mq.send(RoutingKeys.new_tx, tx);
-      }
+      this.mq.send(RoutingKeys.new_tx, tx);
       return newTx;
     }
     return registeredTx;
