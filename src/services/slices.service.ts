@@ -70,10 +70,13 @@ export class SlicesProvider {
   }
 
   async executeCompleteSlices(blockTree: BlockTree) {
-    const sliceInfos = blockTree.sliceInfoList.filter(info => info.isComplete === true && info.isExecuted === false && info.status === BlockchainStatus.TX_MEMPOOL);
+    let sliceInfos = blockTree.sliceInfoList.filter(info => info.isComplete === true && info.isExecuted === false && info.status === BlockchainStatus.TX_MEMPOOL);
     if (sliceInfos.length == 0) {
       return;
     }
+
+    sliceInfos = sliceInfos.sort((s1, s2) => s2.slice.created - s1.slice.created);
+    sliceInfos = sliceInfos.filter((s1, i) => i < 3);
 
     for (let i = 0; i < sliceInfos.length; i++) {
       const slice = sliceInfos[i];
