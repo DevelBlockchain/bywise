@@ -39,7 +39,7 @@ export default class MintSlices {
         }
 
         if (bestSlice && !bestSlice.slice.end) {
-            this.coreContext.applicationContext.logger.info(`mint slice - RECOVER slice stream at block ${lastBlock.block.height + 1}`)
+            this.coreContext.applicationContext.logger.verbose(`mint slice - RECOVER slice stream at block ${lastBlock.block.height + 1}`)
             this.sliceStream(lastBlock, bestSlice.slice.transactions, bestSlice.slice.transactionsData ? bestSlice.slice.transactionsData : []);
         }
     }
@@ -108,7 +108,7 @@ export default class MintSlices {
 
     async startSliceStream(lastBlock: Blocks) {
         this.isRunStream = true;
-        this.coreContext.applicationContext.logger.info(`mint slice - start slice stream at block ${lastBlock.block.height + 1}`)
+        this.coreContext.applicationContext.logger.verbose(`mint slice - start slice stream at block ${lastBlock.block.height + 1}`)
 
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
         const tx = new Tx();
@@ -168,7 +168,7 @@ export default class MintSlices {
             if (now >= lastBlock.block.created + this.coreContext.blockTime) {
                 end = true;
                 mint = true;
-                this.coreContext.applicationContext.logger.debug(`mint slice - mint by END`)
+                this.coreContext.applicationContext.logger.verbose(`mint slice - mint by END`)
             }
             let countSimulatedTransactions = 0;
             let simulateUptime = new Date().getTime();
@@ -176,7 +176,7 @@ export default class MintSlices {
                 const txInfo = mempool[i];
                 if (!transactions.includes(txInfo.tx.hash)) {
                     if (txInfo.tx.created < now - 60) {
-                        this.coreContext.applicationContext.logger.info(`mint slice - ignore transaction by time ${txInfo.tx.created} < ${now - 60}`);
+                        this.coreContext.applicationContext.logger.verbose(`mint slice - ignore transaction by time ${txInfo.tx.created} < ${now - 60}`);
                         txInfo.status = BlockchainStatus.TX_FAILED;
                         txInfo.output = new TransactionOutputDTO();
                         txInfo.output.error = 'TIMEOUT';
@@ -199,9 +199,9 @@ export default class MintSlices {
                                 txInfo.status = BlockchainStatus.TX_FAILED;
                                 txInfo.output = output;
                                 await this.coreContext.transactionsProvider.updateTransaction(txInfo);
-                                this.coreContext.applicationContext.logger.info(`mint slice - invalidate transaction ${txInfo.tx.hash}`)
+                                this.coreContext.applicationContext.logger.verbose(`mint slice - invalidate transaction ${txInfo.tx.hash}`)
                             }
-                            this.coreContext.applicationContext.logger.info('mint slice - ERROR: ' + output.error + ' - ' + count)
+                            this.coreContext.applicationContext.logger.verbose('mint slice - ERROR: ' + output.error + ' - ' + count)
                             await this.coreContext.transactionsProvider.disposeSubContext(ctx);
                         } else {
                             if (ctx.proxyMock.length > 0) {
@@ -218,7 +218,7 @@ export default class MintSlices {
             }
             simulateUptime = new Date().getTime() - simulateUptime;
             if (countSimulatedTransactions > 0)
-                this.coreContext.applicationContext.logger.debug(`mint slice - ${(countSimulatedTransactions / (simulateUptime / 1000)).toFixed(2)} TPS - simulate ${countSimulatedTransactions} transactions in ${simulateUptime / 1000}`)
+                this.coreContext.applicationContext.logger.verbose(`mint slice - ${(countSimulatedTransactions / (simulateUptime / 1000)).toFixed(2)} TPS - simulate ${countSimulatedTransactions} transactions in ${simulateUptime / 1000}`)
 
             if (new Date().getTime() - uptime > 5000 && addTransactions > 0) {
                 mint = true;
@@ -231,7 +231,7 @@ export default class MintSlices {
             if (now >= lastBlock.block.created + this.coreContext.blockTime * 1.5) {
                 end = true;
                 mint = false;
-                this.coreContext.applicationContext.logger.info(`mint slice - SKIP slice end ${lastBlock.block.height + 1}`)
+                this.coreContext.applicationContext.logger.verbose(`mint slice - SKIP slice end ${lastBlock.block.height + 1}`)
             }
 
             if (mint) {
@@ -251,7 +251,7 @@ export default class MintSlices {
             chain: this.coreContext.chain
         })
         if (!isConnected) {
-            this.coreContext.applicationContext.logger.info(`mint slice - Node has disconnected!`)
+            this.coreContext.applicationContext.logger.verbose(`mint slice - Node has disconnected!`)
             this.pipelineChain.stop().then(() => {
                 this.pipelineChain.start();
             });
@@ -274,7 +274,7 @@ export default class MintSlices {
         slice.hash = slice.toHash();
         slice.sign = await mainWallet.signHash(slice.hash);
 
-        this.coreContext.applicationContext.logger.info(`mint slice - height: ${slice.blockHeight} - txs: ${slice.transactions.length} - end: ${slice.end} - hash: ${slice.hash.substring(0, 10)}...`)
+        this.coreContext.applicationContext.logger.verbose(`mint slice - height: ${slice.blockHeight} - txs: ${slice.transactions.length} - end: ${slice.end} - hash: ${slice.hash.substring(0, 10)}...`)
         const bslice = await this.coreContext.slicesProvider.saveNewSlice(slice);
         bslice.isComplete = true;
         await this.coreContext.slicesProvider.updateSlice(bslice);

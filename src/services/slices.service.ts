@@ -59,7 +59,7 @@ export class SlicesProvider {
       }
       if (isComplete) {
         sliceInfo.isComplete = true;
-        this.logger.info(`sync-slices: complete - height: ${sliceInfo.slice.blockHeight} - hash: ${sliceInfo.slice.hash.substring(0, 10)}... - from: ${sliceInfo.slice.from.substring(0, 10)}...`)
+        this.logger.verbose(`sync-slices: complete - height: ${sliceInfo.slice.blockHeight} - hash: ${sliceInfo.slice.hash.substring(0, 10)}... - from: ${sliceInfo.slice.from.substring(0, 10)}...`)
         await this.updateSlice(sliceInfo);
       }
     }
@@ -132,7 +132,7 @@ export class SlicesProvider {
         slice.status = BlockchainStatus.TX_FAILED;
       } else {
         slice.isExecuted = true;
-        this.logger.info(`exec-slices: exec slice - height: ${slice.slice.blockHeight} - hash: ${slice.slice.hash.substring(0, 10)}...`)
+        this.logger.verbose(`exec-slices: exec slice - height: ${slice.slice.blockHeight} - hash: ${slice.slice.hash.substring(0, 10)}...`)
       }
       await this.updateSlice(slice);
     }

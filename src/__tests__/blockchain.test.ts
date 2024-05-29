@@ -46,7 +46,7 @@ afterAll(async () => {
 }, 30000)
 
 describe('simple transactions', () => {
-    
+
     test('send transaction', async () => {
         let tx = new Tx();
         tx.version = '2';
@@ -263,7 +263,7 @@ describe('simple transactions', () => {
         );
         const output = await web3.transactions.sendTransactionSync(tx);
         expect(output.output.contractAddress).toEqual(contractAddress);
-        
+
         // check name of contract
         let result = await web3.contracts.readContract(
             chain,
@@ -273,7 +273,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('SimpleToken');
-        
+
         // check total supply of contract
         result = await web3.contracts.readContract(
             chain,
@@ -283,7 +283,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('5000000000000000000000');
-        
+
         // get balance of deploy address
         result = await web3.contracts.readContract(
             chain,
@@ -293,7 +293,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('5000000000000000000000');
-        
+
         // get balance of deploy address
         result = await web3.contracts.readContract(
             chain,
@@ -303,7 +303,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('0');
-        
+
         // get balance of addr1
         result = await web3.contracts.readContract(
             chain,
@@ -313,7 +313,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('0');
-        
+
         // make transfer to addr1
         tx = await web3.transactions.buildSimpleTx(
             wallet,
@@ -324,7 +324,7 @@ describe('simple transactions', () => {
             [{ method: 'transfer', inputs: [addr1, '10000000'] }]
         );
         await web3.transactions.sendTransactionSync(tx);
-        
+
         // get balance of deploy address
         result = await web3.contracts.readContract(
             chain,
@@ -334,7 +334,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('4999999999999990000000');
-        
+
         // get balance of addr1
         result = await web3.contracts.readContract(
             chain,
@@ -395,6 +395,7 @@ describe('simple transactions', () => {
         let output = await web3.transactions.sendTransactionSync(deployTx);
         expect(output.output.contractAddress).toEqual(contractAddress);
 
+        let txs: Tx[] = []
         let total = 0;
         for (let i = 0; i < 30; i++) {
             const tx = await web3.transactions.buildSimpleTx(
@@ -407,19 +408,22 @@ describe('simple transactions', () => {
             );
             total += i;
             await web3.transactions.sendTransaction(tx);
+            txs.push(tx);
         }
 
-        let tx = await web3.transactions.buildSimpleTx(
-            wallet,
-            chain,
-            contractAddress,
-            '0',
-            TxType.TX_CONTRACT_EXE,
-            [{ method: 'transfer', inputs: [addr1, `1`] }]
-        );
-        total++;
-        await web3.transactions.sendTransactionSync(tx);
-        await helper.sleep(10000);
+        let hasMempool = true;
+        while (hasMempool) {
+            hasMempool = false;
+
+            await helper.sleep(1000);
+            for (let i = 0; i < txs.length; i++) {
+                const tx = txs[i];
+                let req = await web3.transactions.getTransactionByHash(tx.hash);
+                if (req && req.status == 'mempool') {
+                    hasMempool = true;
+                }
+            }
+        }
 
         // get balance of addr1
         let result = await web3.contracts.readContract(

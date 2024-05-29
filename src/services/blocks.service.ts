@@ -156,7 +156,7 @@ export class BlocksProvider {
           if (!lastBlockInfo) throw new Error('syncBlocks - lastBlock not found');
           blockInfo.distance = this.calcBlockModule(lastBlockInfo.block, blockInfo.block, lastBlockInfo.distance);
         }
-        this.applicationContext.logger.info(`sync-blocks: complete - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
+        this.applicationContext.logger.verbose(`sync-blocks: complete - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
         blockInfo.isComplete = true;
       }
       await this.updateBlock(blockInfo);
@@ -180,10 +180,10 @@ export class BlocksProvider {
           if (userVotes.length === 1) {
             if (!unprocessedVote.add) {
               unprocessedVote.add = true;
-              this.applicationContext.logger.info(`compute vote in ${unprocessedVote.height} - hash: ${unprocessedVote.blockHash.substring(0, 10)}... - from: ${unprocessedVote.from.substring(0, 10)}...`);
+              this.applicationContext.logger.verbose(`compute vote in ${unprocessedVote.height} - hash: ${unprocessedVote.blockHash.substring(0, 10)}... - from: ${unprocessedVote.from.substring(0, 10)}...`);
             }
           } else if (unprocessedVote.add) {
-            this.applicationContext.logger.info(`remove vote in ${unprocessedVote.height} - hash: ${unprocessedVote.blockHash.substring(0, 10)}... - from: ${unprocessedVote.from.substring(0, 10)}...`);
+            this.applicationContext.logger.verbose(`remove vote in ${unprocessedVote.height} - hash: ${unprocessedVote.blockHash.substring(0, 10)}... - from: ${unprocessedVote.from.substring(0, 10)}...`);
             unprocessedVote.add = false;
           }
         }
@@ -252,7 +252,7 @@ export class BlocksProvider {
           }
           if (isExecuted) {
             blockInfo.isExecuted = true;
-            this.applicationContext.logger.info(`sync-blocks: exec block - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
+            this.applicationContext.logger.verbose(`sync-blocks: exec block - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
             await this.updateBlock(blockInfo);
           }
         } catch (err: any) {
@@ -411,7 +411,7 @@ export class BlocksProvider {
 
     if (blockPack.block.height !== 0) throw new Error(`expected height = 0`);
     if (blockPack.block.lastHash !== BlockTree.ZERO_HASH) throw new Error(`invalid lastHash ${blockPack.block.lastHash}`);
-    this.applicationContext.logger.info(`select new zero block`)
+    this.applicationContext.logger.verbose(`select new zero block`)
 
     const newBlock: Blocks = {
       block: blockPack.block,

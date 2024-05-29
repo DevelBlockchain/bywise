@@ -33,7 +33,7 @@ export default class VoteBlocks {
 
         const isMinner = await this.coreContext.configsProvider.isValidator(this.coreContext.blockTree, lastBlock.block.hash, lastBlock.block.height, mainWallet.address);
         if (!isMinner) {
-            this.coreContext.applicationContext.logger.info(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
+            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
             this.isRun = false;
             return;
         }
@@ -60,7 +60,7 @@ export default class VoteBlocks {
         tx.hash = tx.toHash();
         tx.sign = [await mainWallet.signHash(tx.hash)];
         await this.coreContext.transactionsProvider.saveNewTransaction(tx);
-        this.coreContext.applicationContext.logger.info(`create vote in ${lastBlock.block.height}`);
+        this.coreContext.applicationContext.logger.verbose(`create vote in ${lastBlock.block.height}`);
 
         this.makePOI(lastBlock.block);
     }
@@ -95,7 +95,7 @@ export default class VoteBlocks {
         await web3.network.tryConnection();
         try {
             await web3.transactions.sendTransactionSync(tx);
-            this.coreContext.applicationContext.logger.info(`create poi in ${block.height} - hash: ${tx.hash}`);
+            this.coreContext.applicationContext.logger.verbose(`create poi in ${block.height} - hash: ${tx.hash}`);
         } catch (err: any) {
             this.coreContext.applicationContext.logger.error(`cant create poi in ${block.height} - error: ${err.message}`);
         }

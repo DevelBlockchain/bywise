@@ -84,12 +84,12 @@ export class ETHProvider {
     
     const hasPrivilege = await proxy.contract.methods.hasPrivilege(account.address).call();
     if (`${hasPrivilege}`.toLowerCase() === 'false') {
-      this.logger.info(`voteAction - dont has privilege - address: ${account.address}`);
+      this.logger.verbose(`voteAction - dont has privilege - address: ${account.address}`);
       return true;
     }
     const isVoteProposal = await proxy.contract.methods.isVoteProposal(account.address, '0x' + action.proposalId).call();
     if (`${isVoteProposal}`.toLowerCase() === 'true') {
-      this.logger.info(`voteAction - already vote proposal - address: ${account.address} proposal: ${action.proposalId}`);
+      this.logger.verbose(`voteAction - already vote proposal - address: ${account.address} proposal: ${action.proposalId}`);
       return true;
     }
     await proxy.contract.methods.vote('0x' + action.proposalId).call({ from: account.address });

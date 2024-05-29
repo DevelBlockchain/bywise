@@ -52,7 +52,7 @@ export default class MintBlocks {
 
         const isMinner = await this.coreContext.configsProvider.isValidator(this.coreContext.blockTree, lastBlock.block.hash, lastBlock.block.height, mainWallet.address);
         if (!isMinner) {
-            this.coreContext.applicationContext.logger.info(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
+            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
             this.isRun = false;
             return;
         }
@@ -79,7 +79,7 @@ export default class MintBlocks {
             chain: this.coreContext.chain
         })
         if(!isConnected) {
-            this.coreContext.applicationContext.logger.info(`ConsensusAlgorithm: Node has disconnected!`)
+            this.coreContext.applicationContext.logger.verbose(`ConsensusAlgorithm: Node has disconnected!`)
             this.pipelineChain.stop().then(() => {
                 this.pipelineChain.start();
             });
@@ -99,7 +99,7 @@ export default class MintBlocks {
         block.hash = block.toHash();
         block.sign = await mainWallet.signHash(block.hash);
 
-        this.coreContext.applicationContext.logger.info(`mint-blocks: mint new block - ${block.height} - hash: ${block.hash.substring(0, 10)}`)
+        this.coreContext.applicationContext.logger.verbose(`mint-blocks: mint new block - ${block.height} - hash: ${block.hash.substring(0, 10)}`)
         await this.coreContext.blockProvider.saveNewBlock(block);
         await this.coreContext.blockProvider.populateBlockInfo(this.coreContext.blockTree, block.hash);
 

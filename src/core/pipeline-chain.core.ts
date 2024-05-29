@@ -29,13 +29,13 @@ export default class PipelineChain implements Task {
         this.runWorkersCount++;
         try {
             const task = new SyncChain(this.coreContext);
-            this.coreContext.applicationContext.logger.info(`start sync chain ${this.coreContext.chain}`);
+            this.coreContext.applicationContext.logger.verbose(`start sync chain ${this.coreContext.chain}`);
             while (this.isRun && task.isRun) {
                 await task.run();
 
                 await helper.sleep(this.defaultDelay);
             }
-            this.coreContext.applicationContext.logger.info(`sync chain ${this.coreContext.chain} done`);
+            this.coreContext.applicationContext.logger.verbose(`sync chain ${this.coreContext.chain} done`);
         } catch (err: any) {
             this.coreContext.applicationContext.logger.error(`error core.runSyncChain chain ${this.coreContext.chain} - ${err.message}`, err);
             this.stop();
@@ -225,7 +225,7 @@ export default class PipelineChain implements Task {
 
     async start() {
         this.isRun = true;
-        this.coreContext.applicationContext.logger.info(`watch ${this.coreContext.chain} chain`)
+        this.coreContext.applicationContext.logger.verbose(`watch ${this.coreContext.chain} chain`)
         await this.runPipeline();
     }
 
