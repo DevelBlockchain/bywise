@@ -79,5 +79,6 @@ export default class Bywise {
         await this.core.stop();
         await this.applicationContext.mq.stop();
         await this.applicationContext.database.stop();
+        await helper.sleep(500);
     }
 }

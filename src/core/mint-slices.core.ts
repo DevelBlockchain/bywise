@@ -240,7 +240,7 @@ export default class MintSlices {
                 addTransactions = 0;
                 mint = false;
             }
-            await helper.wait();
+            await helper.sleep(100);
         } while (!end && this.isRun);
         await this.coreContext.transactionsProvider.disposeContext(ctx);
         this.isRunStream = false;
