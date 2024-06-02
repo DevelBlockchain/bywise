@@ -12,10 +12,13 @@ const PRESET = [
     "class EditDate extends Date { static now = () => parseInt(blockchain.getTxCreated());constructor() { super(EditDate.now()) }};",
     "Date = EditDate;",
 ].join('\n');
+const FILE_BYWISE_UTILS = fs.readFileSync(path.join(__dirname, '../../imports/bywise-utils.mjs'), "utf-8")
+const FILE_BIGNUMBER = fs.readFileSync(path.join(__dirname, '../../imports/bignumber.mjs'), "utf-8")
 const imports = [
-    { module: "bignumber.js", file: "imports/bignumber.mjs" },
-    { module: "bywise-utils.js", file: "imports/bywise-utils.mjs" }
+    { module: "bignumber.js", binary: FILE_BIGNUMBER },
+    { module: "bywise-utils.js", binary: FILE_BYWISE_UTILS }
 ]
+
 
 export type ABIParameters = {
     name: string;
@@ -67,7 +70,7 @@ export class BywiseRuntimeInstance {
             for (let i = 0; i < imports.length; i++) {
                 const element = imports[i];
                 if (element.module === moduleName) {
-                    return fs.readFileSync(path.join(__dirname, '../../' + element.file), "utf-8");
+                    return element.binary;
                 }
             }
             throw new Error(`module ${moduleName} not found`)
