@@ -15,7 +15,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest --watch true --maxWorkers=1 --config jestconfig.json",
     "test:all": "BYWISE_TEST=1 jest --verbose true --maxWorkers=5 --config jestconfig.json",
-    "test:single": "npm run test:clear && npm test -- blocks-propagation.test.ts",
+    "test:single": "npm run test:clear && npm test -- transactions.test.ts",
     "test:clear": "jest --clearCache"
   },
   "author": "Devel Blockchain <contact@develblockchain.com>",
@@ -33,7 +33,7 @@
     "jsonwebtoken": "^9.0.0",
     "level": "^8.0.0",
     "pidusage": "^3.0.2",
-    "quickjs-emscripten": "^0.21.1",
+    "quickjs-emscripten": "^0.21.2",
     "randomstring": "^1.2.2",
     "seedrandom": "^3.0.5",
     "web3": "^4.8.0",

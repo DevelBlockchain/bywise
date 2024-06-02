@@ -253,11 +253,6 @@ export default async function transactionsController(app: express.Express, apiCo
                 return res.status(400).send({ error: `Node does not work with this chain` });
             }
 
-            const output: TransactionOutputDTO = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, simulateWallet: false });
-            if (output.error) {
-                throw new Error(output.error);
-            }
-
             const btx = await apiContext.transactionsProvider.saveNewTransaction(tx);
             return res.send(new TransactionsDTO(btx));
         } catch (err: any) {

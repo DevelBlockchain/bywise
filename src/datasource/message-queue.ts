@@ -169,9 +169,9 @@ export default class MessageQueue {
         if (worker_threads.parentPort) {
             worker_threads.parentPort.close()
         }
+        MessageQueue.postMethod = (value: any) => {};
         const nullVar: any = null;
         MessageQueue.eventEmitter = nullVar;
-        MessageQueue.postMethod = nullVar;
     }
 
     addMessageListener(key: RoutingKeys, action: MessageListener) {
