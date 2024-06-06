@@ -384,6 +384,108 @@ describe('contracts', () => {
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);
+    
+    test('contract call other contracs', async () => {
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
+
+        const saveValueContract = BywiseHelper.getBWSAddressContract();
+        const otherContract = BywiseHelper.getBWSAddressContract();
+        let tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            {
+                contractAddress: saveValueContract, code: `
+                import BywiseUtils, { StorageValue } from 'bywise-utils.js';
+                class StorageContract {
+                    value = new StorageValue('');
+                    setValue(newValue) {
+                        this.value.set(newValue);
+                    }
+                    getValue() { // @view
+                        return this.value.get();
+                    }
+                }
+                BywiseUtils.exportContract(new StorageContract());`
+            }
+        );
+        tx.isValid();
+        let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            saveValueContract,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "getValue", inputs: [] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("");
+        
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            {
+                contractAddress: otherContract, code: `
+                import BywiseUtils, { StorageValue } from 'bywise-utils.js';
+                class OtherContract {
+                    setNewValue(contractAddress, value) {
+                        const SC = BywiseUtils.getContract(contractAddress, ['setValue', 'getValue']);
+                        SC.setValue(value);
+                        return SC.getValue();
+                    }
+                }
+                BywiseUtils.exportContract(new OtherContract());`
+            }
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            otherContract,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "setNewValue", inputs: [saveValueContract, "Banana"] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("Banana");
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            saveValueContract,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "getValue", inputs: [] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("Banana");
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
 });
 
 describe('stress testing', () => {
