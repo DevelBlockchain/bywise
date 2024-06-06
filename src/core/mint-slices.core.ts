@@ -71,7 +71,7 @@ export default class MintSlices {
         const transactions: Map<string, boolean> = new Map();
         let newTransactions: string[] = [];
         let lastSliceHeight: number = -1;
-        let mint = true;
+        let mint = false;
         const LIMIT_BY_NEW_SLICE = 1000;
         let addTransactions = 0;
 
@@ -134,6 +134,7 @@ export default class MintSlices {
                 transactions.set(txInfo.tx.hash, true);
                 newTransactions.push(txInfo.tx.hash);
                 addTransactions++;
+                mint = true;
             }
         }
 
@@ -218,11 +219,10 @@ export default class MintSlices {
                     transactions.set(txInfo.tx.hash, true);
                     newTransactions.push(txInfo.tx.hash);
                     addTransactions++;
+                    end = true;
+                    mint = true;
+                    this.coreContext.applicationContext.logger.verbose(`mint slice - mint by END`)
                 }
-
-                end = true;
-                mint = true;
-                this.coreContext.applicationContext.logger.verbose(`mint slice - mint by END`)
             }
             simulateUptime = new Date().getTime() - simulateUptime;
             if (countSimulatedTransactions > 0) {
