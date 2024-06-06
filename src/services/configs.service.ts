@@ -127,15 +127,17 @@ export class ConfigProvider {
     for (let i = 0; i < envs.length; i++) {
       const env = envs[i];
 
-      let cfgMeta: ConfigMeta = JSON.parse(env.value);
-      let value;
-      if (blockHeight - cfgMeta.lastUpdate > 60 || cfgMeta.lastUpdate === 0) {
-        value = cfgMeta.value;
-      } else {
-        value = cfgMeta.lastValue;
-      }
-      if (value === 'true') {
-        addresses.push(env.key);
+      if (env.value) {
+        let cfgMeta: ConfigMeta = JSON.parse(env.value);
+        let value;
+        if (blockHeight - cfgMeta.lastUpdate > 60 || cfgMeta.lastUpdate === 0) {
+          value = cfgMeta.value;
+        } else {
+          value = cfgMeta.lastValue;
+        }
+        if (value === 'true') {
+          addresses.push(env.key);
+        }
       }
     }
     return addresses;

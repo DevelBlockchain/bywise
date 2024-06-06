@@ -68,12 +68,10 @@ describe('basic tests', () => {
         );
         tx.isValid();
 
-        const blockTree = await blocksProvider.getMainBlockTree(chain);
-        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
-        expect(lastBlockInfo !== undefined).toEqual(true);
-        if (!lastBlockInfo) return;
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
 
-        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
 
         const output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(output.error).toEqual(undefined);
@@ -82,11 +80,9 @@ describe('basic tests', () => {
     }, 30000);
 
     test('set balance', async () => {
-        const blockTree = await blocksProvider.getMainBlockTree(chain);
-        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
-        expect(lastBlockInfo !== undefined).toEqual(true);
-        if (!lastBlockInfo) return;
-        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -107,18 +103,16 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, wallet.address);
+        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
         expect(balance.balance.toString()).toEqual('100');
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);
 
     test('add balance', async () => {
-        const blockTree = await blocksProvider.getMainBlockTree(chain);
-        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
-        expect(lastBlockInfo !== undefined).toEqual(true);
-        if (!lastBlockInfo) return;
-        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -141,18 +135,16 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, wallet.address);
+        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
         expect(balance.balance.toString()).toEqual('60');
 
         await transactionsProvider.disposeContext(ctx);
     }), 30000;
 
     test('sub balance', async () => {
-        const blockTree = await blocksProvider.getMainBlockTree(chain);
-        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
-        expect(lastBlockInfo !== undefined).toEqual(true);
-        if (!lastBlockInfo) return;
-        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -190,7 +182,7 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, wallet.address);
+        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
         expect(balance.balance.toString()).toEqual('75');
 
         await transactionsProvider.disposeContext(ctx);
@@ -198,14 +190,10 @@ describe('basic tests', () => {
 
     test('make transfer', async () => {
         let wallet2 = new Wallet();
-        const blockTree = await blocksProvider.getMainBlockTree(chain);
-        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
-        expect(lastBlockInfo !== undefined).toEqual(true);
-        if (!lastBlockInfo) return;
-        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
-        ctx.simulate = false;
-        ctx.simulateWallet = false;
-        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, wallet.address);
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
+        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
         expect(balance.balance.toString()).toEqual('0');
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -227,7 +215,7 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, wallet.address);
+        balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
         expect(balance.balance.toString()).toEqual('100');
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -242,10 +230,10 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, wallet.address);
+        balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
         expect(balance.balance.toString()).toEqual('30');
 
-        balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, wallet2.address);
+        balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet2.address);
         expect(balance.balance.toString()).toEqual('70');
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -266,11 +254,9 @@ describe('basic tests', () => {
 
 describe('set configs', () => {
     test('set basic fee', async () => {
-        const blockTree = await blocksProvider.getMainBlockTree(chain);
-        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
-        expect(lastBlockInfo !== undefined).toEqual(true);
-        if (!lastBlockInfo) return;
-        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -292,7 +278,7 @@ describe('set configs', () => {
         expect(ctx.output.feeUsed).toEqual("0");
 
         transactionsProvider.createSubContext(ctx);
-        ctx.block.height++;// affter first block
+        ctx.blockHeight++;// affter first block
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -326,7 +312,7 @@ describe('set configs', () => {
         expect(ctx.output.feeUsed).toEqual("0");
 
         transactionsProvider.createSubContext(ctx);
-        ctx.block.height += 10; // wait 10 blocks
+        ctx.blockHeight += 10; // wait 10 blocks
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -341,7 +327,7 @@ describe('set configs', () => {
         expect(ctx.output.feeUsed).toEqual("0");
 
         transactionsProvider.createSubContext(ctx); // waited more than 100 blocks
-        ctx.block.height += 100;
+        ctx.blockHeight += 100;
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -374,12 +360,9 @@ describe('contracts', () => {
         );
         tx.isValid();
 
-        const blockTree = await blocksProvider.getMainBlockTree(chain);
-        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
-        expect(lastBlockInfo !== undefined).toEqual(true);
-        if (!lastBlockInfo) return;
-
-        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
 
         let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(output.error).toEqual(undefined);
@@ -405,12 +388,9 @@ describe('contracts', () => {
 
 describe('stress testing', () => {
     test('simple transactions', async () => {
-        const blockTree = await blocksProvider.getMainBlockTree(chain);
-        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
-        expect(lastBlockInfo !== undefined).toEqual(true);
-        if (!lastBlockInfo) return;
-
-        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
 
         let uptime = new Date().getTime();
 
@@ -440,12 +420,9 @@ describe('stress testing', () => {
     }, 30000);
 
     test('contract transactions', async () => {
-        const blockTree = await blocksProvider.getMainBlockTree(chain);
-        const lastBlockInfo = blockTree.getBlockInfo(blockTree.blockTreeLastMinedHash);
-        expect(lastBlockInfo !== undefined).toEqual(true);
-        if (!lastBlockInfo) return;
-
-        const ctx = transactionsProvider.createContext(blockTree, lastBlockInfo);
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
 
         const contractAddress = BywiseHelper.getBWSAddressContract();
         let tx = await transactionsProvider.createNewTransactionFromWallet(

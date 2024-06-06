@@ -2,13 +2,6 @@ import { Environment } from "../models";
 import { BlockTree } from "../types/environment.types";
 import { ApplicationContext } from "../types/task.type";
 
-type EnvType = {
-    chain: string
-    hash: string
-    key: string
-    value: string
-}
-
 export class EnvironmentProvider {
 
     private EnvironmentRepository;
@@ -17,46 +10,49 @@ export class EnvironmentProvider {
         this.EnvironmentRepository = applicationContext.database.EnvironmentRepository;
     }
 
-    private findEnv(envs: EnvType[], blockTree: BlockTree, blockHash: string, key: string): EnvType | undefined {
+    private findEnv(envs: Environment[], blockTree: BlockTree, contextHash: string, key: string): Environment | undefined {
+        if (envs.length == 0) {
+            return undefined;
+        }
         for (let i = 0; i < envs.length; i++) {
             const env = envs[i];
-            if (env.hash === blockHash && env.key === key) {
+            if (env.hash === contextHash) {
                 return env;
             }
         }
-        if (blockHash !== BlockTree.ZERO_HASH) {
-            const lastHash = blockTree.getLastHash(blockHash);
-            if (blockHash === lastHash) return undefined;
+        if (contextHash !== BlockTree.ZERO_HASH) {
+            const lastHash = blockTree.getLastHash(contextHash);
+            if (lastHash === contextHash) return undefined;
             return this.findEnv(envs, blockTree, lastHash, key);
         } else {
-            return undefined
+            return undefined;
         }
     }
 
-    async has(blockTree: BlockTree, blockHash: string, key: string): Promise<boolean> {
+    async has(blockTree: BlockTree, contextHash: string, key: string): Promise<boolean> {
         const envs = await this.EnvironmentRepository.findByChainAndKey(blockTree.chain, key);
-        const env = this.findEnv(envs, blockTree, blockHash, key);
-        if (!env || env.value === '') {
+        const env = this.findEnv(envs, blockTree, contextHash, key);
+        if (!env || env.value === null) {
             return false;
         } else {
             return true;
         }
     }
 
-    async getList(blockTree: BlockTree, blockHash: string, key: string): Promise<Environment[]> {
+    async getList(blockTree: BlockTree, contextHash: string, key: string): Promise<Environment[]> {
         const envs = await this.EnvironmentRepository.findByChainAndKey(blockTree.chain, key);
         const added: string[] = [];
         const values: Environment[] = [];
-        while (blockHash !== BlockTree.ZERO_HASH) {
+        while (contextHash !== BlockTree.ZERO_HASH) {
             envs.forEach(env => {
-                if (env.hash === blockHash) {
+                if (env.hash === contextHash) {
                     if (!added.includes(env.key)) {
                         values.push(env);
                         added.push(env.key);
                     }
                 }
             })
-            blockHash = blockTree.getLastHash(blockHash);
+            contextHash = blockTree.getLastHash(contextHash);
         }
         envs.forEach(env => {
             if (env.hash === BlockTree.ZERO_HASH) {
@@ -72,51 +68,54 @@ export class EnvironmentProvider {
         });
     }
 
-    async get(blockTree: BlockTree, blockHash: string, key: string): Promise<string> {
+    async get(blockTree: BlockTree, contextHash: string, key: string): Promise<string> {
         const envs = await this.EnvironmentRepository.findByChainAndKey(blockTree.chain, key);
-        for (let i = 0; i < envs.length; i++) {
-            if (envs[i].key !== key) console.log(`invalid search ${key} / ${envs[i].key}`);
-        }
-        const env = this.findEnv(envs, blockTree, blockHash, key);
-        if (env) {
+        const env = this.findEnv(envs, blockTree, contextHash, key);
+        if (env && env.value !== null) {
             return env.value;
         } else {
             return '';
         }
     }
 
-    async set(blockTree: BlockTree, blockHash: string, key: string, value: string): Promise<void> {
+    async set(blockTree: BlockTree, contextHash: string, key: string, value: string): Promise<void> {
         const newEnv: Environment = {
             chain: blockTree.chain,
             key: key,
-            hash: blockHash,
+            hash: contextHash,
             value: value,
         };
         await this.EnvironmentRepository.save(newEnv);
     }
 
-    async delete(blockTree: BlockTree, blockHash: string, key: string): Promise<void> {
+    async delete(blockTree: BlockTree, contextHash: string, key: string): Promise<void> {
         const newEnv: Environment = {
             chain: blockTree.chain,
             key: key,
-            hash: blockHash,
-            value: '',
+            hash: contextHash,
+            value: null,
         };
         await this.EnvironmentRepository.save(newEnv);
     }
 
-    async consolideBlock(blockTree: BlockTree, blockHash: string) {
-        const envs = await this.EnvironmentRepository.findByChainAndHash(blockTree.chain, blockHash);
+    async mergeContext(blockTree: BlockTree, fromContextHash: string, toContextHash: string) {
+        const envs = await this.EnvironmentRepository.findByChainAndHash(blockTree.chain, fromContextHash);
+        const saveEnvs: Environment[] = [];
         for (let i = 0; i < envs.length; i++) {
             const env = envs[i];
-            await this.set(blockTree, BlockTree.ZERO_HASH, env.key, env.value);
+            saveEnvs.push({
+                chain: blockTree.chain,
+                key: env.key,
+                hash: toContextHash,
+                value: env.value,
+            });
         }
-        this.deleteSimulation(blockTree, blockHash);
+        await this.EnvironmentRepository.saveMany(saveEnvs);
     }
 
-    async deleteSimulation(blockTree: BlockTree, blockHash: string) {
-        blockTree.delHash(blockHash);
-        const envs = await this.EnvironmentRepository.findByChainAndHash(blockTree.chain, blockHash);
+    async deleteSimulation(blockTree: BlockTree, contextHash: string) {
+        const envs = await this.EnvironmentRepository.findByChainAndHash(blockTree.chain, contextHash);
         await this.EnvironmentRepository.delMany(envs);
+        blockTree.delBlock(contextHash);
     }
 }

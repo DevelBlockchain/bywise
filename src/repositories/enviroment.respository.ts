@@ -1,4 +1,4 @@
-import Database from "../datasource/database";
+import Database, { SaveRequest } from "../datasource/database";
 import { Environment } from "../models";
 
 export class EnvironmentRepository {
@@ -7,6 +7,15 @@ export class EnvironmentRepository {
 
     constructor(db: Database) {
         this.db = db;
+    }
+
+    async saveMany(env: Environment[]) {
+        let batch: SaveRequest[] = [];
+        env.forEach(env => {
+            batch.push({ key: `${this.table}-${env.chain}-key-${env.key}-${env.hash}`, data: env });
+            batch.push({ key: `${this.table}-${env.chain}-hash-${env.hash}-${env.key}`, data: env });
+        })
+        await this.db.saveMany(batch);
     }
 
     async save(env: Environment) {

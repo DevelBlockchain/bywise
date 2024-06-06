@@ -25,28 +25,27 @@ export class TransactionsProvider {
     this.walletProvider = new WalletProvider(applicationContext);
   }
 
-  createContext(blockTree: BlockTree, lastBlock: Blocks) {
+  createContext(blockTree: BlockTree, lastContextHash: string, blockHeight: number) {
     const simulationId = helper.getRandomHash();
 
     const block = new Block();
-    block.height = lastBlock.block.height + 1;
+    block.height = blockHeight;
     block.chain = blockTree.chain;
     block.version = '2';
     block.created = Math.floor(Date.now() / 1000);
-    block.lastHash = lastBlock.block.hash;
+    block.lastHash = lastContextHash;
     block.hash = simulationId;
 
-    blockTree.addHash(lastBlock.block.hash, simulationId);
+    blockTree.addBlock(block);
 
-    return new SimulateDTO(blockTree, block, simulationId);
+    return new SimulateDTO(blockTree, blockHeight, simulationId);
   }
 
   createSubContext(ctx: SimulateDTO) {
-    if (!ctx.simulationId) throw new Error(`not is simulation`);
     const newHash = helper.getRandomHash();
     ctx.simulationIds.push(newHash);
-    ctx.blockTree.addHash(ctx.block.hash, newHash);
-    ctx.block.hash = newHash;
+    ctx.blockTree.addBlock({ lastHash: ctx.simulationId, hash: newHash, height: ctx.blockHeight});
+    ctx.simulationId = newHash;
   }
 
   async disposeSubContext(ctx: SimulateDTO) {
@@ -54,8 +53,7 @@ export class TransactionsProvider {
     if (id !== undefined) {
       // recuperar ctx.block.hash
       const lastHash = ctx.simulationIds[ctx.simulationIds.length - 1];
-      if (!lastHash) throw new Error(`lastHash not found`);
-      ctx.block.hash = lastHash;
+      ctx.simulationId = lastHash;
       await this.environmentProvider.deleteSimulation(ctx.blockTree, id);
     }
   }
@@ -67,7 +65,18 @@ export class TransactionsProvider {
         await this.environmentProvider.deleteSimulation(ctx.blockTree, id);
       }
     } else {
-      await this.environmentProvider.deleteSimulation(ctx.blockTree, ctx.block.hash);
+      await this.environmentProvider.deleteSimulation(ctx.blockTree, ctx.simulationId);
+    }
+  }
+  
+  async mergeContext(ctx: SimulateDTO, contextHash: string) {
+    if (ctx.simulationId) {
+      for (let i = 0; i < ctx.simulationIds.length; i++) {
+        const id = ctx.simulationIds[i];
+        await this.environmentProvider.mergeContext(ctx.blockTree, id, contextHash);
+      }
+    } else {
+      await this.environmentProvider.mergeContext(ctx.blockTree, ctx.simulationId, contextHash);
     }
   }
 
@@ -141,16 +150,10 @@ export class TransactionsProvider {
     await this.TransactionRepository.save(infoTx);
   }
 
-  async populateTxInfo(blockTree: BlockTree, hash: string) {
-    if (blockTree.getTxInfo(hash)) {
-      return;
-    }
-    const btx = await this.TransactionRepository.findByHash(hash);
-    if (btx) {
-      blockTree.setTxInfo(btx);
-      return true;
-    }
-    return false;
+  async getTxInfo(hash: string) {
+    const txInfo = await this.TransactionRepository.findByHash(hash);
+    if (!txInfo) throw new Error(`transaction not found ${hash}`);
+    return txInfo;
   }
 
   async getMempool(chain: string) {

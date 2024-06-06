@@ -174,9 +174,9 @@ const createSimulationContext = (chain: string) => {
     block.hash = simulationId;
 
     const blockTree = new BlockTree(chain);
-    blockTree.addHash(BlockTree.ZERO_HASH, simulationId);
+    blockTree.addBlock(block);
 
-    return new SimulateDTO(blockTree, block, simulationId);
+    return new SimulateDTO(blockTree, block.height, simulationId);
 }
 
 const numberToString = (n: number | string) => {

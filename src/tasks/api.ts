@@ -39,7 +39,7 @@ class Api implements Task {
     }
 
     private async addChain(chain: string) {
-        const blockTree = await this.apiCtx.blockProvider.getMainBlockTree(chain);
+        const blockTree = await this.apiCtx.blockProvider.getBlockTree(chain);
         this.apiCtx.blockTree.set(chain, blockTree);
         if (!this.apiCtx.chains.includes(chain)) {
             this.apiCtx.chains.push(chain)

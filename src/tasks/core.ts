@@ -65,32 +65,17 @@ class Core implements Task {
     async start() {
         this.applicationContext.mq.addMessageListener(RoutingKeys.new_tx, async (message: any) => {
             if (this.network.web3.network.isConnected) {
-                const tx = new Tx(message);
-                const pipelineChain = this.runChains.get(tx.chain);
-                if (pipelineChain) {
-                    pipelineChain.coreContext.transactionsProvider.populateTxInfo(pipelineChain.coreContext.blockTree, tx.hash);
-                }
-                await this.network.web3.transactions.sendTransaction(tx);
+                await this.network.web3.transactions.sendTransaction(message);
             }
         });
         this.applicationContext.mq.addMessageListener(RoutingKeys.new_slice, async (message: any) => {
             if (this.network.web3.network.isConnected) {
-                const slice = new Slice(message);
-                const pipelineChain = this.runChains.get(slice.chain);
-                if (pipelineChain) {
-                    pipelineChain.coreContext.slicesProvider.populateSliceInfo(pipelineChain.coreContext.blockTree, slice.hash);
-                }
-                await this.network.web3.slices.sendSlice(slice);
+                await this.network.web3.slices.sendSlice(message);
             }
         });
         this.applicationContext.mq.addMessageListener(RoutingKeys.new_block, async (message: any) => {
             if (this.network.web3.network.isConnected) {
-                const block = new Block(message);
-                const pipelineChain = this.runChains.get(block.chain);
-                if (pipelineChain) {
-                    pipelineChain.coreContext.blockProvider.populateBlockInfo(pipelineChain.coreContext.blockTree, block.hash);
-                }
-                await this.network.web3.blocks.sendBlock(block);
+                await this.network.web3.blocks.sendBlock(message);
             }
         });
         this.applicationContext.mq.addMessageListener(RoutingKeys.find_tx, async (message: any) => {
@@ -133,11 +118,11 @@ class Core implements Task {
             return await this.network.web3.network.testConnections();
         });
 
-        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx, simulateWallet: boolean }) => {
+        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx }) => {
             const tx = new Tx(data.tx);
             const pipelineChain = this.runChains.get(tx.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.executeSimulation(tx, data.simulateWallet);
+                return await pipelineChain.executeTransactionsTask.executeSimulation(tx);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }

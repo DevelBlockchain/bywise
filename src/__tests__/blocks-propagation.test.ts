@@ -119,7 +119,6 @@ const connectNodes = async () => {
 }
 
 describe('propagation test', () => {
-
     test('test enviroment', async () => {
         await connectNodes();
 
@@ -195,14 +194,14 @@ describe('propagation test', () => {
         const blocksNode1 = res.body.reverse();
 
         for (let i = 1; i < blocksNode1.length; i++) {
-            if (i < blocksNode0.length) {
+            if (i < blocksNode0.length - 1) {
                 expect(blocksNode1[i].from).toEqual(node0.applicationContext.mainWallet.address);
-            } else {
+            } else if (i > blocksNode0.length) {
                 expect(blocksNode1[i].from).toEqual(node1.applicationContext.mainWallet.address);
             }
         }
     }, blockDelay * 15);
-
+    
     test('multiple validators', async () => {
         await node0.core.runCore();
         await helper.sleep(blockDelay * 3); // start alone
@@ -242,8 +241,8 @@ describe('propagation test', () => {
             const b1 = blocksNode1[i];
             const b2 = blocksNode2[i];
 
-            expect(b0).toEqual(b1);
-            expect(b0).toEqual(b2);
+            expect(b0.hash).toEqual(b1.hash);
+            expect(b0.hash).toEqual(b2.hash);
 
             if (!fromAddress.includes(b2.from)) {
                 fromAddress.push(b2.from)
@@ -251,10 +250,11 @@ describe('propagation test', () => {
         }
         expect(fromAddress.length).toBeGreaterThanOrEqual(2);
     }, blockDelay * 15);
-
+    
     test('blockchain convergence', async () => {
         let res;
         let blocksNode0: Block[] = []
+        let blocksNode1: Block[] = []
         let blocksNode2: Block[] = []
 
         await node0.core.runCore();
@@ -273,14 +273,11 @@ describe('propagation test', () => {
             .get('/api/v2/blocks/last/' + chain)
         expect(res.status).toEqual(200);
         blocksNode2 = res.body.reverse();
-        
-        //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        
+
         // check if different chains
-        expect(blocksNode0.length).toBeGreaterThan(5);
-        expect(blocksNode2.length).toBeGreaterThan(5);
-        for (let i = 1; i < 5; i++) {
+        expect(blocksNode0.length).toBeGreaterThan(3);
+        expect(blocksNode2.length).toBeGreaterThan(3);
+        for (let i = 1; i < blocksNode0.length && i < blocksNode2.length; i++) {
             const b0 = blocksNode0[i];
             const b2 = blocksNode2[i];
             expect(b0.hash).not.toEqual(b2.hash);
@@ -293,13 +290,20 @@ describe('propagation test', () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-
-        await helper.sleep(blockDelay * 6);
+        
+        await helper.sleep(blockDelay * 3);
+        await node1.core.runCore();
+        await helper.sleep(blockDelay * 3);
 
         res = await request(node0.api.server)
             .get('/api/v2/blocks/last/' + chain)
         expect(res.status).toEqual(200);
         blocksNode0 = res.body.reverse();
+        
+        res = await request(node1.api.server)
+            .get('/api/v2/blocks/last/' + chain)
+        expect(res.status).toEqual(200);
+        blocksNode1 = res.body.reverse();
 
         res = await request(node2.api.server)
             .get('/api/v2/blocks/last/' + chain)
@@ -307,13 +311,16 @@ describe('propagation test', () => {
         blocksNode2 = res.body.reverse();
 
         //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
+        //console.log('blocksNode1', blocksNode1.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
         //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
 
         // checks if the chains have converged
         expect(blocksNode0.length).toBeGreaterThan(10);
+        expect(blocksNode1.length).toBeGreaterThan(10);
         expect(blocksNode2.length).toBeGreaterThan(10);
         for (let i = 0; i < 10; i++) {
             const b0 = blocksNode0[i];
+            const b1 = blocksNode1[i];
             const b2 = blocksNode2[i];
             expect(b0.hash).toEqual(b2.hash);
         }

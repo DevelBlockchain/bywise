@@ -70,29 +70,23 @@ export type ValueBooleanDTO = {
 
 export class SimulateDTO {
 
-  constructor(blockTree: BlockTree, block: Block, simulationId?: string) {
+  constructor(blockTree: BlockTree, blockHeight: number, simulationId: string) {
     this.blockTree = blockTree;
-    this.block = block;
-    this.sliceFrom = '';
-    if (simulationId) {
-      this.simulationIds = [simulationId];
-      this.simulationId = simulationId;
-      this.simulate = true;
-      this.simulateWallet = true;
-    }
+    this.blockHeight = blockHeight;
+    this.simulationIds = [simulationId];
+    this.simulationId = simulationId;
   }
 
   blockTree: BlockTree;
-  block: Block;
-  sliceFrom: string;
+  blockHeight: number;
   slicesModels: Slice[] = [];
   transactionsModels: Tx[] = [];
   totalFee: BigNumber = new BigNumber(0);
   simulationIds: string[] = [];
-  simulationId?: string;
+  simulationId: string;
+  sliceFrom: string = '';
   nonce: number = 0;
-  simulate: boolean = false;
-  simulateWallet: boolean = false;
+  checkWalletBalance: boolean = true;
   enableWriteProxy: boolean = false;
   enableReadProxy: boolean = false;
   proxyMock: string[] = [];

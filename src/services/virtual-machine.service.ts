@@ -28,10 +28,10 @@ export class VirtualMachineProvider {
   }
 
   async calcFee(ctx: SimulateDTO, size: BigNumber, amount: BigNumber, cost: BigNumber): Promise<string> {
-    let feeBasic = (await this.configsProvider.getByName(ctx.blockTree, ctx.block.hash, ctx.block.height, 'feeBasic')).toNumber();
-    let feeCoefSize = (await this.configsProvider.getByName(ctx.blockTree, ctx.block.hash, ctx.block.height, 'feeCoefSize')).toNumber();
-    let feeCoefAmount = (await this.configsProvider.getByName(ctx.blockTree, ctx.block.hash, ctx.block.height, 'feeCoefAmount')).toNumber();
-    let feeCoefCost = (await this.configsProvider.getByName(ctx.blockTree, ctx.block.hash, ctx.block.height, 'feeCoefCost')).toNumber();
+    let feeBasic = (await this.configsProvider.getByName(ctx.blockTree, ctx.simulationId, ctx.blockHeight, 'feeBasic')).toNumber();
+    let feeCoefSize = (await this.configsProvider.getByName(ctx.blockTree, ctx.simulationId, ctx.blockHeight, 'feeCoefSize')).toNumber();
+    let feeCoefAmount = (await this.configsProvider.getByName(ctx.blockTree, ctx.simulationId, ctx.blockHeight, 'feeCoefAmount')).toNumber();
+    let feeCoefCost = (await this.configsProvider.getByName(ctx.blockTree, ctx.simulationId, ctx.blockHeight, 'feeCoefCost')).toNumber();
 
     let fee = feeBasic;
     fee = fee.plus(feeCoefSize.multipliedBy(size));
@@ -65,7 +65,7 @@ export class VirtualMachineProvider {
       if (!BywiseHelper.isValidAddress(address)) throw new Error(`Invalid address`);
       if (inputs === undefined) throw new Error(`inputs array not found`);
       if (!Array.isArray(inputs)) throw new Error(`Inputs need be an array`);
-      const bccString = await this.environmentProvider.get(ctx.blockTree, ctx.block.hash, address);
+      const bccString = await this.environmentProvider.get(ctx.blockTree, ctx.simulationId, address);
       if (!bccString) throw new Error(`Contract not found`);
       const bcc: BywiseContractContext = JSON.parse(bccString);
       let foundMethod = false;
@@ -98,7 +98,7 @@ export class VirtualMachineProvider {
       if (!BywiseHelper.isValidAddress(contractAddress)) throw new Error(`invalid address`);
       if (!BywiseHelper.decodeBWSAddress(contractAddress).isContract) throw new Error(`invalid address - not is contract`);
 
-      const oldContract = await this.environmentProvider.get(ctx.blockTree, ctx.block.hash, contractAddress);
+      const oldContract = await this.environmentProvider.get(ctx.blockTree, ctx.simulationId, contractAddress);
       if (oldContract) throw new Error(`Cant update contract`);
 
       let contractAmount = new BigNumber(0);
@@ -111,7 +111,7 @@ export class VirtualMachineProvider {
 
       const bcc = await BywiseRuntime.execContract(this.blockchainBywise, getContract, ctx, contractAddress, tx.from[0], contractAmount.toString(), code);
 
-      await this.environmentProvider.set(ctx.blockTree, ctx.block.hash, contractAddress, JSON.stringify(bcc));
+      await this.environmentProvider.set(ctx.blockTree, ctx.simulationId, contractAddress, JSON.stringify(bcc));
       ctx.output.output = {
         contractAddress: contractAddress,
         abi: bcc.abi
@@ -143,7 +143,7 @@ export class VirtualMachineProvider {
     if (tx.type === TxType.TX_COMMAND || tx.type === TxType.TX_BLOCKCHAIN_COMMAND) {
       feeUsed = "0";
     }
-    if (ctx.simulateWallet === false && (new BigNumber(tx.fee).isLessThan(new BigNumber(feeUsed)))) {
+    if (ctx.checkWalletBalance === true && (new BigNumber(tx.fee).isLessThan(new BigNumber(feeUsed)))) {
       throw new Error(`Invalid fee`);
     }
 
@@ -161,7 +161,7 @@ export class VirtualMachineProvider {
         if (amount !== undefined) {
           const amountBN = new BigNumber(amount);
 
-          const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, to);
+          const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, to);
 
           if (balanceDTO.balance.minus(amountBN).isLessThan(new BigNumber(0))) {
             throw new Error(`Contract with insufficient funds`);
@@ -174,7 +174,7 @@ export class VirtualMachineProvider {
           debit = debit.minus(amountBN);
           balanceDTO.balance = balanceDTO.balance.minus(amountBN);
 
-          await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.block.hash, balanceDTO);
+          await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.simulationId, balanceDTO);
         }
       }
     }
@@ -185,7 +185,7 @@ export class VirtualMachineProvider {
         throw new Error(`Invalid from address`);
       }
 
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, from);
+      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, from);
 
       if (balanceDTO.balance.minus(debit).isLessThan(new BigNumber(0))) {
         debit = debit.minus(balanceDTO.balance);
@@ -194,18 +194,18 @@ export class VirtualMachineProvider {
         balanceDTO.balance = balanceDTO.balance.minus(debit);
         debit = new BigNumber(0);
       }
-      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.block.hash, balanceDTO);
+      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.simulationId, balanceDTO);
     }
-    if (ctx.simulateWallet === false && !debit.isEqualTo(new BigNumber(0))) {
+    if (ctx.checkWalletBalance === true && !debit.isEqualTo(new BigNumber(0))) {
       throw new Error('insufficient funds');
     }
     for (let i = 0; i < tx.to.length; i++) {
       const to = tx.to[i];
       const amount = new BigNumber(tx.amount[i]);
 
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, to);
+      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, to);
       balanceDTO.balance = balanceDTO.balance.plus(new BigNumber(amount));
-      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.block.hash, balanceDTO);
+      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.simulationId, balanceDTO);
     }
 
     ctx.output.fee = tx.fee;
@@ -217,8 +217,8 @@ export class VirtualMachineProvider {
   }
 
   async checkAdminAddress(ctx: SimulateDTO) {
-    if (ctx.tx && ctx.block.height > 0) {
-      let isAdmin = await this.configsProvider.isAdmin(ctx.blockTree, ctx.block.hash, ctx.block.height, ctx.tx.from[0]);
+    if (ctx.tx && ctx.blockHeight > 0) {
+      let isAdmin = await this.configsProvider.isAdmin(ctx.blockTree, ctx.simulationId, ctx.blockHeight, ctx.tx.from[0]);
       if (!isAdmin) {
         throw new Error(`setConfig forbidden`);
       }
@@ -233,7 +233,7 @@ export class VirtualMachineProvider {
       if (cmd.input.length !== 2) throw new Error(`vote-block expected 2 inputs`);
       if (!/^[0-9]+$/.test(cmd.input[1])) throw new Error(`invalid height`);
 
-      const validators = await this.configsProvider.getValidators(ctx.blockTree, ctx.block.hash, ctx.block.height);
+      const validators = await this.configsProvider.getValidators(ctx.blockTree, ctx.simulationId, ctx.blockHeight);
       const from = ctx.tx.from[0];
       const hash = cmd.input[0];
       const height = parseInt(cmd.input[1]);
@@ -264,7 +264,12 @@ export class VirtualMachineProvider {
       if (cmd.input.length !== 1) throw new Error(`start-slice expected 1 inputs`);
       if (!/^[0-9]+$/.test(cmd.input[0])) throw new Error(`invalid height`);
       const height = parseInt(cmd.input[0]);
-      if (ctx.block.height !== height) throw new Error(`wrong start-slice - ${ctx.block.height}/${height}`);
+      if (ctx.blockHeight !== height) throw new Error(`wrong start-slice - ${ctx.blockHeight}/${height}`);
+    } else if (cmd.name == 'end-slice') {
+      if (cmd.input.length !== 1) throw new Error(`end-slice expected 1 inputs`);
+      if (!/^[0-9]+$/.test(cmd.input[0])) throw new Error(`invalid height`);
+      const height = parseInt(cmd.input[0]);
+      if (ctx.blockHeight !== height) throw new Error(`wrong end-slice - ${ctx.blockHeight}/${height}`);
     } else if (cmd.name == 'poi') {
       if (cmd.input.length !== 3) throw new Error(`start-slice expected 1 inputs`);
       if (!/^[0-9]+$/.test(cmd.input[0])) throw new Error(`invalid height`);
@@ -274,12 +279,12 @@ export class VirtualMachineProvider {
       //const hash = cmd.input[1];
 
       const address = ctx.tx.from[0];
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, address);
+      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, address);
       balanceDTO.balance = balanceDTO.balance.minus(new BigNumber("0.1"));
       if (balanceDTO.balance.isLessThan(new BigNumber(0))) {
         balanceDTO.balance = new BigNumber(0);
       }
-      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.block.hash, balanceDTO);
+      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.simulationId, balanceDTO);
     } else {
       throw new Error("Method not implemented.");
     }
@@ -292,9 +297,9 @@ export class VirtualMachineProvider {
       if (cmd.input.length !== 2) throw new Error(`setConfig expected 2 inputs`);
       const cfgName = cmd.input[0];
       const cfgValue = cmd.input[1];
-      const cfg = await this.configsProvider.getByName(ctx.blockTree, ctx.block.hash, ctx.block.height, cfgName);
+      const cfg = await this.configsProvider.getByName(ctx.blockTree, ctx.simulationId, ctx.blockHeight, cfgName);
       cfg.setValue(cfgValue);
-      await this.configsProvider.setConfig(ctx.blockTree, ctx.block.hash, ctx.block.height, cfg);
+      await this.configsProvider.setConfig(ctx.blockTree, ctx.simulationId, ctx.blockHeight, cfg);
 
     } else if (cmd.name == 'addAdmin') {
       if (cmd.input.length !== 1) throw new Error(`addAdmin expected 1 inputs`);
@@ -305,7 +310,7 @@ export class VirtualMachineProvider {
         value: 'true',
         type: 'boolean',
       })
-      await this.configsProvider.setConfig(ctx.blockTree, ctx.block.hash, ctx.block.height, cfg);
+      await this.configsProvider.setConfig(ctx.blockTree, ctx.simulationId, ctx.blockHeight, cfg);
 
     } else if (cmd.name == 'removeAdmin') {
       if (cmd.input.length !== 1) throw new Error(`removeAdmin expected 1 inputs`);
@@ -316,7 +321,7 @@ export class VirtualMachineProvider {
         value: 'false',
         type: 'boolean',
       })
-      await this.configsProvider.setConfig(ctx.blockTree, ctx.block.hash, ctx.block.height, cfg);
+      await this.configsProvider.setConfig(ctx.blockTree, ctx.simulationId, ctx.blockHeight, cfg);
 
     } else if (cmd.name == 'addValidator') {
       if (cmd.input.length !== 1) throw new Error(`addValidator expected 1 inputs`);
@@ -327,7 +332,7 @@ export class VirtualMachineProvider {
         value: 'true',
         type: 'boolean',
       })
-      await this.configsProvider.setConfig(ctx.blockTree, ctx.block.hash, ctx.block.height, cfg);
+      await this.configsProvider.setConfig(ctx.blockTree, ctx.simulationId, ctx.blockHeight, cfg);
 
     } else if (cmd.name == 'removeValidator') {
       if (cmd.input.length !== 1) throw new Error(`removeValidator expected 1 inputs`);
@@ -338,7 +343,7 @@ export class VirtualMachineProvider {
         value: 'false',
         type: 'boolean',
       })
-      await this.configsProvider.setConfig(ctx.blockTree, ctx.block.hash, ctx.block.height, cfg);
+      await this.configsProvider.setConfig(ctx.blockTree, ctx.simulationId, ctx.blockHeight, cfg);
 
     } else if (cmd.name == 'setBalance') {
       if (cmd.input.length !== 2) throw new Error(`setBalance expected 2 inputs`);
@@ -346,9 +351,9 @@ export class VirtualMachineProvider {
       const amount = cmd.input[1];
       if (!BywiseHelper.isValidAddress(address)) throw new Error(`invalid address ${address}`);
       if (!BywiseHelper.isValidAmount(amount)) throw new Error(`invalid amount ${amount}`);
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, address);
+      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, address);
       balanceDTO.balance = new BigNumber(amount);
-      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.block.hash, balanceDTO);
+      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.simulationId, balanceDTO);
 
     } else if (cmd.name == 'addBalance') {
       if (cmd.input.length !== 2) throw new Error(`addBalance expected 2 inputs`);
@@ -356,9 +361,9 @@ export class VirtualMachineProvider {
       const amount = cmd.input[1];
       if (!BywiseHelper.isValidAddress(address)) throw new Error(`invalid address ${address}`);
       if (!BywiseHelper.isValidAmount(amount)) throw new Error(`invalid amount ${amount}`);
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, address);
+      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, address);
       balanceDTO.balance = balanceDTO.balance.plus(new BigNumber(amount));
-      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.block.hash, balanceDTO);
+      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.simulationId, balanceDTO);
 
     } else if (cmd.name == 'subBalance') {
       if (cmd.input.length !== 2) throw new Error(`subBalance expected 2 inputs`);
@@ -366,12 +371,12 @@ export class VirtualMachineProvider {
       const amount = cmd.input[1];
       if (!BywiseHelper.isValidAddress(address)) throw new Error(`invalid address ${address}`);
       if (!BywiseHelper.isValidAmount(amount)) throw new Error(`invalid amount ${amount}`);
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.block.hash, address);
+      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, address);
       balanceDTO.balance = balanceDTO.balance.minus(new BigNumber(amount));
       if (balanceDTO.balance.isLessThan(new BigNumber(0))) {
         balanceDTO.balance = new BigNumber(0);
       }
-      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.block.hash, balanceDTO);
+      await this.walletProvider.setWalletBalance(ctx.blockTree, ctx.simulationId, balanceDTO);
 
     } else {
       throw new Error("Method not implemented.");
@@ -387,13 +392,13 @@ export class VirtualMachineProvider {
       const value = cmd.input[1];
       if (value.length > 1024 * 1000) throw new Error("Value info too long");
 
-      let info = await this.walletProvider.getWalletInfo(ctx.blockTree, ctx.block.hash, ctx.tx.from[0]);
+      let info = await this.walletProvider.getWalletInfo(ctx.blockTree, ctx.simulationId, ctx.tx.from[0]);
       if (name === 'name') info.name = value;
       if (name === 'url') info.url = value;
       if (name === 'bio') info.bio = value;
       if (name === 'photo') info.photo = value;
       if (name === 'publicKey') info.publicKey = value;
-      await this.walletProvider.setWalletInfo(ctx.blockTree, ctx.block.hash, ctx.tx.from[0], info);
+      await this.walletProvider.setWalletInfo(ctx.blockTree, ctx.simulationId, ctx.tx.from[0], info);
       return;
     }
     throw new Error("Method not implemented.");

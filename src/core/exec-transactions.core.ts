@@ -8,6 +8,7 @@ export default class ExecuteTransactions {
     public busy = false;
     private coreContext;
     private lastHash = '';
+    private nextBlockHeight = -1;
     private currentContext: SimulateDTO | undefined;
 
     constructor(coreContext: CoreContext) {
@@ -22,82 +23,48 @@ export default class ExecuteTransactions {
     }
 
     async run() {
+        let currentHash: string;
+        if (this.coreContext.blockTree.bestSlice) {
+            currentHash = this.coreContext.blockTree.bestSlice.hash;
+        } else {
+            currentHash = this.coreContext.blockTree.currentMinnedBlock.hash;
+        }
+
+        if (this.lastHash == currentHash) {
+            return;
+        }
+
+        this.lastHash = currentHash;
+        this.nextBlockHeight = this.coreContext.blockTree.currentMinnedBlock.height + 1;
+
         await this.updateContext();
     }
 
     private async updateContext() {
-        const lastBlock = this.coreContext.lastBlock;
-        if (!lastBlock) throw new Error(`lastBlock block not found`);
+        this.coreContext.applicationContext.logger.verbose(`update main context - hash: ${this.lastHash.substring(0, 10)}...`);
 
-        let currentHash;
-
-        const bestSlice = await this.coreContext.slicesProvider.getBestSlice(this.coreContext.blockTree, lastBlock.block);
-        if (bestSlice === null) {
-            currentHash = '';
-        } else {
-            currentHash = bestSlice.slice.hash;
+        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, this.lastHash, this.nextBlockHeight);
+       
+        await this.waitBusy();
+        const oldContext = this.currentContext;
+        this.currentContext = ctx;
+        if (oldContext) {
+            await this.coreContext.transactionsProvider.disposeContext(oldContext);
         }
-        if (this.lastHash !== currentHash) {
-            this.lastHash = currentHash;
-
-            this.coreContext.applicationContext.logger.verbose(`update main context`);
-
-
-            if (bestSlice) {
-                const constEvents: Events[] = [];
-                const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, lastBlock);
-                for (let i = 0; i < bestSlice.slice.transactions.length; i++) {
-                    const txHash = bestSlice.slice.transactions[i];
-                    const txInfo = ctx.blockTree.getTxInfo(txHash);
-                    if (txInfo) {
-                        const output = await this.coreContext.transactionsProvider.simulateTransaction(txInfo.tx, bestSlice.slice, ctx);
-
-                        for (let j = 0; j < output.events.length; j++) {
-                            const txEvent = output.events[j];
-                            const event: Events = {
-                                id: BywiseHelper.makeHash(Buffer.from(`${txInfo.tx.chain}-${txInfo.tx.hash}-${j}`, 'utf-8').toString('hex')),
-                                chain: txInfo.tx.chain,
-                                hash: txInfo.tx.hash,
-                                create: txInfo.tx.created,
-                                index: j,
-                                from: txEvent.from,
-                                event: txEvent.event,
-                                data: txEvent.data,
-                            }
-                            constEvents.push(event);
-                        }
-                        txInfo.status = BlockchainStatus.TX_CONFIRMED;
-                        txInfo.isExecuted = true;
-                        txInfo.slicesHash = bestSlice.slice.hash;
-                        txInfo.output = output;
-                        await this.coreContext.transactionsProvider.updateTransaction(txInfo);
-                    }
-                }
-                await this.waitBusy();
-                await this.coreContext.applicationContext.database.EventsRepository.save(constEvents);
-                const oldContext = this.currentContext;
-                this.currentContext = ctx;
-                this.coreContext.bestSlice = bestSlice;
-                if (oldContext) {
-                    await this.coreContext.transactionsProvider.disposeContext(oldContext);
-                }
-                this.busy = false;
-            }
-        }
+        this.busy = false;
     }
 
     async getContract(address: string) {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
-        const bestSlice = this.coreContext.bestSlice;
 
-        if (!currentContext || !bestSlice) {
+        if (!currentContext) {
             this.busy = false;
             throw new Error('currentContext not found')
         }
 
-        const bcc = await this.coreContext.environmentProvider.get(currentContext.blockTree, currentContext.block.hash, address);
+        const bcc = await this.coreContext.environmentProvider.get(currentContext.blockTree, currentContext.simulationId, address);
 
         this.busy = false;
         return bcc;
@@ -107,15 +74,14 @@ export default class ExecuteTransactions {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
-        const bestSlice = this.coreContext.bestSlice;
 
-        if (!currentContext || !bestSlice) {
+        if (!currentContext) {
             this.busy = false;
             throw new Error('currentContext not found')
         }
 
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.blockTree, currentContext.block.hash, address);
-        const infoDTO = await this.coreContext.walletProvider.getWalletInfo(currentContext.blockTree, currentContext.block.hash, address);
+        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.blockTree, currentContext.simulationId, address);
+        const infoDTO = await this.coreContext.walletProvider.getWalletInfo(currentContext.blockTree, currentContext.simulationId, address);
 
         this.busy = false;
         return {
@@ -125,21 +91,24 @@ export default class ExecuteTransactions {
         };
     }
 
-    async executeSimulation(tx: Tx, simulateWallet: boolean) {
+    async executeSimulation(tx: Tx) {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
-        const bestSlice = this.coreContext.bestSlice;
 
-        if (!currentContext || !bestSlice) {
+        if (!currentContext) {
             this.busy = false;
             throw new Error('currentContext not found')
         }
 
         await this.coreContext.transactionsProvider.createSubContext(currentContext);
-        currentContext.simulateWallet = simulateWallet;
+        currentContext.checkWalletBalance = false;
         currentContext.enableReadProxy = true;
-        const output = await this.coreContext.transactionsProvider.simulateTransaction(tx, bestSlice.slice, currentContext);
+        const output = await this.coreContext.transactionsProvider.simulateTransaction(tx, {
+            from: helper.getRandomHash(),
+            transactionsData: []
+        }, currentContext);
+        currentContext.checkWalletBalance = true;
         currentContext.enableReadProxy = false;
         await this.coreContext.transactionsProvider.disposeSubContext(currentContext);
 

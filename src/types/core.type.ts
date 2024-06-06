@@ -21,8 +21,6 @@ export class CoreContext {
     configsProvider;
     walletProvider;
 
-    bestSlice: Slices | undefined;
-    lastBlock: Blocks | undefined;
     blockTime: number = 60;
 
     constructor(applicationContext: ApplicationContext, network: Network, blockTree: BlockTree) {
