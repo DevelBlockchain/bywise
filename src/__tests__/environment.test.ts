@@ -319,7 +319,7 @@ describe('consolide tests', () => {
         value = await environmentProvider.get(blockTree, 'block6', 'variable1');
         expect(value).toStrictEqual('');
 
-        await environmentProvider.mergeContext(blockTree, 'simulation', 'block6');
+        await environmentProvider.mergeContext(blockTree.chain, 'simulation', 'block6');
         await environmentProvider.deleteSimulation(blockTree, 'simulation');
 
         value = await environmentProvider.get(blockTree, 'block6', 'variable1');

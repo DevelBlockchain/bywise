@@ -98,13 +98,13 @@ export class EnvironmentProvider {
         await this.EnvironmentRepository.save(newEnv);
     }
 
-    async mergeContext(blockTree: BlockTree, fromContextHash: string, toContextHash: string) {
-        const envs = await this.EnvironmentRepository.findByChainAndHash(blockTree.chain, fromContextHash);
+    async mergeContext(chain: string, fromContextHash: string, toContextHash: string) {
+        const envs = await this.EnvironmentRepository.findByChainAndHash(chain, fromContextHash);
         const saveEnvs: Environment[] = [];
         for (let i = 0; i < envs.length; i++) {
             const env = envs[i];
             saveEnvs.push({
-                chain: blockTree.chain,
+                chain: chain,
                 key: env.key,
                 hash: toContextHash,
                 value: env.value,

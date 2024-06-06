@@ -73,10 +73,10 @@ export class TransactionsProvider {
     if (ctx.simulationId) {
       for (let i = 0; i < ctx.simulationIds.length; i++) {
         const id = ctx.simulationIds[i];
-        await this.environmentProvider.mergeContext(ctx.blockTree, id, contextHash);
+        await this.environmentProvider.mergeContext(ctx.blockTree.chain, id, contextHash);
       }
     } else {
-      await this.environmentProvider.mergeContext(ctx.blockTree, ctx.simulationId, contextHash);
+      await this.environmentProvider.mergeContext(ctx.blockTree.chain, ctx.simulationId, contextHash);
     }
   }
 

@@ -183,7 +183,6 @@ export class BlocksProvider {
   async executeCompleteBlocks(blockTree: BlockTree) {
     let blockInfoList = await this.BlockRepository.findByChainAndStatus(blockTree.chain, BlockchainStatus.TX_MEMPOOL);
     blockInfoList = blockInfoList.filter(info => info.isComplete === true && info.isExecuted === false);
-
     blockInfoList = blockInfoList.sort((b1, b2) => b1.block.created - b2.block.created);
 
     for (let i = 0; i < blockInfoList.length; i++) {
@@ -217,7 +216,6 @@ export class BlocksProvider {
       }
     }
     if (blockInfo.block.lastHash === BlockTree.ZERO_HASH || lastBlockInfo && lastBlockInfo.isExecuted) {
-      const ctx = this.transactionsProvider.createContext(blockTree, blockInfo.block.lastHash, blockInfo.block.height);
       try {
         let isExecuted = true;
         for (let j = 0; j < blockInfo.block.slices.length; j++) {
@@ -237,22 +235,15 @@ export class BlocksProvider {
             } else {
               if (blockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
             }
-            for (let z = 0; z < sliceInfo.slice.transactions.length; z++) {
-              const txHash = sliceInfo.slice.transactions[z];
-
-              const txInfo = await this.transactionsProvider.getTxInfo(txHash);
-
-              try {
-                await this.virtualMachineProvider.executeTransaction(txInfo.tx, sliceInfo.slice, ctx);
-              } catch (err: any) {
-                ctx.output.error = err.message;
-                this.applicationContext.logger.error(err.message, err);
-              }
-              if (ctx.output.error) throw new Error(`tryExecBlock - execute tx error - hash ${txHash}`);
-            }
           }
         }
         if (isExecuted) {
+          for (let j = 0; j < blockInfo.block.slices.length; j++) {
+            const sliceHash = blockInfo.block.slices[j];
+            const sliceInfo = await this.slicesProvider.getSliceInfo(sliceHash);
+  
+            await this.environmentProvider.mergeContext(blockTree.chain, sliceInfo.slice.hash, blockInfo.block.hash);
+          }
           if (!lastBlockInfo) {
             blockInfo.distance = '0';
           } else {
@@ -260,7 +251,6 @@ export class BlocksProvider {
           }
           blockInfo.isExecuted = true;
           this.applicationContext.logger.verbose(`sync-blocks: exec block - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
-          this.transactionsProvider.mergeContext(ctx, blockInfo.block.hash);
         }
       } catch (err: any) {
         blockInfo.isExecuted = false;
@@ -268,7 +258,6 @@ export class BlocksProvider {
         blockInfo.status = BlockchainStatus.TX_FAILED;
       }
       await this.updateBlock(blockInfo);
-      await this.environmentProvider.deleteSimulation(blockTree, ctx.simulationId);
     }
   }
 
@@ -281,7 +270,7 @@ export class BlocksProvider {
         const txHash = sliceInfo.slice.transactions[z];
         const txInfo = await this.transactionsProvider.getTxInfo(txHash);
 
-        txInfo.status = BlockchainStatus.TX_MEMPOOL;
+        txInfo.status = BlockchainStatus.TX_CONFIRMED;
         txInfo.blockHash = '';
         txInfo.slicesHash = '';
         await this.transactionsProvider.updateTransaction(txInfo);
