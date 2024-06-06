@@ -469,7 +469,7 @@ describe('contracts', () => {
         output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(output.error).toEqual(undefined);
         expect(output.output).toEqual("Banana");
-
+        
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,

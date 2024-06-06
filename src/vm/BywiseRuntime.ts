@@ -142,7 +142,7 @@ export class BywiseRuntimeInstance {
         return new BywiseContractContext(ctx.tx ? ctx.tx.hash : '', abi, code, calls);
     }
 
-    execInContract = async (getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string, code: string) => {
+    startContract = async (getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string) => {
         const tx: TransactionMessage = {
             contractAddress,
             sender: sender,
@@ -157,6 +157,22 @@ export class BywiseRuntimeInstance {
             await this.exec(tx, PRESET, false);
             await this.exec(tx, bcc.code, false);
             await this.exec(tx, "globalThis.abi;", false);
+        } catch (err) {
+            throw err;
+        }
+    }
+
+    execStartedContract = async (getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string, code: string) => {
+        const tx: TransactionMessage = {
+            contractAddress,
+            sender: sender,
+            value: value,
+            ctx,
+            bywiseRuntime: this,
+            getContract,
+            random: seedrandom(`${ctx.sliceFrom}:${ctx.nonce}:${ctx.tx?.hash}`)
+        }
+        try {
             const result = await this.exec(tx, code, true);
             return result;
         } catch (err) {
@@ -223,35 +239,45 @@ export default class BywiseRuntime {
 
     static execInContract = async (blockchain: BlockchainInterface, getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string, code: string) => {
         const runtimeModule = await BywiseRuntime.getModule(true);
-        let br = new BywiseRuntimeInstance(runtimeModule.module, blockchain);
+        let br: BywiseRuntimeInstance = ctx.executedContracts.get(contractAddress);
+        if (!br) {
+            br = new BywiseRuntimeInstance(runtimeModule.module, blockchain);
+            await br.startContract(getContract, ctx, contractAddress, bcc, sender, value);
+            ctx.executedContracts.set(contractAddress, br);
+        }
         try {
-            let result = await br.execInContract(getContract, ctx, contractAddress, bcc, sender, value, code);
-            await br.dispose();
+            br.bywiseVirtualMachineStack = 0;
+            br.interruptCycles = 0;
+            let result = await br.execStartedContract(getContract, ctx, contractAddress, bcc, sender, value, code);
             runtimeModule.busy = false;
             return result;
         } catch (err) {
-            await br.dispose();
             runtimeModule.busy = false;
             throw err;
         }
     }
 
     static execInContractSubContext = async (brSubcontext: BywiseRuntimeInstance, getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string, code: string) => {
-        const runtimeModule = await BywiseRuntime.getModule(false);
-        let br = new BywiseRuntimeInstance(runtimeModule.module, brSubcontext.blockchain);
-        br.bywiseVirtualMachineStack = brSubcontext.bywiseVirtualMachineStack + 1;
-        br.interruptCycles = brSubcontext.interruptCycles;
-        if (br.bywiseVirtualMachineStack > 5) {
+        const bywiseVirtualMachineStack = brSubcontext.bywiseVirtualMachineStack + 1;
+        if (bywiseVirtualMachineStack > 5) {
             throw new Error(`BVM: call many contracts`);
         }
+        const runtimeModule = await BywiseRuntime.getModule(false);
+        const subContextKey = `sub_context_${bywiseVirtualMachineStack}_${contractAddress}`;
+        let br: BywiseRuntimeInstance = ctx.executedContracts.get(subContextKey);
+        if (!br) {
+            br = new BywiseRuntimeInstance(runtimeModule.module, brSubcontext.blockchain);
+            await br.startContract(getContract, ctx, contractAddress, bcc, sender, value);
+            ctx.executedContracts.set(subContextKey, br);
+        }
         try {
-            let result = await br.execInContract(getContract, ctx, contractAddress, bcc, sender, value, code);
+            br.bywiseVirtualMachineStack = bywiseVirtualMachineStack;
+            br.interruptCycles = brSubcontext.interruptCycles;
+            let result = await br.execStartedContract(getContract, ctx, contractAddress, bcc, sender, value, code);
             brSubcontext.interruptCycles = br.interruptCycles;
-            await br.dispose();
             runtimeModule.busy = false;
             return result;
         } catch (err) {
-            await br.dispose();
             runtimeModule.busy = false;
             throw err;
         }

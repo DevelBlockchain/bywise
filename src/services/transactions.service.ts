@@ -44,7 +44,7 @@ export class TransactionsProvider {
   createSubContext(ctx: SimulateDTO) {
     const newHash = helper.getRandomHash();
     ctx.simulationIds.push(newHash);
-    ctx.blockTree.addBlock({ lastHash: ctx.simulationId, hash: newHash, height: ctx.blockHeight});
+    ctx.blockTree.addBlock({ lastHash: ctx.simulationId, hash: newHash, height: ctx.blockHeight });
     ctx.simulationId = newHash;
   }
 
@@ -67,8 +67,11 @@ export class TransactionsProvider {
     } else {
       await this.environmentProvider.deleteSimulation(ctx.blockTree, ctx.simulationId);
     }
+    for (let [contract, br] of ctx.executedContracts) {
+      await br.dispose();
+    }
   }
-  
+
   async mergeContext(ctx: SimulateDTO, contextHash: string) {
     if (ctx.simulationId) {
       for (let i = 0; i < ctx.simulationIds.length; i++) {

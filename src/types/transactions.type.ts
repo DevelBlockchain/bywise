@@ -77,6 +77,7 @@ export class SimulateDTO {
     this.simulationId = simulationId;
   }
 
+  executedContracts: Map<string, any> = new Map();
   blockTree: BlockTree;
   blockHeight: number;
   slicesModels: Slice[] = [];

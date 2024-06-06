@@ -254,8 +254,8 @@ export default class MintSlices {
             }
             await helper.sleep(100);
         } while (!end && this.isRun);
+        
         await this.coreContext.transactionsProvider.disposeContext(ctx);
-
         this.isRunStream = false;
     }
 
