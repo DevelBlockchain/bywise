@@ -1,5 +1,5 @@
 import { Environment } from "../models";
-import { BlockTree } from "../types/environment.types";
+import { BlockTree, EnvironmentContext } from "../types/environment.types";
 import { ApplicationContext } from "../types/task.type";
 
 export class EnvironmentProvider {
@@ -8,6 +8,51 @@ export class EnvironmentProvider {
 
     constructor(applicationContext: ApplicationContext) {
         this.EnvironmentRepository = applicationContext.database.EnvironmentRepository;
+    }
+
+    private async getFromContextEnv(envContext: EnvironmentContext, key: string): Promise<Environment> {
+        let env: Environment | null = null;
+        let getEnv = envContext.setStageKeys.get(key);
+        if (env == null && getEnv !== undefined) {
+            env = getEnv;
+        }
+        getEnv = envContext.setMainKeys.get(key);
+        if (env == null && getEnv !== undefined) {
+            env = getEnv;
+        }
+        getEnv = envContext.getStageKeys.get(key);
+        if (env == null && getEnv !== undefined) {
+            env = getEnv;
+        }
+        getEnv = envContext.getMainKeys.get(key);
+        if (env == null && getEnv !== undefined) {
+            env = getEnv;
+        }
+        getEnv = envContext.getMainKeys.get(key);
+        if (env == null) {
+            if (envContext.fromContextHash === EnvironmentContext.MAIN_CONTEXT_HASH) {
+                const main_context_env = await this.EnvironmentRepository.get(envContext.blockTree.chain, key, EnvironmentContext.MAIN_CONTEXT_HASH);
+                if (main_context_env) {
+                    env = main_context_env;
+                }
+            } else {
+                const slowEnvs = await this.EnvironmentRepository.findByChainAndKey(envContext.blockTree.chain, key);
+                const slowEnv = this.findEnv(slowEnvs, envContext.blockTree, envContext.fromContextHash, key);
+                if (slowEnv) {
+                    env = slowEnv;
+                }
+            }
+        }
+        if (env == null) {
+            env = {
+                chain: envContext.blockTree.chain,
+                key: key,
+                hash: envContext.fromContextHash,
+                value: null,
+            }
+        }
+        envContext.getStageKeys.set(key, env);
+        return env;
     }
 
     private findEnv(envs: Environment[], blockTree: BlockTree, contextHash: string, key: string): Environment | undefined {
@@ -26,16 +71,6 @@ export class EnvironmentProvider {
             return this.findEnv(envs, blockTree, lastHash, key);
         } else {
             return undefined;
-        }
-    }
-
-    async has(blockTree: BlockTree, contextHash: string, key: string): Promise<boolean> {
-        const envs = await this.EnvironmentRepository.findByChainAndKey(blockTree.chain, key);
-        const env = this.findEnv(envs, blockTree, contextHash, key);
-        if (!env || env.value === null) {
-            return false;
-        } else {
-            return true;
         }
     }
 
@@ -68,7 +103,17 @@ export class EnvironmentProvider {
         });
     }
 
-    async get(blockTree: BlockTree, contextHash: string, key: string): Promise<string> {
+    async hasSlow(blockTree: BlockTree, contextHash: string, key: string): Promise<boolean> {
+        const envs = await this.EnvironmentRepository.findByChainAndKey(blockTree.chain, key);
+        const env = this.findEnv(envs, blockTree, contextHash, key);
+        if (!env || env.value === null) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    async getSlow(blockTree: BlockTree, contextHash: string, key: string): Promise<string> {
         const envs = await this.EnvironmentRepository.findByChainAndKey(blockTree.chain, key);
         const env = this.findEnv(envs, blockTree, contextHash, key);
         if (env && env.value !== null) {
@@ -78,29 +123,75 @@ export class EnvironmentProvider {
         }
     }
 
-    async set(blockTree: BlockTree, contextHash: string, key: string, value: string): Promise<void> {
-        const newEnv: Environment = {
-            chain: blockTree.chain,
-            key: key,
-            hash: contextHash,
-            value: value,
-        };
-        await this.EnvironmentRepository.save(newEnv);
+    async has(envContext: EnvironmentContext, key: string): Promise<boolean> {
+        const env = await this.getFromContextEnv(envContext, key);
+        if (env.value !== null) {
+            return true;
+        }
+        return false;
     }
 
-    async delete(blockTree: BlockTree, contextHash: string, key: string): Promise<void> {
+    async get(envContext: EnvironmentContext, key: string): Promise<string> {
+        const env = await this.getFromContextEnv(envContext, key);
+        if (env.value !== null) {
+            return env.value;
+        }
+        return '';
+    }
+
+    async set(envContext: EnvironmentContext, key: string, value: string): Promise<void> {
         const newEnv: Environment = {
-            chain: blockTree.chain,
+            chain: envContext.blockTree.chain,
             key: key,
-            hash: contextHash,
+            hash: EnvironmentContext.MAIN_CONTEXT_HASH,
+            value: value,
+        };
+        envContext.setStageKeys.set(newEnv.key, newEnv);
+    }
+
+    async delete(envContext: EnvironmentContext, key: string): Promise<void> {
+        const newEnv: Environment = {
+            chain: envContext.blockTree.chain,
+            key: key,
+            hash: EnvironmentContext.MAIN_CONTEXT_HASH,
             value: null,
         };
-        await this.EnvironmentRepository.save(newEnv);
+        envContext.setStageKeys.set(newEnv.key, newEnv);
+    }
+
+    async deleteCommit(envContext: EnvironmentContext) {
+        envContext.setStageKeys.clear();
+        envContext.getStageKeys.clear();
+    }
+
+    async commit(envContext: EnvironmentContext) {
+        for (let [key, env] of envContext.setStageKeys) {
+            envContext.setMainKeys.set(key, env);
+        }
+        for (let [key, env] of envContext.getMainKeys) {
+            envContext.getMainKeys.set(key, env);
+        }
+        envContext.setStageKeys.clear();
+        envContext.getStageKeys.clear();
+    }
+
+    async push(envContext: EnvironmentContext, toContextHash: string) {
+        if (envContext.setStageKeys.size > 0) throw new Error(`Environment context not commited`);
+        const saveEnvs: Environment[] = [];
+        for (let [key, env] of envContext.setMainKeys) {
+            saveEnvs.push({
+                chain: env.chain,
+                key: env.key,
+                value: env.value,
+                hash: toContextHash,
+            });
+        }
+        await this.EnvironmentRepository.saveMany(saveEnvs);
     }
 
     async mergeContext(chain: string, fromContextHash: string, toContextHash: string) {
-        const envs = await this.EnvironmentRepository.findByChainAndHash(chain, fromContextHash);
         const saveEnvs: Environment[] = [];
+        const envs = await this.EnvironmentRepository.findByChainAndHash(chain, fromContextHash);
         for (let i = 0; i < envs.length; i++) {
             const env = envs[i];
             saveEnvs.push({
@@ -113,9 +204,17 @@ export class EnvironmentProvider {
         await this.EnvironmentRepository.saveMany(saveEnvs);
     }
 
-    async deleteSimulation(blockTree: BlockTree, contextHash: string) {
-        const envs = await this.EnvironmentRepository.findByChainAndHash(blockTree.chain, contextHash);
-        await this.EnvironmentRepository.delMany(envs);
-        blockTree.delBlock(contextHash);
+    async consolide(blockTree: BlockTree) {
+        let delEnvs: Environment[] = [];
+        do {
+            delEnvs = await this.EnvironmentRepository.findByChainAndHash(blockTree.chain, EnvironmentContext.MAIN_CONTEXT_HASH, 10000);
+            await this.EnvironmentRepository.delMany(delEnvs);
+        } while (delEnvs.length > 0);
+        
+        for (let height = 0; height <= blockTree.currentMinnedBlock.height; height++) {
+            const minnedBlock = blockTree.minnedBlockList.get(height);
+            if(!minnedBlock) throw new Error(`Minned block ${height} not found`);
+            await this.mergeContext(blockTree.chain, minnedBlock.hash, EnvironmentContext.MAIN_CONTEXT_HASH);
+        }
     }
 }

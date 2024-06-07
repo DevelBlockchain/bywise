@@ -50,14 +50,14 @@ export default class MintBlocks {
         const blockTime = this.coreContext.blockTime;
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
 
-        const isMinner = await this.coreContext.configsProvider.isValidator(this.coreContext.blockTree, fromBlock.hash, fromBlock.height, mainWallet.address);
+        const isMinner = await this.coreContext.configsProvider.isSlowValidator(this.coreContext.blockTree, fromBlock.hash, fromBlock.height, mainWallet.address);
         if (!isMinner) {
             this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
             this.isRun = false;
             return;
         }
-        const minValue = await this.coreContext.configsProvider.getByName(this.coreContext.blockTree, fromBlock.hash, fromBlock.height, 'min-bws-block');
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(this.coreContext.blockTree, fromBlock.hash, mainWallet.address);
+        const minValue = await this.coreContext.configsProvider.getSlowConfigByName(this.coreContext.blockTree, fromBlock.hash, fromBlock.height, 'min-bws-block');
+        const balanceDTO = await this.coreContext.walletProvider.getSlowWalletBalance(this.coreContext.blockTree, fromBlock.hash, mainWallet.address);
         if (balanceDTO.balance.isLessThan(new BigNumber(minValue.value))) {
             return;
         }

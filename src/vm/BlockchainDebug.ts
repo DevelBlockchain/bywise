@@ -78,7 +78,7 @@ export default class BlockchainDebug implements BlockchainInterface {
 
     getBlockHeight = async (tx: TransactionMessage): Promise<string> => {
 
-        return tx.ctx.blockHeight + '';
+        return tx.ctx.envContext.blockHeight + '';
     }
 
     getThisAddress = async (tx: TransactionMessage): Promise<string> => {

@@ -1,5 +1,5 @@
 import { ConfigDTO } from '../types';
-import { BlockTree } from '../types/environment.types';
+import { BlockTree, EnvironmentContext } from '../types/environment.types';
 import { ApplicationContext } from '../types/task.type';
 import { EnvironmentProvider } from './environment.service';
 
@@ -96,14 +96,14 @@ export class ConfigProvider {
     return null;
   }
 
-  async getByName(blockTree: BlockTree, blockHash: string, blockHeight: number, name: string): Promise<ConfigDTO> {
+  async getSlowConfigByName(blockTree: BlockTree, blockHash: string, blockHeight: number, name: string): Promise<ConfigDTO> {
     let cfg = new ConfigDTO({
       chain: blockTree.chain,
       name: name,
       value: 'false',
       type: 'boolean',
     });
-    let configEnv = await this.environmentProvider.get(blockTree, blockHash, `config-${name}`);
+    let configEnv = await this.environmentProvider.getSlow(blockTree, blockHash, `config-${name}`);
     if (configEnv) {
       let cfgMeta: ConfigMeta = JSON.parse(configEnv);
       cfg.type = cfgMeta.type;
@@ -119,6 +119,24 @@ export class ConfigProvider {
       cfg.setValue(defaultCfg.value);
     }
     return new ConfigDTO(cfg);
+  }
+
+  async isSlowValidator(blockTree: BlockTree, blockHash: string, blockHeight: number, address: string): Promise<boolean> {
+    try {
+      const isValidatorAddress = await this.getSlowConfigByName(blockTree, blockHash, blockHeight, `validator-${address}`);
+      return isValidatorAddress.toBoolean();
+    } catch (err) {
+      return false;
+    }
+  }
+
+  async isSlowAdmin(blockTree: BlockTree, blockHash: string, blockHeight: number, address: string): Promise<boolean> {
+    try {
+      const isAdminAddress = await this.getSlowConfigByName(blockTree, blockHash, blockHeight, `admin-address-${address}`);
+      return isAdminAddress.toBoolean();
+    } catch (err) {
+      return false;
+    }
   }
 
   async getValidators(blockTree: BlockTree, blockHash: string, blockHeight: number) {
@@ -143,38 +161,63 @@ export class ConfigProvider {
     return addresses;
   }
 
-  async isValidator(blockTree: BlockTree, blockHash: string, blockHeight: number, address: string): Promise<boolean> {
+  async isValidator(envContext: EnvironmentContext, address: string): Promise<boolean> {
     try {
-      const isValidatorAddress = await this.getByName(blockTree, blockHash, blockHeight, `validator-${address}`);
+      const isValidatorAddress = await this.getByName(envContext, `validator-${address}`);
       return isValidatorAddress.toBoolean();
     } catch (err) {
       return false;
     }
   }
 
-  async isAdmin(blockTree: BlockTree, blockHash: string, blockHeight: number, address: string): Promise<boolean> {
+  async isAdmin(envContext: EnvironmentContext, address: string): Promise<boolean> {
     try {
-      const isAdminAddress = await this.getByName(blockTree, blockHash, blockHeight, `admin-address-${address}`);
+      const isAdminAddress = await this.getByName(envContext, `admin-address-${address}`);
       return isAdminAddress.toBoolean();
     } catch (err) {
       return false;
     }
   }
 
-  async setConfig(blockTree: BlockTree, blockHash: string, blockHeight: number, cfg: ConfigDTO) {
+  async getByName(envContext: EnvironmentContext, name: string): Promise<ConfigDTO> {
+    let cfg = new ConfigDTO({
+      chain: envContext.blockTree.chain,
+      name: name,
+      value: 'false',
+      type: 'boolean',
+    });
+    let configEnv = await this.environmentProvider.get(envContext, `config-${name}`);
+    if (configEnv) {
+      let cfgMeta: ConfigMeta = JSON.parse(configEnv);
+      cfg.type = cfgMeta.type;
+      if (envContext.blockHeight - cfgMeta.lastUpdate > 60 || cfgMeta.lastUpdate === 0) {
+        cfg.setValue(cfgMeta.value);
+      } else {
+        cfg.setValue(cfgMeta.lastValue);
+      }
+    } else {
+      let defaultCfg = this.findByName(name);
+      if (defaultCfg === null) throw new Error(`config ${name} not found`);
+      cfg.type = defaultCfg.type;
+      cfg.setValue(defaultCfg.value);
+    }
+    return new ConfigDTO(cfg);
+  }
+
+  async setConfig(envContext: EnvironmentContext, cfg: ConfigDTO) {
     let defaultCfg = this.findByName(cfg.name);
     const newConfigValue: ConfigMeta = {
       lastValue: defaultCfg !== null ? defaultCfg.value : (cfg.type === 'boolean' ? 'false' : '0'),
       value: cfg.value,
-      lastUpdate: blockHeight,
+      lastUpdate: envContext.blockHeight,
       type: cfg.type
     }
 
-    let configEnv = await this.environmentProvider.get(blockTree, blockHash, `config-${cfg.name}`);
+    let configEnv = await this.environmentProvider.get(envContext, `config-${cfg.name}`);
     if (configEnv) {
       let cfgMeta: ConfigMeta = JSON.parse(configEnv);
       newConfigValue.lastValue = cfgMeta.value;
     }
-    await this.environmentProvider.set(blockTree, blockHash, `config-${cfg.name}`, JSON.stringify(newConfigValue));
+    await this.environmentProvider.set(envContext, `config-${cfg.name}`, JSON.stringify(newConfigValue));
   }
 }

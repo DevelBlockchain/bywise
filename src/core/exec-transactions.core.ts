@@ -64,7 +64,7 @@ export default class ExecuteTransactions {
             throw new Error('currentContext not found')
         }
 
-        const bcc = await this.coreContext.environmentProvider.get(currentContext.blockTree, currentContext.simulationId, address);
+        const bcc = await this.coreContext.environmentProvider.get(currentContext.envContext, address);
 
         this.busy = false;
         return bcc;
@@ -80,8 +80,8 @@ export default class ExecuteTransactions {
             throw new Error('currentContext not found')
         }
 
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.blockTree, currentContext.simulationId, address);
-        const infoDTO = await this.coreContext.walletProvider.getWalletInfo(currentContext.blockTree, currentContext.simulationId, address);
+        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.envContext, address);
+        const infoDTO = await this.coreContext.walletProvider.getWalletInfo(currentContext.envContext, address);
 
         this.busy = false;
         return {
@@ -100,8 +100,6 @@ export default class ExecuteTransactions {
             this.busy = false;
             throw new Error('currentContext not found')
         }
-
-        await this.coreContext.transactionsProvider.createSubContext(currentContext);
         currentContext.checkWalletBalance = false;
         currentContext.enableReadProxy = true;
         const output = await this.coreContext.transactionsProvider.simulateTransaction(tx, {
@@ -110,7 +108,7 @@ export default class ExecuteTransactions {
         }, currentContext);
         currentContext.checkWalletBalance = true;
         currentContext.enableReadProxy = false;
-        await this.coreContext.transactionsProvider.disposeSubContext(currentContext);
+        await this.coreContext.environmentProvider.deleteCommit(currentContext.envContext);
 
         this.busy = false;
         return output;

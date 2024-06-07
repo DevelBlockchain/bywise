@@ -1,16 +1,18 @@
 import { BlockchainStatus } from '../types/transactions.type';
-import { Block, Slice } from '@bywise/web3';
+import { Slice } from '@bywise/web3';
 import { ApplicationContext } from '../types/task.type';
 import { RoutingKeys } from '../datasource/message-queue';
-import { Blocks, Slices } from '../models';
+import { Slices } from '../models';
 import { BlockTree } from '../types/environment.types';
 import { TransactionsProvider } from './transactions.service';
+import { EnvironmentProvider } from './environment.service';
 
 export class SlicesProvider {
 
   private TransactionRepository;
   private SliceRepository;
   private transactionsProvider;
+  private environmentProvider;
   private mq;
   private logger;
 
@@ -20,6 +22,7 @@ export class SlicesProvider {
     this.TransactionRepository = applicationContext.database.TransactionRepository;
     this.SliceRepository = applicationContext.database.SliceRepository;
     this.transactionsProvider = new TransactionsProvider(applicationContext);
+    this.environmentProvider = new EnvironmentProvider(applicationContext);
   }
 
   async saveNewSlice(slice: Slice) {
@@ -95,7 +98,8 @@ export class SlicesProvider {
         sliceInfo.status = BlockchainStatus.TX_FAILED;
       } else {
         sliceInfo.isExecuted = true;
-        this.transactionsProvider.mergeContext(ctx, sliceInfo.slice.hash);
+        this.environmentProvider.commit(ctx.envContext);
+        this.environmentProvider.push(ctx.envContext, sliceInfo.slice.hash);
         this.logger.verbose(`exec-slices: exec slice - height: ${sliceInfo.slice.blockHeight} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
         
         if(blockTree.bestSlice) {

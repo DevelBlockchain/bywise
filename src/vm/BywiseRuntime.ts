@@ -239,11 +239,11 @@ export default class BywiseRuntime {
 
     static execInContract = async (blockchain: BlockchainInterface, getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string, code: string) => {
         const runtimeModule = await BywiseRuntime.getModule(true);
-        let br: BywiseRuntimeInstance = ctx.executedContracts.get(contractAddress);
+        let br: BywiseRuntimeInstance | undefined = ctx.envContext.executedContracts.get(contractAddress);
         if (!br) {
             br = new BywiseRuntimeInstance(runtimeModule.module, blockchain);
             await br.startContract(getContract, ctx, contractAddress, bcc, sender, value);
-            ctx.executedContracts.set(contractAddress, br);
+            ctx.envContext.executedContracts.set(contractAddress, br);
         }
         try {
             br.bywiseVirtualMachineStack = 0;
@@ -264,11 +264,11 @@ export default class BywiseRuntime {
         }
         const runtimeModule = await BywiseRuntime.getModule(false);
         const subContextKey = `sub_context_${bywiseVirtualMachineStack}_${contractAddress}`;
-        let br: BywiseRuntimeInstance = ctx.executedContracts.get(subContextKey);
+        let br: BywiseRuntimeInstance | undefined = ctx.envContext.executedContracts.get(subContextKey);
         if (!br) {
             br = new BywiseRuntimeInstance(runtimeModule.module, brSubcontext.blockchain);
             await br.startContract(getContract, ctx, contractAddress, bcc, sender, value);
-            ctx.executedContracts.set(subContextKey, br);
+            ctx.envContext.executedContracts.set(subContextKey, br);
         }
         try {
             br.bywiseVirtualMachineStack = bywiseVirtualMachineStack;

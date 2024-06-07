@@ -1,4 +1,6 @@
 import { Block, Slice } from "@bywise/web3";
+import { Environment } from "../models";
+import { BywiseRuntimeInstance } from "../vm/BywiseRuntime";
 
 export type NodeBlockTree = {
     hash: string,
@@ -205,5 +207,35 @@ export class BlockTree {
             }
             bestSlices.push(bestSlice);
         }
+    }
+}
+
+export class EnvironmentContext {
+    public static readonly MAIN_CONTEXT_HASH = 'main_context';
+    
+    public blockTree: BlockTree;
+    public blockHeight: number;
+    public fromContextHash: string;
+    public executedContracts: Map<string, BywiseRuntimeInstance> = new Map();
+    public setMainKeys: Map<string, Environment> = new Map();
+    public getMainKeys: Map<string, Environment> = new Map();
+    public setStageKeys: Map<string, Environment> = new Map();
+    public getStageKeys: Map<string, Environment> = new Map();
+
+    constructor(blockTree: BlockTree, blockHeight: number, fromContextHash: string) {
+        this.blockTree = blockTree;
+        this.blockHeight = blockHeight;
+        this.fromContextHash = fromContextHash;
+    }
+
+    async dispose() {
+        for (let [contract, br] of this.executedContracts) {
+            await br.dispose();
+        }
+        this.setStageKeys.clear();
+        this.getStageKeys.clear();
+        this.setMainKeys.clear();
+        this.getMainKeys.clear();
+        this.executedContracts.clear();
     }
 }

@@ -1,18 +1,15 @@
 import { SimulateDTO, TransactionOutputDTO, BlockchainStatus } from '../types/transactions.type';
 import { VirtualMachineProvider } from './virtual-machine.service';
-import { Tx, TxType, Block, Wallet, SliceData } from '@bywise/web3';
+import { Tx, TxType, Wallet, SliceData } from '@bywise/web3';
 import { ApplicationContext } from '../types/task.type';
 import { WalletProvider } from './wallet.service';
-import { BlockTree } from '../types/environment.types';
-import helper from '../utils/helper';
-import { EnvironmentProvider } from './environment.service';
+import { BlockTree, EnvironmentContext } from '../types/environment.types';
 import { RoutingKeys } from '../datasource/message-queue';
-import { Blocks, Transaction } from '../models';
+import { Transaction } from '../models';
 
 export class TransactionsProvider {
 
   private virtualMachineProvider;
-  private environmentProvider;
   private mq;
   private TransactionRepository;
   private walletProvider;
@@ -20,67 +17,17 @@ export class TransactionsProvider {
   constructor(applicationContext: ApplicationContext) {
     this.TransactionRepository = applicationContext.database.TransactionRepository;
     this.mq = applicationContext.mq;
-    this.environmentProvider = new EnvironmentProvider(applicationContext);
     this.virtualMachineProvider = new VirtualMachineProvider(applicationContext);
     this.walletProvider = new WalletProvider(applicationContext);
   }
 
   createContext(blockTree: BlockTree, lastContextHash: string, blockHeight: number) {
-    const simulationId = helper.getRandomHash();
-
-    const block = new Block();
-    block.height = blockHeight;
-    block.chain = blockTree.chain;
-    block.version = '2';
-    block.created = Math.floor(Date.now() / 1000);
-    block.lastHash = lastContextHash;
-    block.hash = simulationId;
-
-    blockTree.addBlock(block);
-
-    return new SimulateDTO(blockTree, blockHeight, simulationId);
-  }
-
-  createSubContext(ctx: SimulateDTO) {
-    const newHash = helper.getRandomHash();
-    ctx.simulationIds.push(newHash);
-    ctx.blockTree.addBlock({ lastHash: ctx.simulationId, hash: newHash, height: ctx.blockHeight });
-    ctx.simulationId = newHash;
-  }
-
-  async disposeSubContext(ctx: SimulateDTO) {
-    const id = ctx.simulationIds.pop();
-    if (id !== undefined) {
-      // recuperar ctx.block.hash
-      const lastHash = ctx.simulationIds[ctx.simulationIds.length - 1];
-      ctx.simulationId = lastHash;
-      await this.environmentProvider.deleteSimulation(ctx.blockTree, id);
-    }
+    const envContext = new EnvironmentContext(blockTree, blockHeight, lastContextHash);
+    return new SimulateDTO(envContext);
   }
 
   async disposeContext(ctx: SimulateDTO) {
-    if (ctx.simulationId) {
-      for (let i = 0; i < ctx.simulationIds.length; i++) {
-        const id = ctx.simulationIds[i];
-        await this.environmentProvider.deleteSimulation(ctx.blockTree, id);
-      }
-    } else {
-      await this.environmentProvider.deleteSimulation(ctx.blockTree, ctx.simulationId);
-    }
-    for (let [contract, br] of ctx.executedContracts) {
-      await br.dispose();
-    }
-  }
-
-  async mergeContext(ctx: SimulateDTO, contextHash: string) {
-    if (ctx.simulationId) {
-      for (let i = 0; i < ctx.simulationIds.length; i++) {
-        const id = ctx.simulationIds[i];
-        await this.environmentProvider.mergeContext(ctx.blockTree.chain, id, contextHash);
-      }
-    } else {
-      await this.environmentProvider.mergeContext(ctx.blockTree.chain, ctx.simulationId, contextHash);
-    }
+    await ctx.envContext.dispose();
   }
 
   async createNewTransaction(chain: string, to: string, amount: string, fee: string, type: TxType, data: any = {}, foreignKeys?: string[]) {

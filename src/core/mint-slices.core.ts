@@ -158,7 +158,6 @@ export default class MintSlices {
                         await this.coreContext.transactionsProvider.updateTransaction(txInfo);
                     } else {
                         countSimulatedTransactions++;
-                        await this.coreContext.transactionsProvider.createSubContext(ctx);
                         let output = await this.coreContext.transactionsProvider.simulateTransaction(txInfo.tx, {
                             from: mainWallet.address,
                             transactionsData: []
@@ -167,7 +166,7 @@ export default class MintSlices {
                             txInfo.status = BlockchainStatus.TX_FAILED;
                             txInfo.output = output;
                             await this.coreContext.transactionsProvider.updateTransaction(txInfo);
-                            await this.coreContext.transactionsProvider.disposeSubContext(ctx);
+                            await this.coreContext.environmentProvider.deleteCommit(ctx.envContext);
                             //this.coreContext.applicationContext.logger.verbose(`mint slice - invalidate transaction ${txInfo.tx.hash}`)
                         } else {
                             if (ctx.proxyMock.length > 0) {
@@ -179,8 +178,7 @@ export default class MintSlices {
                             transactions.set(txInfo.tx.hash, true);
                             newTransactions.push(txInfo.tx.hash);
                             addTransactions++;
-                            await this.coreContext.transactionsProvider.mergeContext(ctx, ctx.simulationIds[ctx.simulationIds.length - 2]);
-                            await this.coreContext.transactionsProvider.disposeSubContext(ctx);
+                            await this.coreContext.environmentProvider.commit(ctx.envContext);
                         }
                     }
                 }

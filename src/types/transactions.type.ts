@@ -1,6 +1,6 @@
-import { TxType, Slice, Tx, Block } from '@bywise/web3';
+import { TxType, Slice, Tx } from '@bywise/web3';
 import BigNumber from "bignumber.js";
-import { BlockTree } from './environment.types';
+import { EnvironmentContext } from './environment.types';
 
 export enum BlockchainStatus {
   TX_MEMPOOL = 'mempool',
@@ -70,21 +70,14 @@ export type ValueBooleanDTO = {
 
 export class SimulateDTO {
 
-  constructor(blockTree: BlockTree, blockHeight: number, simulationId: string) {
-    this.blockTree = blockTree;
-    this.blockHeight = blockHeight;
-    this.simulationIds = [simulationId];
-    this.simulationId = simulationId;
+  constructor(envContext: EnvironmentContext) {
+    this.envContext = envContext;
   }
 
-  executedContracts: Map<string, any> = new Map();
-  blockTree: BlockTree;
-  blockHeight: number;
+  envContext: EnvironmentContext;
   slicesModels: Slice[] = [];
   transactionsModels: Tx[] = [];
   totalFee: BigNumber = new BigNumber(0);
-  simulationIds: string[] = [];
-  simulationId: string;
   sliceFrom: string = '';
   nonce: number = 0;
   checkWalletBalance: boolean = true;

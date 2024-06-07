@@ -58,7 +58,7 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     getBlockHeight = async (tx: TransactionMessage): Promise<string> => {
-        return tx.ctx.blockHeight + '';
+        return tx.ctx.envContext.blockHeight + '';
     }
 
     getThisAddress = async (tx: TransactionMessage): Promise<string> => {
@@ -96,22 +96,22 @@ export default class BlockchainBywise implements BlockchainInterface {
         if (!BywiseHelper.isValidAmount(amount)) throw new Error('BVM: invalid amount')
         let amoutBN = new BigNumber(amount);
 
-        let balanceAccount = await this.walletProvider.getWalletBalance(tx.ctx.blockTree, tx.ctx.simulationId, tx.contractAddress);
-        let balanceRecipient = await this.walletProvider.getWalletBalance(tx.ctx.blockTree, tx.ctx.simulationId, recipient);
+        let balanceAccount = await this.walletProvider.getWalletBalance(tx.ctx.envContext, tx.contractAddress);
+        let balanceRecipient = await this.walletProvider.getWalletBalance(tx.ctx.envContext, recipient);
         if (amoutBN.isGreaterThan(balanceAccount.balance)) throw new Error('BVM: insuficient funds');
 
         balanceAccount.balance = balanceAccount.balance.minus(new BigNumber(amoutBN));
         balanceRecipient.balance = balanceRecipient.balance.plus(new BigNumber(amoutBN));
 
-        await this.walletProvider.setWalletBalance(tx.ctx.blockTree, tx.ctx.simulationId, balanceAccount);
-        await this.walletProvider.setWalletBalance(tx.ctx.blockTree, tx.ctx.simulationId, balanceRecipient);
+        await this.walletProvider.setWalletBalance(tx.ctx.envContext, balanceAccount);
+        await this.walletProvider.setWalletBalance(tx.ctx.envContext, balanceRecipient);
         return '';
     }
 
     balanceOf = async (tx: TransactionMessage, address: string): Promise<string> => {
         if (typeof address !== 'string') throw new Error('BVM: invalid typeof address')
 
-        const balanceDTO = await this.walletProvider.getWalletBalance(tx.ctx.blockTree, tx.ctx.simulationId, address);
+        const balanceDTO = await this.walletProvider.getWalletBalance(tx.ctx.envContext, address);
         return balanceDTO.balance.toString();
     }
 
@@ -125,7 +125,7 @@ export default class BlockchainBywise implements BlockchainInterface {
             uuid = await await this.getUUID(tx);
         }
         const key = `V-${tx.contractAddress}-${uuid}`
-        await this.environmentProvider.set(tx.ctx.blockTree, tx.ctx.simulationId, key, value);
+        await this.environmentProvider.set(tx.ctx.envContext, key, value);
         return uuid;
     }
 
@@ -134,8 +134,8 @@ export default class BlockchainBywise implements BlockchainInterface {
 
         if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
         const key = `V-${tx.contractAddress}-${uuid}`
-        if (await this.environmentProvider.has(tx.ctx.blockTree, tx.ctx.simulationId, key)) {
-            return await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, key);
+        if (await this.environmentProvider.has(tx.ctx.envContext, key)) {
+            return await this.environmentProvider.get(tx.ctx.envContext, key);
         } else {
             return '';
         }
@@ -146,7 +146,7 @@ export default class BlockchainBywise implements BlockchainInterface {
 
         const uuid = await this.getUUID(tx);
         const mapKey = `M-${tx.contractAddress}-${uuid}-default`
-        await this.environmentProvider.set(tx.ctx.blockTree, tx.ctx.simulationId, mapKey, defaultValue);
+        await this.environmentProvider.set(tx.ctx.envContext, mapKey, defaultValue);
         return uuid;
     }
 
@@ -160,9 +160,9 @@ export default class BlockchainBywise implements BlockchainInterface {
 
         const mapKey = `M-${tx.contractAddress}-${uuid}-default`;
         const searchKey = `M-${tx.contractAddress}-${uuid}-value-${key.replace(/-/gm, '_')}`;
-        if (!await this.environmentProvider.has(tx.ctx.blockTree, tx.ctx.simulationId, mapKey)) throw new Error('BVM: invalid map uuid')
+        if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
-        await this.environmentProvider.set(tx.ctx.blockTree, tx.ctx.simulationId, searchKey, value);
+        await this.environmentProvider.set(tx.ctx.envContext, searchKey, value);
         return '';
     }
 
@@ -174,12 +174,12 @@ export default class BlockchainBywise implements BlockchainInterface {
 
         const mapKey = `M-${tx.contractAddress}-${uuid}-default`;
         const searchKey = `M-${tx.contractAddress}-${uuid}-value-${key.replace(/-/gm, '_')}`;
-        if (!await this.environmentProvider.has(tx.ctx.blockTree, tx.ctx.simulationId, mapKey)) throw new Error('BVM: invalid map uuid')
+        if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
-        if (await this.environmentProvider.has(tx.ctx.blockTree, tx.ctx.simulationId, searchKey)) {
-            return await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, searchKey);
+        if (await this.environmentProvider.has(tx.ctx.envContext, searchKey)) {
+            return await this.environmentProvider.get(tx.ctx.envContext, searchKey);
         } else {
-            return await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, mapKey);
+            return await this.environmentProvider.get(tx.ctx.envContext, mapKey);
         }
     }
 
@@ -192,9 +192,9 @@ export default class BlockchainBywise implements BlockchainInterface {
         const mapKey = `M-${tx.contractAddress}-${uuid}-default`;
         const searchKey = `M-${tx.contractAddress}-${uuid}-value-${key.replace(/-/gm, '_')}`;
 
-        if (!await this.environmentProvider.has(tx.ctx.blockTree, tx.ctx.simulationId, mapKey)) throw new Error('BVM: invalid map uuid')
+        if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
-        if (await this.environmentProvider.has(tx.ctx.blockTree, tx.ctx.simulationId, searchKey)) {
+        if (await this.environmentProvider.has(tx.ctx.envContext, searchKey)) {
             return '1';
         } else {
             return '0';
@@ -210,17 +210,17 @@ export default class BlockchainBywise implements BlockchainInterface {
         const mapKey = `M-${tx.contractAddress}-${uuid}-default`;
         const searchKey = `M-${tx.contractAddress}-${uuid}-value-${key.replace(/-/gm, '_')}`;
 
-        if (!await this.environmentProvider.has(tx.ctx.blockTree, tx.ctx.simulationId, mapKey)) throw new Error('BVM: invalid map uuid')
+        if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
-        if (await this.environmentProvider.has(tx.ctx.blockTree, tx.ctx.simulationId, searchKey)) {
-            await this.environmentProvider.delete(tx.ctx.blockTree, tx.ctx.simulationId, searchKey);
+        if (await this.environmentProvider.has(tx.ctx.envContext, searchKey)) {
+            await this.environmentProvider.delete(tx.ctx.envContext, searchKey);
         }
         return '';
     }
 
     listNew = async (tx: TransactionMessage): Promise<string> => {
         const uuid = await this.getUUID(tx);
-        await this.environmentProvider.set(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-size`, '0');
+        await this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, '0');
         return uuid;
     }
 
@@ -228,9 +228,9 @@ export default class BlockchainBywise implements BlockchainInterface {
         if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
 
         if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
-        if (!await this.environmentProvider.has(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-size`)) throw new Error('BVM: list not found');
+        if (!await this.environmentProvider.has(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`)) throw new Error('BVM: list not found');
 
-        return await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-size`);
+        return await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`);
     }
 
     listGet = async (tx: TransactionMessage, index: string, uuid: string): Promise<string> => {
@@ -241,11 +241,11 @@ export default class BlockchainBywise implements BlockchainInterface {
         if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
 
         let indexBN = new BigNumber(index);
-        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-size`));
+        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`));
         if (indexBN.isGreaterThanOrEqualTo(size)) throw new Error('BVM: index out of array');
 
         const key = `L-${tx.contractAddress}-${uuid}-value-${indexBN.toFixed(0)}`
-        return await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, key);
+        return await this.environmentProvider.get(tx.ctx.envContext, key);
     }
 
     listSet = async (tx: TransactionMessage, index: string, value: string, uuid: string): Promise<string> => {
@@ -258,11 +258,11 @@ export default class BlockchainBywise implements BlockchainInterface {
         if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
 
         let indexBN = new BigNumber(index);
-        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-size`));
+        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`));
         if (indexBN.isGreaterThanOrEqualTo(size)) throw new Error('BVM: index out of array');
 
         const key = `L-${tx.contractAddress}-${uuid}-value-${indexBN.toFixed(0)}`;
-        await this.environmentProvider.set(tx.ctx.blockTree, tx.ctx.simulationId, key, value);
+        await this.environmentProvider.set(tx.ctx.envContext, key, value);
         return '';
     }
 
@@ -272,11 +272,11 @@ export default class BlockchainBywise implements BlockchainInterface {
         if (value.length > BlockchainBywise.MAX_VALUE_LENGTH) throw new Error('BVM: value too large')
         if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
 
-        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-size`));
+        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`));
         let newSize = size.plus(1).toFixed(0);
 
-        await this.environmentProvider.set(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-value-${size.toFixed(0)}`, value);
-        await this.environmentProvider.set(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-size`, newSize);
+        await this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${size.toFixed(0)}`, value);
+        await this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, newSize);
         return '';
     }
 
@@ -284,13 +284,13 @@ export default class BlockchainBywise implements BlockchainInterface {
         if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
         if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
 
-        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-size`));
+        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`));
         if (size.isEqualTo(0)) throw new Error('BVM: array is empty')
         let newSize = size.minus(1).toFixed(0);
 
-        const returnValue = await this.environmentProvider.get(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-value-${newSize}`);
-        await this.environmentProvider.delete(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-value-${newSize}`);
-        await this.environmentProvider.set(tx.ctx.blockTree, tx.ctx.simulationId, `L-${tx.contractAddress}-${uuid}-size`, newSize);
+        const returnValue = await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${newSize}`);
+        await this.environmentProvider.delete(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${newSize}`);
+        await this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, newSize);
         return returnValue;
     }
 

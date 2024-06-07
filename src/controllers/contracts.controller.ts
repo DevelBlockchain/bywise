@@ -82,7 +82,7 @@ export default async function contractsController(app: express.Express, apiConte
 
                 const ctx = helper.createSimulationContext('local');
                 ctx.nonce = runtimeContext.nonce++;
-                ctx.blockHeight = runtimeContext.blockHeight;
+                ctx.envContext.blockHeight = runtimeContext.blockHeight;
                 ctx.tx = new Tx();
                 ctx.tx.version = '2';
                 ctx.tx.chain = 'local';
@@ -116,7 +116,7 @@ export default async function contractsController(app: express.Express, apiConte
                 const contractAddress = body.contractAddress;
                 const ctx = helper.createSimulationContext('local');
                 ctx.nonce = runtimeContext.nonce++;
-                ctx.blockHeight = runtimeContext.blockHeight;
+                ctx.envContext.blockHeight = runtimeContext.blockHeight;
                 ctx.tx = new Tx();
                 ctx.tx.version = '2';
                 ctx.tx.chain = 'local';

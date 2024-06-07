@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { BlockPack, BywiseHelper, Tx, TxType, Wallet } from '@bywise/web3';
 import Bywise from '../bywise';
-import { BlocksProvider, TransactionsProvider } from '../services';
+import { BlocksProvider, EnvironmentProvider, TransactionsProvider } from '../services';
 import { WalletProvider } from '../services/wallet.service';
 import helper from '../utils/helper';
 import { ChainConfig } from '../types';
@@ -11,6 +11,7 @@ var bywise: Bywise;
 var transactionsProvider: TransactionsProvider;
 var blocksProvider: BlocksProvider;
 var walletProvider: WalletProvider;
+var environmentProvider: EnvironmentProvider;
 var b0: BlockPack;
 
 const chain = 'local';
@@ -43,6 +44,7 @@ beforeAll(async () => {
     transactionsProvider = new TransactionsProvider(bywise.applicationContext);
     blocksProvider = new BlocksProvider(bywise.applicationContext);
     walletProvider = new WalletProvider(bywise.applicationContext);
+    environmentProvider = new EnvironmentProvider(bywise.applicationContext);
 }, 30000)
 
 beforeEach(async () => {
@@ -103,7 +105,7 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
+        let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
         expect(balance.balance.toString()).toEqual('100');
 
         await transactionsProvider.disposeContext(ctx);
@@ -135,7 +137,7 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
+        let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
         expect(balance.balance.toString()).toEqual('60');
 
         await transactionsProvider.disposeContext(ctx);
@@ -182,7 +184,7 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
+        let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
         expect(balance.balance.toString()).toEqual('75');
 
         await transactionsProvider.disposeContext(ctx);
@@ -193,7 +195,7 @@ describe('basic tests', () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
         const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
-        let balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
+        let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
         expect(balance.balance.toString()).toEqual('0');
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -215,7 +217,7 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
+        balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
         expect(balance.balance.toString()).toEqual('100');
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -230,10 +232,10 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet.address);
+        balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
         expect(balance.balance.toString()).toEqual('30');
 
-        balance = await walletProvider.getWalletBalance(ctx.blockTree, ctx.simulationId, wallet2.address);
+        balance = await walletProvider.getWalletBalance(ctx.envContext, wallet2.address);
         expect(balance.balance.toString()).toEqual('70');
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -277,8 +279,8 @@ describe('set configs', () => {
         expect(ctx.output.error).toEqual(undefined);
         expect(ctx.output.feeUsed).toEqual("0");
 
-        transactionsProvider.createSubContext(ctx);
-        ctx.blockHeight++;// affter first block
+        environmentProvider.commit(ctx.envContext);
+        ctx.envContext.blockHeight++;// affter first block
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -311,8 +313,8 @@ describe('set configs', () => {
         expect(ctx.output.error).toEqual(undefined);
         expect(ctx.output.feeUsed).toEqual("0");
 
-        transactionsProvider.createSubContext(ctx);
-        ctx.blockHeight += 10; // wait 10 blocks
+        environmentProvider.commit(ctx.envContext);
+        ctx.envContext.blockHeight += 10; // wait 10 blocks
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -326,8 +328,8 @@ describe('set configs', () => {
         expect(ctx.output.error).toEqual(undefined);
         expect(ctx.output.feeUsed).toEqual("0");
 
-        transactionsProvider.createSubContext(ctx); // waited more than 100 blocks
-        ctx.blockHeight += 100;
+        environmentProvider.commit(ctx.envContext); // waited more than 100 blocks
+        ctx.envContext.blockHeight += 100;
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
