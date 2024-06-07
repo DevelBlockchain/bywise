@@ -1,10 +1,12 @@
 import { Block, Slice, SliceData, Tx, TxType } from "@bywise/web3";
 import { RequestKeys } from "../datasource/message-queue";
-import { Blocks, Slices } from "../models";
 import { BlockchainStatus, CoreContext, TransactionOutputDTO } from "../types";
 import { BlockTree } from "../types/environment.types";
 import helper from "../utils/helper";
 import PipelineChain from "./pipeline-chain.core";
+
+const TIME_LIMIT_SLICE = 5000;
+const LIMIT_BY_NEW_SLICE = 1000;
 
 export default class MintSlices {
     public isRun = true;
@@ -72,7 +74,6 @@ export default class MintSlices {
         let newTransactions: string[] = [];
         let lastSliceHeight: number = -1;
         let mint = false;
-        const LIMIT_BY_NEW_SLICE = 1000;
         let addTransactions = 0;
 
         for (let i = 0; i < slices.length; i++) {
@@ -146,7 +147,7 @@ export default class MintSlices {
 
             let countSimulatedTransactions = 0;
             let simulateUptime = new Date().getTime();
-            for (let i = 0; i < mempool.length && (new Date().getTime() - simulateUptime) < 1000; i++) {
+            for (let i = 0; i < mempool.length && (new Date().getTime() - simulateUptime) < TIME_LIMIT_SLICE; i++) {
                 const txInfo = mempool[i];
                 if (!transactions.has(txInfo.tx.hash)) {
                     if (txInfo.tx.created < now - 60) {
@@ -229,7 +230,7 @@ export default class MintSlices {
                 this.coreContext.applicationContext.logger.verbose(`mint slice - ${(countSimulatedTransactions / (simulateUptime / 1000)).toFixed(2)} TPS - simulate ${countSimulatedTransactions} transactions in ${simulateUptime / 1000}`)
             }
 
-            if (new Date().getTime() - uptime > 5000 && addTransactions > 0) {
+            if (new Date().getTime() - uptime > TIME_LIMIT_SLICE && addTransactions > 0) {
                 mint = true;
             }
 
@@ -252,7 +253,7 @@ export default class MintSlices {
                 newTransactions = [];
                 transactionsData = [];
             }
-            await helper.sleep(100);
+            await helper.sleep(10);
         } while (!end && this.isRun);
         
         await this.coreContext.transactionsProvider.disposeContext(ctx);
