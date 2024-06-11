@@ -1,7 +1,7 @@
 import { Block, Slice, SliceData, Tx, TxType } from "@bywise/web3";
 import { RequestKeys } from "../datasource/message-queue";
 import { BlockchainStatus, CoreContext, TransactionOutputDTO } from "../types";
-import { BlockTree } from "../types/environment.types";
+import { BlockTree, EnvironmentContext } from "../types/environment.types";
 import helper from "../utils/helper";
 import PipelineChain from "./pipeline-chain.core";
 
@@ -65,7 +65,7 @@ export default class MintSlices {
             (a, b) => a.slice.height - b.slice.height
         );
 
-        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
+        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, EnvironmentContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
         ctx.enableReadProxy = true;
         ctx.enableWriteProxy = true;
         let end = false;

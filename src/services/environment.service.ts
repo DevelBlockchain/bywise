@@ -204,17 +204,43 @@ export class EnvironmentProvider {
         await this.EnvironmentRepository.saveMany(saveEnvs);
     }
 
-    async consolide(blockTree: BlockTree) {
+    async getLastConsolidatedContextHash(blockTree: BlockTree) {
+        const main_context_last_hash_env = await this.EnvironmentRepository.get(blockTree.chain, `config-last_hash`, EnvironmentContext.MAIN_CONTEXT_HASH);
+        let lastHash: string = BlockTree.ZERO_HASH;
+        if (main_context_last_hash_env && main_context_last_hash_env.value) {
+            lastHash = main_context_last_hash_env.value;
+        }
+        return lastHash;
+    }
+
+    async consolide(blockTree: BlockTree, contextHash: string) {
+        let lastConsolidatedContextHash: string = await this.getLastConsolidatedContextHash(blockTree);
+        await this.consolideFromHash(blockTree, lastConsolidatedContextHash, contextHash);
+        await this.EnvironmentRepository.save({
+            chain: blockTree.chain,
+            key: `config-last_hash`,
+            hash: EnvironmentContext.MAIN_CONTEXT_HASH,
+            value: contextHash,
+        });
+
+
+    }
+
+    private async consolideFromHash(blockTree: BlockTree, fromContextHash: string, toContextHash: string) {
+        if (toContextHash === BlockTree.ZERO_HASH) {
+            await this.clearMainContext(blockTree);
+        } else if (fromContextHash !== toContextHash) {
+            const lastHash = blockTree.getLastHash(toContextHash);
+            await this.consolideFromHash(blockTree, fromContextHash, lastHash);
+        }
+        await this.mergeContext(blockTree.chain, toContextHash, EnvironmentContext.MAIN_CONTEXT_HASH);
+    }
+
+    private async clearMainContext(blockTree: BlockTree) {
         let delEnvs: Environment[] = [];
         do {
             delEnvs = await this.EnvironmentRepository.findByChainAndHash(blockTree.chain, EnvironmentContext.MAIN_CONTEXT_HASH, 10000);
             await this.EnvironmentRepository.delMany(delEnvs);
         } while (delEnvs.length > 0);
-        
-        for (let height = 0; height <= blockTree.currentMinnedBlock.height; height++) {
-            const minnedBlock = blockTree.minnedBlockList.get(height);
-            if(!minnedBlock) throw new Error(`Minned block ${height} not found`);
-            await this.mergeContext(blockTree.chain, minnedBlock.hash, EnvironmentContext.MAIN_CONTEXT_HASH);
-        }
     }
 }

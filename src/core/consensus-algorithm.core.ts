@@ -106,6 +106,7 @@ export default class ConsensusAlgorithm {
 
     private async selectNewMinedBlock(bestBlock: Blocks) {
         await this.coreContext.blockProvider.selectMinedBlock(this.coreContext.blockTree, bestBlock.block.hash);
+        await this.coreContext.environmentProvider.consolide(this.coreContext.blockTree, bestBlock.block.hash);
         const config = await this.coreContext.configsProvider.getSlowConfigByName(this.coreContext.blockTree, bestBlock.block.hash, bestBlock.block.height, 'blockTime');
         this.coreContext.blockTime = parseInt(config.value);
         await this.coreContext.applicationContext.mq.send(RoutingKeys.selected_new_block, this.coreContext.chain);
