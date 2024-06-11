@@ -42,7 +42,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
     await node0.stop();
-}, 30000)
+}, 1000)
 
 describe('simple transactions', () => {
 
@@ -74,7 +74,7 @@ describe('simple transactions', () => {
             expect(res.status == 'confirmed' || res.status == 'mined').toEqual(true);
         }
     }, 30000);
-
+    
     test('send add balance', async () => {
         const addr = new Wallet();
 

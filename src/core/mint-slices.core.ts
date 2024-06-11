@@ -168,10 +168,9 @@ export default class MintSlices {
                         executedTime += new Date().getTime() - currentTime;
                     }
                 }
+                if (!this.pipelineChain.isRun) return;
             }
-            if (!this.isRun) {
-                return;
-            }
+            if (!this.pipelineChain.isRun) return;
             await helper.sleep(10);
         }
 
@@ -221,11 +220,6 @@ export default class MintSlices {
             await this.mintSlice(lastSliceHeight, newTransactions, transactionsData, outputs, currentMinnedBlock, end, ctx);
         }
         await this.coreContext.transactionsProvider.disposeContext(ctx);
-    }
-
-    async stop() {
-        this.isRun = false;
-        await helper.sleep(100);
     }
 
     async isSliceMinner(currentMinnedBlock: Block) {

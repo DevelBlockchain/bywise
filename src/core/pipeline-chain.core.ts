@@ -148,7 +148,6 @@ export default class PipelineChain implements Task {
 
                 await helper.sleep(this.defaultDelay);
             }
-            await task.stop();
         } catch (err: any) {
             this.coreContext.applicationContext.logger.error(`error core.mintSlices chain ${this.coreContext.chain} - ${err.message}`, err);
             this.stop();
