@@ -128,7 +128,7 @@ export default class MintSlices {
         let currentTime = new Date().getTime();
         let executedTime = 0;
         while ((currentTime - uptime) < TIME_LIMIT_SLICE && currentTime / 1000 < currentMinnedBlock.created + this.coreContext.blockTime) {
-            const mempool = await this.TransactionRepository.findByChainAndStatus(currentMinnedBlock.chain, BlockchainStatus.TX_MEMPOOL);
+            const mempool = await this.TransactionRepository.findByChainAndStatus(currentMinnedBlock.chain, BlockchainStatus.TX_MEMPOOL, 1000);
 
             let countSimulatedTransactions = 0;
             for (let i = 0; i < mempool.length && (currentTime - uptime) < TIME_LIMIT_SLICE && currentTime / 1000 < currentMinnedBlock.created + this.coreContext.blockTime; i++) {
@@ -165,7 +165,11 @@ export default class MintSlices {
                             await this.coreContext.environmentProvider.commit(ctx.envContext);
                         }
                         countSimulatedTransactions++;
-                        executedTime += new Date().getTime() - currentTime;
+                        const spendTime = new Date().getTime() - currentTime;
+                        if(spendTime > 100) {
+                            this.coreContext.applicationContext.logger.warn(`mint slice - slow transaction: ${spendTime} - ${txInfo.tx.hash}`);
+                        }
+                        executedTime += spendTime;
                     }
                 }
                 if (!this.pipelineChain.isRun) return;
