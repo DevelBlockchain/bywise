@@ -117,7 +117,7 @@ export class SlicesProvider {
           let txInfo = await this.transactionsProvider.getTxInfo(txHash);
           txInfo.status = BlockchainStatus.TX_CONFIRMED;
           txInfo.output = sliceInfo.outputs[j];
-          this.transactionsProvider.updateTransaction(txInfo);
+          await this.transactionsProvider.updateTransaction(txInfo);
         }
       }
     } catch (err: any) {
