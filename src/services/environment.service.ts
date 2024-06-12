@@ -74,7 +74,7 @@ export class EnvironmentProvider {
         }
     }
 
-    async getList(blockTree: BlockTree, contextHash: string, key: string): Promise<Environment[]> {
+    async getSlowList(blockTree: BlockTree, contextHash: string, key: string): Promise<Environment[]> {
         const envs = await this.EnvironmentRepository.findByChainAndKey(blockTree.chain, key);
         const added: string[] = [];
         const values: Environment[] = [];
@@ -121,6 +121,20 @@ export class EnvironmentProvider {
         } else {
             return '';
         }
+    }
+
+    async getList(envContext: EnvironmentContext, key: string): Promise<Environment[]> {
+        let envs: Environment[];
+        if(envContext.fromContextHash === EnvironmentContext.MAIN_CONTEXT_HASH) {
+            envs = await this.EnvironmentRepository.findByChainAndHashAndKey(envContext.blockTree.chain, BlockTree.ZERO_HASH, key);
+            envs = envs.map(env => {
+                env.key = env.key.replace(key + '-', '');
+                return env;
+            });
+        } else {
+            envs = await this.getSlowList(envContext.blockTree, envContext.fromContextHash, key);
+        }
+        return envs;
     }
 
     async has(envContext: EnvironmentContext, key: string): Promise<boolean> {

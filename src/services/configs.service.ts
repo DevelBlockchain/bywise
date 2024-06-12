@@ -139,9 +139,9 @@ export class ConfigProvider {
     }
   }
 
-  async getValidators(blockTree: BlockTree, blockHash: string, blockHeight: number) {
+  async getSlowValidators(blockTree: BlockTree, blockHash: string, blockHeight: number) {
     const addresses: string[] = [];
-    let envs = await this.environmentProvider.getList(blockTree, blockHash, `config-validator`);
+    let envs = await this.environmentProvider.getSlowList(blockTree, blockHash, `config-validator`);
     for (let i = 0; i < envs.length; i++) {
       const env = envs[i];
 
@@ -149,6 +149,28 @@ export class ConfigProvider {
         let cfgMeta: ConfigMeta = JSON.parse(env.value);
         let value;
         if (blockHeight - cfgMeta.lastUpdate > 60 || cfgMeta.lastUpdate === 0) {
+          value = cfgMeta.value;
+        } else {
+          value = cfgMeta.lastValue;
+        }
+        if (value === 'true') {
+          addresses.push(env.key);
+        }
+      }
+    }
+    return addresses;
+  }
+
+  async getValidators(envContext: EnvironmentContext) {
+    const addresses: string[] = [];
+    let envs = await this.environmentProvider.getList(envContext, `config-validator`);
+    for (let i = 0; i < envs.length; i++) {
+      const env = envs[i];
+
+      if (env.value) {
+        let cfgMeta: ConfigMeta = JSON.parse(env.value);
+        let value;
+        if (envContext.blockHeight - cfgMeta.lastUpdate > 60 || cfgMeta.lastUpdate === 0) {
           value = cfgMeta.value;
         } else {
           value = cfgMeta.lastValue;

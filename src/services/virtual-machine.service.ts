@@ -233,7 +233,7 @@ export class VirtualMachineProvider {
       if (cmd.input.length !== 2) throw new Error(`vote-block expected 2 inputs`);
       if (!/^[0-9]+$/.test(cmd.input[1])) throw new Error(`invalid height`);
 
-      const validators = await this.configsProvider.getValidators(ctx.envContext.blockTree, ctx.envContext.fromContextHash, ctx.envContext.blockHeight);
+      const validators = await this.configsProvider.getValidators(ctx.envContext);
       const from = ctx.tx.from[0];
       const hash = cmd.input[0];
       const height = parseInt(cmd.input[1]);

@@ -32,6 +32,10 @@ export class EnvironmentRepository {
     async findByChainAndHash(chain: string, hash: string, limit: number = 1000000000): Promise<Environment[]> {
         return await this.db.find(`${this.table}-${chain}-hash-${hash}`, limit);
     }
+    
+    async findByChainAndHashAndKey(chain: string, hash: string, key: string, limit: number = 1000000000): Promise<Environment[]> {
+        return await this.db.find(`${this.table}-${chain}-hash-${hash}-${key}`, limit);
+    }
 
     async get(chain: string, key: string, hash: string): Promise<Environment | null> {
         return await this.db.get(`${this.table}-${chain}-key-${key}-${hash}`);

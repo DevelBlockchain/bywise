@@ -6,7 +6,7 @@ import helper from "../utils/helper";
 export default class VoteBlocks {
     public isRun = true;
     private coreContext;
-    private currentHeight = 0;
+    private blockHeight = -1;
 
     constructor(coreContext: CoreContext) {
         this.coreContext = coreContext;
@@ -15,10 +15,6 @@ export default class VoteBlocks {
     async run() {
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
         const currentBlock = await this.coreContext.blockTree.currentMinnedBlock;
-        
-        if (this.currentHeight >= currentBlock.height) {
-            return;
-        }
 
         const blockTime = this.coreContext.blockTime;
         const now = helper.getNow();
@@ -27,8 +23,10 @@ export default class VoteBlocks {
         if (now < nextVote) {
             return;
         }
-
-        this.currentHeight = currentBlock.height;
+        if(this.blockHeight >= currentBlock.height) {
+            return;
+        }
+        this.blockHeight = currentBlock.height;
 
         const isMinner = await this.coreContext.configsProvider.isSlowValidator(this.coreContext.blockTree, currentBlock.hash, currentBlock.height, mainWallet.address);
         if (!isMinner) {
@@ -61,7 +59,7 @@ export default class VoteBlocks {
         await this.coreContext.transactionsProvider.saveNewTransaction(tx);
         this.coreContext.applicationContext.logger.verbose(`create vote in ${currentBlock.height}`);
 
-        this.makePOI(currentBlock);
+        await this.makePOI(currentBlock);
     }
 
     async makePOI(block: Block) {
