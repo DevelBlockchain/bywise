@@ -32,8 +32,6 @@ export default class PipelineChain implements Task {
             this.coreContext.applicationContext.logger.verbose(`start sync chain ${this.coreContext.chain}`);
             while (this.isRun && task.isRun) {
                 await task.run();
-
-                await helper.sleep(this.defaultDelay);
             }
             this.coreContext.applicationContext.logger.verbose(`sync chain ${this.coreContext.chain} done`);
         } catch (err: any) {
