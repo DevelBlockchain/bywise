@@ -59,6 +59,7 @@ export default class MintBlocks {
         const minValue = await this.coreContext.configsProvider.getSlowConfigByName(this.coreContext.blockTree, fromBlock.hash, fromBlock.height, 'min-bws-block');
         const balanceDTO = await this.coreContext.walletProvider.getSlowWalletBalance(this.coreContext.blockTree, fromBlock.hash, mainWallet.address);
         if (balanceDTO.balance.isLessThan(new BigNumber(minValue.value))) {
+            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain} - low balance`);
             return;
         }
 

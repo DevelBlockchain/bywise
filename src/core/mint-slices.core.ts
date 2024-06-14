@@ -63,9 +63,11 @@ export default class MintSlices {
         const transactions: Map<string, boolean> = new Map();
         let end = false;
         let lastSliceHeight: number = -1;
+        let lastSliceHash: string = currentMinnedBlock.hash;
         for (let i = 0; i < slices.length; i++) {
             const sliceInfo = slices[i];
             lastSliceHeight = sliceInfo.slice.height;
+            lastSliceHash = sliceInfo.slice.hash;
             if (sliceInfo.slice.end) {
                 end = true;
             }
@@ -81,7 +83,7 @@ export default class MintSlices {
         let outputs: TransactionOutputDTO[] = [];
         let newTransactions: string[] = [];
         let transactionsData: SliceData[] = [];
-        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, EnvironmentContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
+        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, lastSliceHash, currentMinnedBlock.height + 1);
         ctx.enableReadProxy = true;
         ctx.enableWriteProxy = true;
         //this.coreContext.applicationContext.logger.debug(`mint slice - START`)
@@ -127,7 +129,7 @@ export default class MintSlices {
         const uptime = new Date().getTime();
         let currentTime = new Date().getTime();
         let executedTime = 0;
-        while ((currentTime - uptime) < TIME_LIMIT_SLICE && currentTime / 1000 < currentMinnedBlock.created + this.coreContext.blockTime) {
+        while ((currentTime - uptime) < TIME_LIMIT_SLICE) {
             const mempool = await this.TransactionRepository.findByChainAndStatus(currentMinnedBlock.chain, BlockchainStatus.TX_MEMPOOL, 1000);
 
             let countSimulatedTransactions = 0;
