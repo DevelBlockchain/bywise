@@ -208,11 +208,13 @@ export class BlocksProvider {
     const blockInfo = await this.getBlockInfo(hash);
 
     let lastBlockInfo = null;
-    let lastlastBlockInfo = null;
+    let expectedFrom = blockInfo.block.from;
     if (blockInfo.block.lastHash !== BlockTree.ZERO_HASH) {
       lastBlockInfo = await this.getBlockInfo(blockInfo.block.lastHash);
+      expectedFrom = lastBlockInfo.block.from;
       if (lastBlockInfo.block.lastHash !== BlockTree.ZERO_HASH) {
-        lastlastBlockInfo = await this.getBlockInfo(lastBlockInfo.block.lastHash);
+        const lastlastBlockInfo = await this.getBlockInfo(lastBlockInfo.block.lastHash);
+        expectedFrom = lastlastBlockInfo.block.from;
       }
     }
     if (blockInfo.block.lastHash === BlockTree.ZERO_HASH || lastBlockInfo && lastBlockInfo.isExecuted) {
@@ -226,15 +228,7 @@ export class BlocksProvider {
             isExecuted = false;
           } else {
             if (blockInfo.block.height !== sliceInfo.slice.blockHeight) throw new Error(`tryExecBlock - wrong blockHeight ${blockInfo.block.height}/${sliceInfo.slice.blockHeight}`);
-            if (lastBlockInfo) {
-              if (lastlastBlockInfo) {
-                if (lastlastBlockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
-              } else {
-                if (lastBlockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
-              }
-            } else {
-              if (blockInfo.block.from !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
-            }
+            if (expectedFrom !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
           }
         }
         if (isExecuted) {

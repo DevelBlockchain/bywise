@@ -239,15 +239,8 @@ export default class MintSlices {
             }
         } else {
             const lastBlock = await this.coreContext.blockProvider.getBlockInfo(currentMinnedBlock.lastHash);
-            if (lastBlock.block.lastHash === BlockTree.ZERO_HASH) {
-                if (lastBlock.block.from === mainWallet.address) {
-                    isMining = true;
-                }
-            } else {
-                const lastLastBlock = await this.coreContext.blockProvider.getBlockInfo(lastBlock.block.lastHash);
-                if (lastLastBlock.block.from === mainWallet.address) {
-                    isMining = true;
-                }
+            if (lastBlock.block.from === mainWallet.address) {
+                isMining = true;
             }
         }
         return isMining;
