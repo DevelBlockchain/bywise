@@ -1,7 +1,7 @@
-import { BywiseHelper, Tx } from "@bywise/web3";
-import { Events } from "../models";
-import { BlockchainStatus, CoreContext, SimulateDTO } from "../types";
+import { Tx } from "@bywise/web3";
+import { CoreContext, SimulateDTO } from "../types";
 import helper from "../utils/helper";
+import { EnvironmentContext } from "../types/environment.types";
 
 export default class ExecuteTransactions {
     public isRun = true;
@@ -17,18 +17,13 @@ export default class ExecuteTransactions {
 
     private async waitBusy() {
         while (this.busy) {
-            await helper.sleep(0);
+            await helper.sleep(10);
         }
         this.busy = true;
     }
 
     async run() {
-        let currentHash: string;
-        if (this.coreContext.blockTree.bestSlice) {
-            currentHash = this.coreContext.blockTree.bestSlice.hash;
-        } else {
-            currentHash = this.coreContext.blockTree.currentMinnedBlock.hash;
-        }
+        let currentHash = this.coreContext.blockTree.getLastContextHash();
 
         if (this.lastHash == currentHash) {
             return;
@@ -42,10 +37,10 @@ export default class ExecuteTransactions {
 
     private async updateContext() {
         this.coreContext.applicationContext.logger.verbose(`update main context - hash: ${this.lastHash.substring(0, 10)}...`);
-        await this.coreContext.environmentProvider.consolide(this.coreContext.blockTree, this.lastHash);
 
-        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, this.lastHash, this.nextBlockHeight);
-       
+        await this.coreContext.environmentProvider.consolide(this.coreContext.blockTree, this.lastHash);
+        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, EnvironmentContext.MAIN_CONTEXT_HASH, this.nextBlockHeight);
+
         await this.waitBusy();
         const oldContext = this.currentContext;
         this.currentContext = ctx;

@@ -1,5 +1,4 @@
 import Network from "../core/network.core";
-import { Blocks, Slices } from "../models";
 import { BlocksProvider, ChainsProvider, EnvironmentProvider, SlicesProvider, TransactionsProvider } from "../services";
 import { ConfigProvider } from "../services/configs.service";
 import { MinnerProvider } from "../services/minner.service";

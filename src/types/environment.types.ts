@@ -42,6 +42,14 @@ export class BlockTree {
         this.blockMap.set(this.tree.hash, this.tree);
     }
 
+    getLastContextHash(): string {
+        if (this.bestSlice) {
+            return this.bestSlice.hash;
+        } else {
+            return this.currentMinnedBlock.hash;
+        }
+    }
+
     addBlock(blockInfo: { lastHash: string, hash: string, height: number }) {
         const slice = this.sliceMap.get(blockInfo.lastHash);
         if (!slice) {
@@ -212,7 +220,7 @@ export class BlockTree {
 
 export class EnvironmentContext {
     public static readonly MAIN_CONTEXT_HASH = 'main_context';
-    
+
     public blockTree: BlockTree;
     public blockHeight: number;
     public fromContextHash: string;

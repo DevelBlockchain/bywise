@@ -3,7 +3,7 @@ import { Slice } from '@bywise/web3';
 import { ApplicationContext } from '../types/task.type';
 import { RoutingKeys } from '../datasource/message-queue';
 import { Slices } from '../models';
-import { BlockTree } from '../types/environment.types';
+import { BlockTree, EnvironmentContext } from '../types/environment.types';
 import { TransactionsProvider } from './transactions.service';
 import { EnvironmentProvider } from './environment.service';
 
@@ -79,7 +79,11 @@ export class SlicesProvider {
   }
 
   async executeCompleteSlice(blockTree: BlockTree, lastContextHash: string, sliceInfo: Slices) {
-    const ctx = this.transactionsProvider.createContext(blockTree, lastContextHash, sliceInfo.slice.blockHeight);
+    let context_hash = await this.environmentProvider.getLastConsolidatedContextHash(blockTree);
+    if(context_hash === lastContextHash) {
+      context_hash = EnvironmentContext.MAIN_CONTEXT_HASH;
+    }
+    const ctx = this.transactionsProvider.createContext(blockTree, context_hash, sliceInfo.slice.blockHeight);
     try {
       let error = false;
       sliceInfo.outputs = [];

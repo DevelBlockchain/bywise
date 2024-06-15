@@ -1,10 +1,9 @@
 import BigNumber from "bignumber.js";
 import { Block, BywiseHelper, Slice, Tx, BlockPack } from '@bywise/web3';
 import { ApplicationContext } from '../types/task.type';
-import { BlockchainStatus, SimulateDTO } from '../types';
+import { BlockchainStatus } from '../types';
 import { MinnerProvider } from './minner.service';
-import { BlockTree } from '../types/environment.types';
-import { VirtualMachineProvider } from "./virtual-machine.service";
+import { BlockTree, EnvironmentContext } from '../types/environment.types';
 import { EnvironmentProvider } from "./environment.service";
 import { RoutingKeys } from "../datasource/message-queue";
 import { Blocks } from "../models";
@@ -17,7 +16,6 @@ export class BlocksProvider {
   private mq;
   private environmentProvider;
   private minnerProvider;
-  private virtualMachineProvider;
   private slicesProvider;
   private transactionsProvider;
   private BlockRepository;
@@ -29,7 +27,6 @@ export class BlocksProvider {
     this.mq = applicationContext.mq;
     this.environmentProvider = new EnvironmentProvider(applicationContext);
     this.minnerProvider = new MinnerProvider(applicationContext);
-    this.virtualMachineProvider = new VirtualMachineProvider(applicationContext);
     this.slicesProvider = new SlicesProvider(applicationContext);
     this.transactionsProvider = new TransactionsProvider(applicationContext);
     this.BlockRepository = applicationContext.database.BlockRepository;
@@ -358,18 +355,24 @@ export class BlocksProvider {
     await this.saveNewBlock(blockPack.block);
     blockTree.addBlock(blockPack.block);
 
+    await this.environmentProvider.consolide(blockTree, blockPack.block.lastHash);
+
     let lastContextHash = blockPack.block.lastHash;
     for (let i = 0; i < blockPack.slices.length; i++) {
       const slice = blockPack.slices[i];
       let sliceInfo = await this.slicesProvider.saveNewSlice(slice);
       sliceInfo = await this.slicesProvider.syncSliceByHash(blockTree, slice.hash);
       await this.slicesProvider.executeCompleteSlice(blockTree, lastContextHash, sliceInfo);
+
+      await this.environmentProvider.mergeContext(blockTree.chain, slice.hash, EnvironmentContext.MAIN_CONTEXT_HASH);
+      await this.environmentProvider.setLastConsolidatedContextHash(blockTree, slice.hash);
     }
 
     await this.processVotes(blockTree);
     await this.syncBlockByHash(blockTree, blockPack.block.hash);
     await this.executeCompleteBlockByHash(blockTree, blockPack.block.hash);
     await this.selectMinedBlock(blockTree, blockPack.block.hash);
+    await this.environmentProvider.setLastConsolidatedContextHash(blockTree, blockPack.block.hash);
   }
 
   async getBlockTree(chain: string) {

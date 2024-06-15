@@ -1,8 +1,12 @@
 import { Environment } from "../models";
+import { SimulateDTO } from "../types";
 import { BlockTree, EnvironmentContext } from "../types/environment.types";
 import { ApplicationContext } from "../types/task.type";
+import helper from "../utils/helper";
 
 export class EnvironmentProvider {
+
+    public static busy = false;
 
     private EnvironmentRepository;
 
@@ -125,7 +129,7 @@ export class EnvironmentProvider {
 
     async getList(envContext: EnvironmentContext, key: string): Promise<Environment[]> {
         let envs: Environment[];
-        if(envContext.fromContextHash === EnvironmentContext.MAIN_CONTEXT_HASH) {
+        if (envContext.fromContextHash === EnvironmentContext.MAIN_CONTEXT_HASH) {
             envs = await this.EnvironmentRepository.findByChainAndHashAndKey(envContext.blockTree.chain, BlockTree.ZERO_HASH, key);
             envs = envs.map(env => {
                 env.key = env.key.replace(key + '-', '');
@@ -227,22 +231,27 @@ export class EnvironmentProvider {
         return lastHash;
     }
 
-    async consolide(blockTree: BlockTree, contextHash: string) {
-        let lastConsolidatedContextHash: string = await this.getLastConsolidatedContextHash(blockTree);
-        await this.consolideFromHash(blockTree, lastConsolidatedContextHash, contextHash);
+    async setLastConsolidatedContextHash(blockTree: BlockTree, contextHash: string) {
         await this.EnvironmentRepository.save({
             chain: blockTree.chain,
             key: `config-last_hash`,
             hash: EnvironmentContext.MAIN_CONTEXT_HASH,
             value: contextHash,
         });
+    }
 
-
+    async consolide(blockTree: BlockTree, contextHash: string) {
+        let lastConsolidatedContextHash: string = await this.getLastConsolidatedContextHash(blockTree);
+        if (contextHash == lastConsolidatedContextHash) {
+            return;
+        }
+        await this.consolideFromHash(blockTree, lastConsolidatedContextHash, contextHash);
+        await this.setLastConsolidatedContextHash(blockTree, contextHash);
     }
 
     private async consolideFromHash(blockTree: BlockTree, fromContextHash: string, toContextHash: string) {
         if (toContextHash === BlockTree.ZERO_HASH) {
-            await this.clearMainContext(blockTree);
+            await this.clearMainContext(blockTree.chain);
         } else if (fromContextHash !== toContextHash) {
             const lastHash = blockTree.getLastHash(toContextHash);
             await this.consolideFromHash(blockTree, fromContextHash, lastHash);
@@ -250,10 +259,10 @@ export class EnvironmentProvider {
         await this.mergeContext(blockTree.chain, toContextHash, EnvironmentContext.MAIN_CONTEXT_HASH);
     }
 
-    private async clearMainContext(blockTree: BlockTree) {
+    public async clearMainContext(chain: string) {
         let delEnvs: Environment[] = [];
         do {
-            delEnvs = await this.EnvironmentRepository.findByChainAndHash(blockTree.chain, EnvironmentContext.MAIN_CONTEXT_HASH, 10000);
+            delEnvs = await this.EnvironmentRepository.findByChainAndHash(chain, EnvironmentContext.MAIN_CONTEXT_HASH, 10000);
             await this.EnvironmentRepository.delMany(delEnvs);
         } while (delEnvs.length > 0);
     }
