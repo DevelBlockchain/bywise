@@ -226,9 +226,7 @@ export default class MintSlices {
         if (newTransactions.length > 0) {
             lastSliceHeight++;
             this.coreContext.applicationContext.logger.verbose(`mint slice - ${(newTransactions.length / (executedTime / 1000)).toFixed(2)} TPS - simulate ${newTransactions.length} transactions in ${executedTime / 1000}`)
-            const slice = await this.mintSlice(lastSliceHeight, newTransactions, transactionsData, outputs, currentMinnedBlock, end, ctx);
-            await this.environmentProvider.mergeContext(this.coreContext.blockTree.chain, slice.hash, EnvironmentContext.MAIN_CONTEXT_HASH);
-            await this.environmentProvider.setLastConsolidatedContextHash(this.coreContext.blockTree, slice.hash);
+            await this.mintSlice(lastSliceHeight, newTransactions, transactionsData, outputs, currentMinnedBlock, end, ctx);
         }
         await this.transactionsProvider.disposeContext(ctx);
     }
