@@ -266,7 +266,7 @@ export class BlocksProvider {
         txInfo.slicesHash = '';
         await this.transactionsProvider.updateTransaction(txInfo);
       }
-      sliceInfo.status = BlockchainStatus.TX_MEMPOOL;
+      sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
       sliceInfo.blockHash = '';
       await this.slicesProvider.updateSlice(sliceInfo);
     }

@@ -103,8 +103,8 @@ export default class BlockchainBywise implements BlockchainInterface {
         balanceAccount.balance = balanceAccount.balance.minus(new BigNumber(amoutBN));
         balanceRecipient.balance = balanceRecipient.balance.plus(new BigNumber(amoutBN));
 
-        await this.walletProvider.setWalletBalance(tx.ctx.envContext, balanceAccount);
-        await this.walletProvider.setWalletBalance(tx.ctx.envContext, balanceRecipient);
+        this.walletProvider.setWalletBalance(tx.ctx.envContext, balanceAccount);
+        this.walletProvider.setWalletBalance(tx.ctx.envContext, balanceRecipient);
         return '';
     }
 

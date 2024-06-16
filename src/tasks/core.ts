@@ -5,6 +5,8 @@ import PipelineChain from '../core/pipeline-chain.core';
 import Network from '../core/network.core';
 import { Block, Slice, Tx } from '@bywise/web3';
 import { RequestKeys, RoutingKeys } from '../datasource/message-queue';
+import { BlockTree } from '../types/environment.types';
+import { Slices } from '../models';
 
 class Core implements Task {
 
@@ -140,6 +142,36 @@ class Core implements Task {
             const pipelineChain = this.runChains.get(data.chain);
             if (pipelineChain) {
                 return await pipelineChain.executeTransactionsTask.getContract(data.address);
+            } else {
+                throw new Error(`Node does not work with this chain`);
+            }
+        });
+        this.applicationContext.mq.addRequestListener(RequestKeys.get_confirmed_slices, async (data: { chain: string }) => {
+            const pipelineChain = this.runChains.get(data.chain);
+            if (pipelineChain) {
+                const currentBlock = pipelineChain.coreContext.blockTree.currentMinnedBlock;
+                let from = currentBlock.from;
+                if (currentBlock.lastHash !== BlockTree.ZERO_HASH) {
+                    const lastLastBlock = await pipelineChain.coreContext.blockProvider.getBlockInfo(currentBlock.lastHash);
+                    from = lastLastBlock.block.from;
+                }
+                const bestSlices = await pipelineChain.coreContext.blockTree.getBestSlice(from, currentBlock.height + 1);
+                const slices: Slices[] = [];
+                let end = false;
+                for (let i = 0; i < bestSlices.length; i++) {
+                    const slice = bestSlices[i];
+                    const sliceInfo = await pipelineChain.coreContext.slicesProvider.getSliceInfo(slice.hash);
+                    if (!sliceInfo.isExecuted) {
+                        break;
+                    }
+                    if (sliceInfo.slice.end) {
+                        end = true;
+                        slices.push(sliceInfo);
+                        break;
+                    }
+                    slices.push(sliceInfo);
+                }
+                return slices;
             } else {
                 throw new Error(`Node does not work with this chain`);
             }

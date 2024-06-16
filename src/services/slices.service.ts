@@ -111,6 +111,7 @@ export class SlicesProvider {
             blockTree.bestSlice.height < sliceInfo.slice.height ||
             blockTree.bestSlice.height == sliceInfo.slice.height && blockTree.bestSlice.transactionsCount < sliceInfo.slice.transactionsCount) {
             blockTree.bestSlice = sliceInfo.slice;
+            sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
           }
         } else if(sliceInfo.slice.blockHeight > blockTree.currentMinnedBlock.height) {
           blockTree.bestSlice = sliceInfo.slice;

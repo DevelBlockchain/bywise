@@ -272,7 +272,11 @@ export default class MintSlices {
         bslice.isComplete = true;
 
         bslice.isExecuted = true;
+        bslice.status = BlockchainStatus.TX_CONFIRMED;
         bslice.outputs = outputs;
+        this.environmentProvider.commit(ctx.envContext);
+        await this.environmentProvider.push(ctx.envContext, slice.hash);
+
         for (let j = 0; j < bslice.slice.transactions.length; j++) {
             const txHash = bslice.slice.transactions[j];
             let txInfo = await this.transactionsProvider.getTxInfo(txHash);
@@ -280,8 +284,6 @@ export default class MintSlices {
             txInfo.output = bslice.outputs[j];
             await this.transactionsProvider.updateTransaction(txInfo);
         }
-        this.environmentProvider.commit(ctx.envContext);
-        await this.environmentProvider.push(ctx.envContext, slice.hash);
 
         await this.coreContext.slicesProvider.updateSlice(bslice);
         this.coreContext.blockTree.addSlice(slice);
