@@ -10,8 +10,8 @@ import { BywiseHelper } from '@bywise/web3';
 
 export default class BlockchainBywise implements BlockchainInterface {
 
-    static MAX_VALUE_LENGTH = 1000000;
-    static MAX_KEY_LENGTH = 2048;
+    static readonly MAX_VALUE_LENGTH = 1000000;
+    static readonly MAX_KEY_LENGTH = 2048;
 
     environmentProvider;
     walletProvider;

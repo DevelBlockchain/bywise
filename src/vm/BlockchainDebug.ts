@@ -32,8 +32,8 @@ class Memory {
 
 export default class BlockchainDebug implements BlockchainInterface {
 
-    static MAX_VALUE_LENGTH = 1000000;
-    static MAX_KEY_LENGTH = 2048;
+    static readonly MAX_VALUE_LENGTH = 1000000;
+    static readonly MAX_KEY_LENGTH = 2048;
 
     balances = new Memory();
     memory = new Memory();

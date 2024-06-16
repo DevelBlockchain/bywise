@@ -19,7 +19,7 @@ export type NodeSliceTree = {
 
 export class BlockTree {
 
-    public static ZERO_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
+    public static readonly ZERO_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
 
     public readonly chain: string;
 
