@@ -157,7 +157,7 @@ export class EnvironmentProvider {
         return '';
     }
 
-    async set(envContext: EnvironmentContext, key: string, value: string): Promise<void> {
+    set(envContext: EnvironmentContext, key: string, value: string): void {
         const newEnv: Environment = {
             chain: envContext.blockTree.chain,
             key: key,
@@ -167,7 +167,7 @@ export class EnvironmentProvider {
         envContext.setStageKeys.set(newEnv.key, newEnv);
     }
 
-    async delete(envContext: EnvironmentContext, key: string): Promise<void> {
+    delete(envContext: EnvironmentContext, key: string): void {
         const newEnv: Environment = {
             chain: envContext.blockTree.chain,
             key: key,
@@ -177,12 +177,12 @@ export class EnvironmentProvider {
         envContext.setStageKeys.set(newEnv.key, newEnv);
     }
 
-    async deleteCommit(envContext: EnvironmentContext) {
+    deleteCommit(envContext: EnvironmentContext) {
         envContext.setStageKeys.clear();
         envContext.getStageKeys.clear();
     }
 
-    async commit(envContext: EnvironmentContext) {
+    commit(envContext: EnvironmentContext) {
         for (let [key, env] of envContext.setStageKeys) {
             envContext.setMainKeys.set(key, env);
         }
@@ -260,6 +260,7 @@ export class EnvironmentProvider {
     }
 
     public async clearMainContext(chain: string) {
+        console.log('######## clearMainContext')
         let delEnvs: Environment[] = [];
         do {
             delEnvs = await this.EnvironmentRepository.findByChainAndHash(chain, EnvironmentContext.MAIN_CONTEXT_HASH, 10000);

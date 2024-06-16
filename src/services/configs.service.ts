@@ -240,6 +240,6 @@ export class ConfigProvider {
       let cfgMeta: ConfigMeta = JSON.parse(configEnv);
       newConfigValue.lastValue = cfgMeta.value;
     }
-    await this.environmentProvider.set(envContext, `config-${cfg.name}`, JSON.stringify(newConfigValue));
+    this.environmentProvider.set(envContext, `config-${cfg.name}`, JSON.stringify(newConfigValue));
   }
 }

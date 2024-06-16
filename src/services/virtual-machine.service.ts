@@ -111,7 +111,7 @@ export class VirtualMachineProvider {
 
       const bcc = await BywiseRuntime.execContract(this.blockchainBywise, getContract, ctx, contractAddress, tx.from[0], contractAmount.toString(), code);
 
-      await this.environmentProvider.set(ctx.envContext, contractAddress, JSON.stringify(bcc));
+      this.environmentProvider.set(ctx.envContext, contractAddress, JSON.stringify(bcc));
       ctx.output.output = {
         contractAddress: contractAddress,
         abi: bcc.abi
@@ -174,7 +174,7 @@ export class VirtualMachineProvider {
           debit = debit.minus(amountBN);
           balanceDTO.balance = balanceDTO.balance.minus(amountBN);
 
-          await this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+          this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
         }
       }
     }
@@ -194,7 +194,7 @@ export class VirtualMachineProvider {
         balanceDTO.balance = balanceDTO.balance.minus(debit);
         debit = new BigNumber(0);
       }
-      await this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
     }
     if (ctx.checkWalletBalance === true && !debit.isEqualTo(new BigNumber(0))) {
       throw new Error('insufficient funds');
@@ -205,7 +205,7 @@ export class VirtualMachineProvider {
 
       const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, to);
       balanceDTO.balance = balanceDTO.balance.plus(new BigNumber(amount));
-      await this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
     }
 
     ctx.output.fee = tx.fee;
@@ -284,7 +284,7 @@ export class VirtualMachineProvider {
       if (balanceDTO.balance.isLessThan(new BigNumber(0))) {
         balanceDTO.balance = new BigNumber(0);
       }
-      await this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
     } else {
       throw new Error("Method not implemented.");
     }
@@ -353,7 +353,7 @@ export class VirtualMachineProvider {
       if (!BywiseHelper.isValidAmount(amount)) throw new Error(`invalid amount ${amount}`);
       const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, address);
       balanceDTO.balance = new BigNumber(amount);
-      await this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
 
     } else if (cmd.name == 'addBalance') {
       if (cmd.input.length !== 2) throw new Error(`addBalance expected 2 inputs`);
@@ -363,7 +363,7 @@ export class VirtualMachineProvider {
       if (!BywiseHelper.isValidAmount(amount)) throw new Error(`invalid amount ${amount}`);
       const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, address);
       balanceDTO.balance = balanceDTO.balance.plus(new BigNumber(amount));
-      await this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
 
     } else if (cmd.name == 'subBalance') {
       if (cmd.input.length !== 2) throw new Error(`subBalance expected 2 inputs`);
@@ -376,7 +376,7 @@ export class VirtualMachineProvider {
       if (balanceDTO.balance.isLessThan(new BigNumber(0))) {
         balanceDTO.balance = new BigNumber(0);
       }
-      await this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
 
     } else {
       throw new Error("Method not implemented.");
@@ -398,7 +398,7 @@ export class VirtualMachineProvider {
       if (name === 'bio') info.bio = value;
       if (name === 'photo') info.photo = value;
       if (name === 'publicKey') info.publicKey = value;
-      await this.walletProvider.setWalletInfo(ctx.envContext, ctx.tx.from[0], info);
+      this.walletProvider.setWalletInfo(ctx.envContext, ctx.tx.from[0], info);
       return;
     }
     throw new Error("Method not implemented.");

@@ -51,11 +51,11 @@ export class WalletProvider {
     return new WalletDTO();
   }
 
-  async setWalletBalance(envContext: EnvironmentContext, balanceDTO: BalanceDTO): Promise<void> {
-    await this.environmentProvider.set(envContext, `wallet:${balanceDTO.address}:balance`, balanceDTO.balance.toString());
+  setWalletBalance(envContext: EnvironmentContext, balanceDTO: BalanceDTO): void {
+    this.environmentProvider.set(envContext, `wallet:${balanceDTO.address}:balance`, balanceDTO.balance.toString());
   }
   
-  async setWalletInfo(envContext: EnvironmentContext, address: string, info: WalletDTO): Promise<void> {
-    await this.environmentProvider.set(envContext, `wallet:${address}:info`, JSON.stringify(info));
+  setWalletInfo(envContext: EnvironmentContext, address: string, info: WalletDTO): void {
+    this.environmentProvider.set(envContext, `wallet:${address}:info`, JSON.stringify(info));
   }
 }

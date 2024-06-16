@@ -104,7 +104,7 @@ export default class ExecuteTransactions {
         }, currentContext);
         currentContext.checkWalletBalance = true;
         currentContext.enableReadProxy = false;
-        await this.coreContext.environmentProvider.deleteCommit(currentContext.envContext);
+        this.coreContext.environmentProvider.deleteCommit(currentContext.envContext);
 
         this.busy = false;
         return output;

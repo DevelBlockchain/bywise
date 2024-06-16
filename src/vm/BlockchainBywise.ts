@@ -125,7 +125,7 @@ export default class BlockchainBywise implements BlockchainInterface {
             uuid = await await this.getUUID(tx);
         }
         const key = `V-${tx.contractAddress}-${uuid}`
-        await this.environmentProvider.set(tx.ctx.envContext, key, value);
+        this.environmentProvider.set(tx.ctx.envContext, key, value);
         return uuid;
     }
 
@@ -146,7 +146,7 @@ export default class BlockchainBywise implements BlockchainInterface {
 
         const uuid = await this.getUUID(tx);
         const mapKey = `M-${tx.contractAddress}-${uuid}-default`
-        await this.environmentProvider.set(tx.ctx.envContext, mapKey, defaultValue);
+        this.environmentProvider.set(tx.ctx.envContext, mapKey, defaultValue);
         return uuid;
     }
 
@@ -162,7 +162,7 @@ export default class BlockchainBywise implements BlockchainInterface {
         const searchKey = `M-${tx.contractAddress}-${uuid}-value-${key.replace(/-/gm, '_')}`;
         if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
-        await this.environmentProvider.set(tx.ctx.envContext, searchKey, value);
+        this.environmentProvider.set(tx.ctx.envContext, searchKey, value);
         return '';
     }
 
@@ -213,14 +213,14 @@ export default class BlockchainBywise implements BlockchainInterface {
         if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
         if (await this.environmentProvider.has(tx.ctx.envContext, searchKey)) {
-            await this.environmentProvider.delete(tx.ctx.envContext, searchKey);
+            this.environmentProvider.delete(tx.ctx.envContext, searchKey);
         }
         return '';
     }
 
     listNew = async (tx: TransactionMessage): Promise<string> => {
         const uuid = await this.getUUID(tx);
-        await this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, '0');
+        this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, '0');
         return uuid;
     }
 
@@ -262,7 +262,7 @@ export default class BlockchainBywise implements BlockchainInterface {
         if (indexBN.isGreaterThanOrEqualTo(size)) throw new Error('BVM: index out of array');
 
         const key = `L-${tx.contractAddress}-${uuid}-value-${indexBN.toFixed(0)}`;
-        await this.environmentProvider.set(tx.ctx.envContext, key, value);
+        this.environmentProvider.set(tx.ctx.envContext, key, value);
         return '';
     }
 
@@ -275,8 +275,8 @@ export default class BlockchainBywise implements BlockchainInterface {
         let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`));
         let newSize = size.plus(1).toFixed(0);
 
-        await this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${size.toFixed(0)}`, value);
-        await this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, newSize);
+        this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${size.toFixed(0)}`, value);
+        this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, newSize);
         return '';
     }
 
@@ -289,8 +289,8 @@ export default class BlockchainBywise implements BlockchainInterface {
         let newSize = size.minus(1).toFixed(0);
 
         const returnValue = await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${newSize}`);
-        await this.environmentProvider.delete(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${newSize}`);
-        await this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, newSize);
+        this.environmentProvider.delete(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${newSize}`);
+        this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, newSize);
         return returnValue;
     }
 

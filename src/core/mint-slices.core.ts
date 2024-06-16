@@ -120,9 +120,10 @@ export default class MintSlices {
                         data: ctx.proxyMock
                     });
                 }
-                outputs.push(output);
                 transactions.set(txInfo.tx.hash, true);
                 newTransactions.push(txInfo.tx.hash);
+                outputs.push(output);
+                this.coreContext.environmentProvider.commit(ctx.envContext);
             }
         }
 
@@ -152,7 +153,7 @@ export default class MintSlices {
                             txInfo.status = BlockchainStatus.TX_FAILED;
                             txInfo.output = output;
                             await this.coreContext.transactionsProvider.updateTransaction(txInfo);
-                            await this.coreContext.environmentProvider.deleteCommit(ctx.envContext);
+                            this.coreContext.environmentProvider.deleteCommit(ctx.envContext);
                             this.coreContext.applicationContext.logger.warn(`mint slice - invalidate transaction ${txInfo.tx.hash}`)
                         } else {
                             if (ctx.proxyMock.length > 0) {
@@ -164,7 +165,7 @@ export default class MintSlices {
                             transactions.set(txInfo.tx.hash, true);
                             newTransactions.push(txInfo.tx.hash);
                             outputs.push(output);
-                            await this.coreContext.environmentProvider.commit(ctx.envContext);
+                            this.coreContext.environmentProvider.commit(ctx.envContext);
                         }
                         countSimulatedTransactions++;
                         const spendTime = new Date().getTime() - currentTime;
@@ -215,6 +216,7 @@ export default class MintSlices {
                     transactions.set(txInfo.tx.hash, true);
                     newTransactions.push(txInfo.tx.hash);
                     outputs.push(output);
+                    this.coreContext.environmentProvider.commit(ctx.envContext);
                     end = true;
                     this.coreContext.applicationContext.logger.verbose(`mint slice - mint by END`)
                 }
@@ -278,7 +280,7 @@ export default class MintSlices {
             txInfo.output = bslice.outputs[j];
             await this.transactionsProvider.updateTransaction(txInfo);
         }
-        await this.environmentProvider.commit(ctx.envContext);
+        this.environmentProvider.commit(ctx.envContext);
         await this.environmentProvider.push(ctx.envContext, slice.hash);
 
         await this.coreContext.slicesProvider.updateSlice(bslice);

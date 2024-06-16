@@ -103,7 +103,7 @@ export class SlicesProvider {
       } else {
         sliceInfo.isExecuted = true;
         this.environmentProvider.commit(ctx.envContext);
-        this.environmentProvider.push(ctx.envContext, sliceInfo.slice.hash);
+        await this.environmentProvider.push(ctx.envContext, sliceInfo.slice.hash);
         this.logger.verbose(`exec-slices: exec slice - height: ${sliceInfo.slice.blockHeight} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
         
         if(blockTree.bestSlice) {
