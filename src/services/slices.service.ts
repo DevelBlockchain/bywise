@@ -81,9 +81,9 @@ export class SlicesProvider {
   async executeCompleteSlice(blockTree: BlockTree, lastContextHash: string, sliceInfo: Slices) {
     let context_hash = await this.environmentProvider.getLastConsolidatedContextHash(blockTree);
     if(context_hash === lastContextHash) {
-      context_hash = EnvironmentContext.MAIN_CONTEXT_HASH;
+      lastContextHash = EnvironmentContext.MAIN_CONTEXT_HASH;
     }
-    const ctx = this.transactionsProvider.createContext(blockTree, context_hash, sliceInfo.slice.blockHeight);
+    const ctx = this.transactionsProvider.createContext(blockTree, lastContextHash, sliceInfo.slice.blockHeight);
     try {
       let error = false;
       sliceInfo.outputs = [];

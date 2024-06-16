@@ -1,12 +1,8 @@
 import { Environment } from "../models";
-import { SimulateDTO } from "../types";
 import { BlockTree, EnvironmentContext } from "../types/environment.types";
 import { ApplicationContext } from "../types/task.type";
-import helper from "../utils/helper";
 
 export class EnvironmentProvider {
-
-    public static busy = false;
 
     private EnvironmentRepository;
 
@@ -32,7 +28,6 @@ export class EnvironmentProvider {
         if (env == null && getEnv !== undefined) {
             env = getEnv;
         }
-        getEnv = envContext.getMainKeys.get(key);
         if (env == null) {
             if (envContext.fromContextHash === EnvironmentContext.MAIN_CONTEXT_HASH) {
                 const main_context_env = await this.EnvironmentRepository.get(envContext.blockTree.chain, key, EnvironmentContext.MAIN_CONTEXT_HASH);
@@ -186,7 +181,7 @@ export class EnvironmentProvider {
         for (let [key, env] of envContext.setStageKeys) {
             envContext.setMainKeys.set(key, env);
         }
-        for (let [key, env] of envContext.getMainKeys) {
+        for (let [key, env] of envContext.getStageKeys) {
             envContext.getMainKeys.set(key, env);
         }
         envContext.setStageKeys.clear();

@@ -138,8 +138,9 @@ export default class MintSlices {
                 currentTime = new Date().getTime();
                 const txInfo = mempool[i];
                 if (!transactions.has(txInfo.tx.hash)) {
+                    transactions.set(txInfo.tx.hash, true);
                     if (txInfo.tx.created < currentTime / 1000 - 60) {
-                        this.coreContext.applicationContext.logger.warn(`mint slice - ignore transaction by time ${txInfo.tx.created} < ${currentTime / 1000 - 60}`);
+                        //this.coreContext.applicationContext.logger.warn(`mint slice - ignore transaction by time ${txInfo.tx.created} < ${currentTime / 1000 - 60}`);
                         txInfo.status = BlockchainStatus.TX_FAILED;
                         txInfo.output = new TransactionOutputDTO();
                         txInfo.output.error = 'TIMEOUT';
@@ -154,7 +155,7 @@ export default class MintSlices {
                             txInfo.output = output;
                             await this.coreContext.transactionsProvider.updateTransaction(txInfo);
                             this.coreContext.environmentProvider.deleteCommit(ctx.envContext);
-                            this.coreContext.applicationContext.logger.warn(`mint slice - invalidate transaction ${txInfo.tx.hash}`)
+                            this.coreContext.applicationContext.logger.warn(`mint slice - invalidate transaction ${txInfo.tx.hash} - "${output.error}"`)
                         } else {
                             if (ctx.proxyMock.length > 0) {
                                 transactionsData.push({
@@ -162,7 +163,6 @@ export default class MintSlices {
                                     data: ctx.proxyMock
                                 });
                             }
-                            transactions.set(txInfo.tx.hash, true);
                             newTransactions.push(txInfo.tx.hash);
                             outputs.push(output);
                             this.coreContext.environmentProvider.commit(ctx.envContext);
