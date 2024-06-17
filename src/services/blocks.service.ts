@@ -366,6 +366,7 @@ export class BlocksProvider {
 
       await this.environmentProvider.mergeContext(blockTree.chain, slice.hash, EnvironmentContext.MAIN_CONTEXT_HASH);
       await this.environmentProvider.setLastConsolidatedContextHash(blockTree, slice.hash);
+      lastContextHash = slice.hash;
     }
 
     await this.processVotes(blockTree);
