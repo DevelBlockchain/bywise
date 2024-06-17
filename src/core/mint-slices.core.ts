@@ -4,6 +4,7 @@ import { BlockchainStatus, CoreContext, SimulateDTO, TransactionOutputDTO } from
 import { BlockTree, EnvironmentContext } from "../types/environment.types";
 import helper from "../utils/helper";
 import PipelineChain from "./pipeline-chain.core";
+import { Slices } from "../models";
 
 const TIME_LIMIT_SLICE = 5000;
 
@@ -226,7 +227,8 @@ export default class MintSlices {
         if (newTransactions.length > 0) {
             lastSliceHeight++;
             this.coreContext.applicationContext.logger.verbose(`mint slice - ${(newTransactions.length / (executedTime / 1000)).toFixed(2)} TPS - simulate ${newTransactions.length} transactions in ${executedTime / 1000}`)
-            await this.mintSlice(lastSliceHeight, newTransactions, transactionsData, outputs, currentMinnedBlock, end, ctx);
+            const sliceInfo = await this.mintSlice(lastSliceHeight, newTransactions, transactionsData, currentMinnedBlock, end);
+            await this.saveExecutedSlices(sliceInfo, outputs, ctx);
         }
         await this.transactionsProvider.disposeContext(ctx);
     }
@@ -247,7 +249,7 @@ export default class MintSlices {
         return isMining;
     }
 
-    private async mintSlice(height: number, transactions: string[], transactionsData: SliceData[], outputs: TransactionOutputDTO[], currentMinnedBlock: Block, end: boolean, ctx: SimulateDTO) {
+    private async mintSlice(height: number, transactions: string[], transactionsData: SliceData[], currentMinnedBlock: Block, end: boolean): Promise<Slices> {
         if (transactions.length === 0) throw new Error(`mint slice without transactions`);
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
 
@@ -269,23 +271,26 @@ export default class MintSlices {
         const bslice = await this.coreContext.slicesProvider.saveNewSlice(slice);
         bslice.isComplete = true;
 
-        bslice.isExecuted = true;
-        bslice.status = BlockchainStatus.TX_CONFIRMED;
-        bslice.outputs = outputs;
-        this.environmentProvider.commit(ctx.envContext);
-        await this.environmentProvider.push(ctx.envContext, slice.hash);
-
-        for (let j = 0; j < bslice.slice.transactions.length; j++) {
-            const txHash = bslice.slice.transactions[j];
-            let txInfo = await this.transactionsProvider.getTxInfo(txHash);
-            txInfo.status = BlockchainStatus.TX_CONFIRMED;
-            txInfo.output = bslice.outputs[j];
-            await this.transactionsProvider.updateTransaction(txInfo);
-        }
 
         await this.coreContext.slicesProvider.updateSlice(bslice);
         this.coreContext.blockTree.addSlice(slice);
-        this.coreContext.blockTree.bestSlice = slice;
-        return slice;
+        return bslice;
+    }
+
+    private async saveExecutedSlices(sliceInfo: Slices, outputs: TransactionOutputDTO[], ctx: SimulateDTO) {
+        sliceInfo.isExecuted = true;
+        sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
+        sliceInfo.outputs = outputs;
+        this.environmentProvider.commit(ctx.envContext);
+        await this.environmentProvider.push(ctx.envContext, sliceInfo.slice.hash);
+        for (let j = 0; j < sliceInfo.slice.transactions.length; j++) {
+            const txHash = sliceInfo.slice.transactions[j];
+            let txInfo = await this.transactionsProvider.getTxInfo(txHash);
+            txInfo.status = BlockchainStatus.TX_CONFIRMED;
+            txInfo.output = sliceInfo.outputs[j];
+            await this.transactionsProvider.updateTransaction(txInfo);
+        }
+        this.coreContext.blockTree.bestSlice = sliceInfo.slice;
+        await this.coreContext.slicesProvider.updateSlice(sliceInfo);
     }
 }
