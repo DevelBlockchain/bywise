@@ -84,8 +84,8 @@ export class SlicesProvider {
       lastContextHash = EnvironmentContext.MAIN_CONTEXT_HASH;
     }
     const ctx = this.transactionsProvider.createContext(blockTree, lastContextHash, sliceInfo.slice.blockHeight);
+    let error = false;
     try {
-      let error = false;
       sliceInfo.outputs = [];
       for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
         const txHash = sliceInfo.slice.transactions[j];
@@ -128,9 +128,11 @@ export class SlicesProvider {
     } catch (err: any) {
       this.logger.error(`Error: ${err.message}`, err);
       sliceInfo.status = BlockchainStatus.TX_FAILED;
+      error = true;
     }
     await this.updateSlice(sliceInfo);
     await this.transactionsProvider.disposeContext(ctx);
+    return error;
   }
 
   async getSlice(sliceHash: string): Promise<Slices | null> {
