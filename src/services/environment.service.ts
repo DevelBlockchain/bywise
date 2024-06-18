@@ -13,20 +13,26 @@ export class EnvironmentProvider {
     private async getFromContextEnv(envContext: EnvironmentContext, key: string): Promise<Environment> {
         let env: Environment | null = null;
         let getEnv = envContext.setStageKeys.get(key);
-        if (env == null && getEnv !== undefined) {
+        if (getEnv !== undefined) {
             env = getEnv;
         }
-        getEnv = envContext.setMainKeys.get(key);
-        if (env == null && getEnv !== undefined) {
-            env = getEnv;
+        if(env == null) {
+            getEnv = envContext.setMainKeys.get(key);
+            if (getEnv !== undefined) {
+                env = getEnv;
+            }
         }
-        getEnv = envContext.getStageKeys.get(key);
-        if (env == null && getEnv !== undefined) {
-            env = getEnv;
+        if(env == null) {
+            getEnv = envContext.getStageKeys.get(key);
+            if (getEnv !== undefined) {
+                env = getEnv;
+            }
         }
-        getEnv = envContext.getMainKeys.get(key);
-        if (env == null && getEnv !== undefined) {
-            env = getEnv;
+        if(env == null) {
+            getEnv = envContext.getMainKeys.get(key);
+            if (getEnv !== undefined) {
+                env = getEnv;
+            }
         }
         if (env == null) {
             if (envContext.fromContextHash === EnvironmentContext.MAIN_CONTEXT_HASH) {
