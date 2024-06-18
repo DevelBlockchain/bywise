@@ -79,11 +79,8 @@ export class SlicesProvider {
   }
 
   async executeCompleteSlice(blockTree: BlockTree, lastContextHash: string, sliceInfo: Slices) {
-    let context_hash = await this.environmentProvider.getLastConsolidatedContextHash(blockTree);
-    if(context_hash === lastContextHash) {
-      lastContextHash = EnvironmentContext.MAIN_CONTEXT_HASH;
-    }
-    const ctx = this.transactionsProvider.createContext(blockTree, lastContextHash, sliceInfo.slice.blockHeight);
+    await this.environmentProvider.consolide(blockTree, lastContextHash);
+    const ctx = this.transactionsProvider.createContext(blockTree, EnvironmentContext.MAIN_CONTEXT_HASH, sliceInfo.slice.blockHeight);
     let error = false;
     try {
       sliceInfo.outputs = [];
@@ -104,7 +101,7 @@ export class SlicesProvider {
         sliceInfo.isExecuted = true;
         this.environmentProvider.commit(ctx.envContext);
         await this.environmentProvider.push(ctx.envContext, sliceInfo.slice.hash);
-        this.logger.verbose(`exec-slices: exec slice - height: ${sliceInfo.slice.blockHeight} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
+        this.logger.verbose(`exec-slices: exec slice - height: ${sliceInfo.slice.blockHeight} - txs: ${sliceInfo.slice.transactionsCount} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
         
         if(blockTree.bestSlice) {
           if(blockTree.bestSlice.blockHeight < sliceInfo.slice.blockHeight ||

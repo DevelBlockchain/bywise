@@ -42,7 +42,7 @@ export default class MintSlices {
             chain: this.coreContext.chain
         })
         if (!isConnected) {
-            this.coreContext.applicationContext.logger.verbose(`mint slice - Node has disconnected!`)
+            this.coreContext.applicationContext.logger.error(`mint slice - Node has disconnected!`)
             this.pipelineChain.stop().then(() => {
                 this.pipelineChain.start();
             });
@@ -141,7 +141,7 @@ export default class MintSlices {
                 if (!transactions.has(txInfo.tx.hash)) {
                     transactions.set(txInfo.tx.hash, true);
                     if (txInfo.tx.created < currentTime / 1000 - 60) {
-                        //this.coreContext.applicationContext.logger.warn(`mint slice - ignore transaction by time ${txInfo.tx.created} < ${currentTime / 1000 - 60}`);
+                        this.coreContext.applicationContext.logger.verbose(`mint slice - ignore transaction by time ${txInfo.tx.created} < ${currentTime / 1000 - 60}`);
                         txInfo.status = BlockchainStatus.TX_FAILED;
                         txInfo.output = new TransactionOutputDTO();
                         txInfo.output.error = 'TIMEOUT';
@@ -156,7 +156,7 @@ export default class MintSlices {
                             txInfo.output = output;
                             await this.coreContext.transactionsProvider.updateTransaction(txInfo);
                             this.coreContext.environmentProvider.deleteCommit(ctx.envContext);
-                            this.coreContext.applicationContext.logger.warn(`mint slice - invalidate transaction ${txInfo.tx.hash} - "${output.error}"`)
+                            this.coreContext.applicationContext.logger.verbose(`mint slice - invalidate transaction ${txInfo.tx.hash} - "${output.error}"`)
                         } else {
                             if (ctx.proxyMock.length > 0) {
                                 transactionsData.push({
@@ -271,7 +271,6 @@ export default class MintSlices {
         const bslice = await this.coreContext.slicesProvider.saveNewSlice(slice);
         bslice.isComplete = true;
 
-
         await this.coreContext.slicesProvider.updateSlice(bslice);
         this.coreContext.blockTree.addSlice(slice);
         return bslice;
@@ -290,7 +289,7 @@ export default class MintSlices {
             txInfo.output = sliceInfo.outputs[j];
             await this.transactionsProvider.updateTransaction(txInfo);
         }
-        this.coreContext.blockTree.bestSlice = sliceInfo.slice;
         await this.coreContext.slicesProvider.updateSlice(sliceInfo);
+        this.coreContext.blockTree.bestSlice = sliceInfo.slice;
     }
 }

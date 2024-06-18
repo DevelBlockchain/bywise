@@ -355,8 +355,6 @@ export class BlocksProvider {
     await this.saveNewBlock(blockPack.block);
     blockTree.addBlock(blockPack.block);
 
-    await this.environmentProvider.consolide(blockTree, blockPack.block.lastHash);
-
     let lastContextHash = blockPack.block.lastHash;
     for (let i = 0; i < blockPack.slices.length; i++) {
       const slice = blockPack.slices[i];
