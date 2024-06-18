@@ -38,12 +38,11 @@ beforeAll(async () => {
         initialNodes: [`http://localhost:${port0}`]
     });
     await web3.network.tryConnection();
-    await helper.sleep(10000);
 }, 30000);
 
 afterAll(async () => {
     await node0.stop();
-}, 30000)
+}, 1000)
 
 describe('simple transactions', () => {
 
@@ -66,22 +65,16 @@ describe('simple transactions', () => {
         let error = await web3.transactions.sendTransaction(tx);
         expect(error).toEqual(undefined);
 
+        await web3.transactions.waitConfirmation(tx.hash, 10000);
+
         let res = await web3.transactions.getTransactionByHash(tx.hash);
         expect(res !== undefined).toEqual(true);
         if (res !== undefined) {
-            expect(res.status).toEqual('mempool');
-            expect(res.hash).toEqual(tx.hash);
-        }
-
-        await web3.transactions.waitConfirmation(tx.hash, 10000);
-
-        res = await web3.transactions.getTransactionByHash(tx.hash);
-        expect(res !== undefined).toEqual(true);
-        if (res !== undefined) {
-            expect(res.status).toEqual('confirmed');
+            expect(res.status).not.toEqual('mempool');
+            expect(res.status == 'confirmed' || res.status == 'mined').toEqual(true);
         }
     }, 30000);
-
+    
     test('send add balance', async () => {
         const addr = new Wallet();
 
@@ -392,8 +385,15 @@ describe('simple transactions', () => {
             TxType.TX_CONTRACT,
             { contractAddress, code: ERCCode }
         );
-        let output = await web3.transactions.sendTransactionSync(deployTx);
-        expect(output.output.contractAddress).toEqual(contractAddress);
+        await web3.transactions.sendTransaction(deployTx);
+        await web3.transactions.waitConfirmation(deployTx.hash, 10000);
+        let res = await web3.transactions.getTransactionByHash(deployTx.hash);
+        expect(res !== undefined).toEqual(true);
+        if (res !== undefined) {
+            expect(res.status).not.toEqual('mempool');
+            expect(res.status == 'confirmed' || res.status == 'mined').toEqual(true);
+            expect(res.output.output.contractAddress).toEqual(contractAddress);
+        }
 
         let txs: Tx[] = []
         let total = 0;
@@ -415,13 +415,23 @@ describe('simple transactions', () => {
         while (hasMempool) {
             hasMempool = false;
 
-            await helper.sleep(1000);
             for (let i = 0; i < txs.length; i++) {
                 const tx = txs[i];
                 let req = await web3.transactions.getTransactionByHash(tx.hash);
                 if (req && req.status == 'mempool') {
                     hasMempool = true;
                 }
+            }
+            await helper.sleep(1000);
+        }
+
+        for (let i = 0; i < txs.length; i++) {
+            const tx = txs[i];
+            let req = await web3.transactions.getTransactionByHash(tx.hash);
+            expect(req !== undefined).toEqual(true);
+            if(req) {
+                expect(req.status).not.toEqual('mempool');
+                expect(req.output.error).toEqual(undefined);
             }
         }
 

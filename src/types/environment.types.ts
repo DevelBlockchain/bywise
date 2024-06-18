@@ -1,114 +1,249 @@
-import { Blocks, Slices, Transaction } from "../models"
+import { Block, Slice } from "@bywise/web3";
+import { Environment } from "../models";
+import { BywiseRuntimeInstance } from "../vm/BywiseRuntime";
+
+export type NodeBlockTree = {
+    hash: string,
+    height: number,
+    lastContextHash: string
+}
+
+export type NodeSliceTree = {
+    hash: string,
+    from: string,
+    transactionsCount: number,
+    height: number,
+    blockHeight: number,
+    end: boolean
+}
 
 export class BlockTree {
 
-    public static ZERO_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
+    public static readonly ZERO_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
 
     public readonly chain: string;
 
-    public blockTreeLastMinedHash: string = BlockTree.ZERO_HASH;
+    public currentMinnedBlock: Block = new Block();
+    public bestSlice: Slice | null = null;
+    public minnedBlockList: Map<number, NodeBlockTree> = new Map();
 
-    private hashesMap: Map<string, string> = new Map();
-    private treeMap: Map<string, string[]> = new Map();
+    public tree: NodeBlockTree = {
+        hash: BlockTree.ZERO_HASH,
+        height: -1,
+        lastContextHash: BlockTree.ZERO_HASH
+    };
 
-    private blockInfo: Map<string, Blocks> = new Map();
-    public blockInfoList: Blocks[] = [];
-
-    private sliceInfo: Map<string, Slices> = new Map();
-    public sliceInfoList: Slices[] = [];
-
-    private txInfo: Map<string, Transaction> = new Map();
-    public txInfoList: Transaction[] = [];
+    public blockMap: Map<string, NodeBlockTree> = new Map();
+    public sliceMap: Map<string, NodeSliceTree> = new Map();
+    public sliceByHeightMap: Map<number, NodeSliceTree[]> = new Map();
 
     constructor(chain: string) {
         this.chain = chain;
+        this.blockMap.set(this.tree.hash, this.tree);
     }
 
-    addHash(lastHash: string, hash: string) {
-        this.hashesMap.set(hash, lastHash);
-        let list = this.treeMap.get(lastHash);
-        if (list !== undefined) {
-            list.push(hash);
+    getLastContextHash(): string {
+        if (this.bestSlice) {
+            return this.bestSlice.hash;
         } else {
-            this.treeMap.set(lastHash, [hash]);
+            return this.currentMinnedBlock.hash;
         }
     }
 
-    delHash(hash: string) {
-        let list = this.treeMap.get(hash);
-        if (list !== undefined) {
-            list.forEach(h => this.addHash(BlockTree.ZERO_HASH, h));
-            this.treeMap.delete(hash);
+    addBlock(blockInfo: { lastHash: string, hash: string, height: number }) {
+        const slice = this.sliceMap.get(blockInfo.lastHash);
+        if (!slice) {
+            const block = this.blockMap.get(blockInfo.lastHash);
+            if (!block) {
+                throw new Error(`lastContextHash not found ${blockInfo.lastHash}`);
+            }
         }
-        this.hashesMap.delete(hash);
-    }
-
-    setTxInfo(info: Transaction) {
-        if (this.txInfo.has(info.tx.hash)) {
-            this.txInfoList = this.txInfoList.filter(i => i.tx.hash !== info.tx.hash);
+        let block = this.blockMap.get(blockInfo.hash);
+        if (!block) {
+            block = {
+                hash: blockInfo.hash,
+                height: blockInfo.height,
+                lastContextHash: blockInfo.lastHash
+            }
+            this.blockMap.set(blockInfo.hash, block);
         }
-        this.txInfo.set(info.tx.hash, info);
-        this.txInfoList.push(info);
     }
 
-    setSliceInfo(info: Slices) {
-        if (this.sliceInfo.has(info.slice.hash)) {
-            this.sliceInfoList = this.sliceInfoList.filter(i => i.slice.hash !== info.slice.hash);
+    addSlice(slice: NodeSliceTree) {
+        let sliceInfo = this.sliceMap.get(slice.hash);
+        if (!sliceInfo) {
+            sliceInfo = {
+                hash: slice.hash,
+                from: slice.from,
+                transactionsCount: slice.transactionsCount,
+                height: slice.height,
+                blockHeight: slice.blockHeight,
+                end: slice.end,
+            }
+            this.sliceMap.set(slice.hash, sliceInfo);
+            let list = this.sliceByHeightMap.get(slice.blockHeight);
+            if (!list) {
+                list = [];
+            }
+            list.push(sliceInfo);
+            this.sliceByHeightMap.set(slice.blockHeight, list);
         }
-        this.sliceInfo.set(info.slice.hash, info);
-        this.sliceInfoList.push(info);
     }
 
-    setBlockInfo(info: Blocks) {
-        if (this.blockInfo.has(info.block.hash)) {
-            this.blockInfoList = this.blockInfoList.filter(i => i.block.hash !== info.block.hash);
+    setMinnedBlock(block: Block) {
+        let blockNode = this.blockMap.get(block.hash);
+        if (!blockNode) throw new Error(`blockNode not found ${block.hash}`);
+        this.minnedBlockList.set(block.height, blockNode);
+        if (this.currentMinnedBlock.height < block.height) {
+            this.bestSlice = null;
         }
-        this.blockInfo.set(info.block.hash, info);
-        this.blockInfoList.push(info);
-    }
-
-    getLastHash(hash: string): string {
-        const lastHash = this.hashesMap.get(hash);
-        if (lastHash == undefined) throw new Error(`hash ${hash} not found in block tree`);
-        return lastHash
-    }
-
-    getBlockInfo(hash: string): Blocks | null {
-        let info = this.blockInfo.get(hash);
-        if (info !== undefined) {
-            return info;
+        if (this.currentMinnedBlock.height <= block.height) {
+            this.currentMinnedBlock = block;
         }
-        return null;
     }
 
-    getSliceInfo(hash: string): Slices | null {
-        let info = this.sliceInfo.get(hash);
-        if (info !== undefined) {
-            return info;
+    delBlock(hash: string) {
+        let block = this.blockMap.get(hash);
+        if (block) {
+            this.blockMap.delete(hash);
+        };
+    }
+
+    getLastHash(contextHash: string) {
+        let block = this.blockMap.get(contextHash);
+        if (block) {
+            return block.lastContextHash;
         }
-        return null;
-    }
-
-    getTxInfo(hash: string): Transaction | null {
-        let info = this.txInfo.get(hash);
-        if (info !== undefined) {
-            return info;
+        let slice = this.sliceMap.get(contextHash);
+        if (slice) {
+            const sliceHeight = slice.height - 1;
+            if (sliceHeight == -1) {
+                if (slice.blockHeight - 1 >= 0) {
+                    const minnedBlock = this.minnedBlockList.get(slice.blockHeight - 1);
+                    if (!minnedBlock) throw new Error(`last minned block not found ${contextHash} - height: ${slice.blockHeight - 1}`);
+                    return minnedBlock.hash;
+                } else {
+                    return BlockTree.ZERO_HASH;
+                }
+            } else {
+                let slices = this.sliceByHeightMap.get(slice.blockHeight);
+                if (!slices) {
+                    slices = [];
+                }
+                let bestSlice: NodeSliceTree | null = null;
+                for (let i = 0; i < slices.length; i++) {
+                    const sliceInfo = slices[i];
+                    if (sliceInfo.from === slice.from && sliceInfo.height === sliceHeight) {
+                        if (bestSlice === null || sliceInfo.transactionsCount > bestSlice.transactionsCount) {
+                            bestSlice = sliceInfo;
+                        }
+                    }
+                }
+                if (!bestSlice) throw new Error(`last slice not found ${contextHash}`);
+                return bestSlice.hash;
+            }
         }
-        return null;
+        throw new Error(`contextHash not found ${contextHash}`);
     }
 
-    removeBlockInfo(hash: string): void {
-        this.blockInfoList = this.blockInfoList.filter(i => i.block.hash !== hash);
-        this.blockInfo.delete(hash);
+    getBlockList(hash: string): string[] {
+        if (hash == BlockTree.ZERO_HASH) {
+            return [hash];
+        }
+        let block = this.blockMap.get(hash);
+        if (block) {
+            let hashList = this.getBlockList(block.lastContextHash);
+            hashList.push(hash)
+            return hashList;
+        }
+        throw new Error(`block not found ${hash}`);
     }
 
-    removeSliceInfo(hash: string): void {
-        this.sliceInfoList = this.sliceInfoList.filter(i => i.slice.hash !== hash);
-        this.sliceInfo.delete(hash);
+    getSliceList(hash: string): NodeSliceTree[] {
+        let slice = this.sliceMap.get(hash);
+        if (!slice) throw new Error(`slice not found ${hash}`);
+        let slices = this.sliceByHeightMap.get(slice.blockHeight);
+        if (!slices) {
+            slices = [];
+        }
+        let bestSlices: NodeSliceTree[] = [];
+        let bestSlice: NodeSliceTree | null = null;
+        for (let sliceHeight = 0; sliceHeight < slice.height; sliceHeight++) {
+            bestSlice = null;
+            for (let i = 0; i < slices.length; i++) {
+                const sliceInfo = slices[i];
+                if (sliceInfo.from === slice.from && sliceInfo.height === sliceHeight) {
+                    if (sliceInfo.end) {
+                        bestSlice = sliceInfo;
+                    } else if (bestSlice === null || sliceInfo.transactionsCount > bestSlice.transactionsCount) {
+                        bestSlice = sliceInfo;
+                    }
+                }
+            }
+            if (!bestSlice) return [];
+            bestSlices.push(bestSlice);
+        }
+        bestSlices.push(slice);
+        return bestSlices;
     }
 
-    removeTxInfo(hash: string): void {
-        this.txInfoList = this.txInfoList.filter(i => i.tx.hash !== hash);
-        this.txInfo.delete(hash);
+    getBestSlice(from: string, blockHeight: number): NodeSliceTree[] {
+        let slices = this.sliceByHeightMap.get(blockHeight);
+        if (!slices) {
+            slices = [];
+        }
+        let bestSlices: NodeSliceTree[] = [];
+        let bestSlice: NodeSliceTree | null = null;
+        let sliceHeight = 0;
+        while (true) {
+            bestSlice = null;
+            for (let i = 0; i < slices.length; i++) {
+                const sliceInfo = slices[i];
+                if (sliceInfo.from === from && sliceInfo.height === sliceHeight) {
+                    if (sliceInfo.end) {
+                        bestSlice = sliceInfo;
+                        bestSlices.push(bestSlice);
+                        return bestSlices;
+                    } else if (bestSlice === null || sliceInfo.transactionsCount > bestSlice.transactionsCount) {
+                        bestSlice = sliceInfo;
+                    }
+                }
+            }
+            sliceHeight++;
+            if (!bestSlice) {
+                return bestSlices;
+            }
+            bestSlices.push(bestSlice);
+        }
+    }
+}
+
+export class EnvironmentContext {
+    public static readonly MAIN_CONTEXT_HASH = 'main_context';
+
+    public blockTree: BlockTree;
+    public blockHeight: number;
+    public fromContextHash: string;
+    public executedContracts: Map<string, BywiseRuntimeInstance> = new Map();
+    public setMainKeys: Map<string, Environment> = new Map();
+    public getMainKeys: Map<string, Environment> = new Map();
+    public setStageKeys: Map<string, Environment> = new Map();
+    public getStageKeys: Map<string, Environment> = new Map();
+
+    constructor(blockTree: BlockTree, blockHeight: number, fromContextHash: string) {
+        this.blockTree = blockTree;
+        this.blockHeight = blockHeight;
+        this.fromContextHash = fromContextHash;
+    }
+
+    async dispose() {
+        for (let [contract, br] of this.executedContracts) {
+            await br.dispose();
+        }
+        this.setStageKeys.clear();
+        this.getStageKeys.clear();
+        this.setMainKeys.clear();
+        this.getMainKeys.clear();
+        this.executedContracts.clear();
     }
 }

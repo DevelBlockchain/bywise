@@ -1,23 +1,28 @@
 import { BlockchainStatus } from '../types/transactions.type';
-import { Block, Slice } from '@bywise/web3';
+import { Slice } from '@bywise/web3';
 import { ApplicationContext } from '../types/task.type';
 import { RoutingKeys } from '../datasource/message-queue';
-import { Blocks, Slices } from '../models';
-import { BlockTree } from '../types/environment.types';
+import { Slices } from '../models';
+import { BlockTree, EnvironmentContext } from '../types/environment.types';
 import { TransactionsProvider } from './transactions.service';
+import { EnvironmentProvider } from './environment.service';
 
 export class SlicesProvider {
 
+  private TransactionRepository;
   private SliceRepository;
   private transactionsProvider;
+  private environmentProvider;
   private mq;
   private logger;
 
   constructor(applicationContext: ApplicationContext) {
     this.mq = applicationContext.mq;
     this.logger = applicationContext.logger;
+    this.TransactionRepository = applicationContext.database.TransactionRepository;
     this.SliceRepository = applicationContext.database.SliceRepository;
     this.transactionsProvider = new TransactionsProvider(applicationContext);
+    this.environmentProvider = new EnvironmentProvider(applicationContext);
   }
 
   async saveNewSlice(slice: Slice) {
@@ -40,117 +45,91 @@ export class SlicesProvider {
   }
 
   async syncSlices(blockTree: BlockTree) {
-    const sliceInfoList = blockTree.sliceInfoList.filter(info => info.isComplete === false && info.status === BlockchainStatus.TX_MEMPOOL);
+    let slices = await this.SliceRepository.findByChainAndStatus(blockTree.chain, BlockchainStatus.TX_MEMPOOL);
+    slices = slices.filter(info => info.isComplete === false);
 
-    for (let i = 0; i < sliceInfoList.length; i++) {
-      const sliceInfo = sliceInfoList[i];
+    for (let i = 0; i < slices.length; i++) {
+      const sliceInfo = slices[i];
 
       await this.syncSliceByHash(blockTree, sliceInfo.slice.hash)
     }
   }
 
   async syncSliceByHash(blockTree: BlockTree, hash: string) {
-    const sliceInfo = blockTree.getSliceInfo(hash);
-    if (!sliceInfo) throw new Error(`slice not found - ${hash}`);
+    const sliceInfo = await this.getSliceInfo(hash);
 
     let isComplete = true;
 
     for (let z = 0; z < sliceInfo.slice.transactions.length; z++) {
       const txHash = sliceInfo.slice.transactions[z];
-      const tx = blockTree.getTxInfo(txHash);
+      const tx = await this.TransactionRepository.findByHash(txHash);
       if (!tx) {
         isComplete = false;
-        let found = await this.transactionsProvider.populateTxInfo(blockTree, txHash);
-        if (!found) {
-          await this.mq.send(RoutingKeys.find_tx, txHash);
-        }
+        await this.mq.send(RoutingKeys.find_tx, txHash);
       }
     }
     if (isComplete) {
       sliceInfo.isComplete = true;
       this.logger.verbose(`sync-slices: complete - height: ${sliceInfo.slice.blockHeight} - hash: ${sliceInfo.slice.hash.substring(0, 10)}... - from: ${sliceInfo.slice.from.substring(0, 10)}...`)
+
+      blockTree.addSlice(sliceInfo.slice);
       await this.updateSlice(sliceInfo);
     }
+    return sliceInfo;
   }
 
-  async executeCompleteSlices(blockTree: BlockTree) {
-    let sliceInfos = blockTree.sliceInfoList.filter(info => info.isComplete === true && info.isExecuted === false && info.status === BlockchainStatus.TX_MEMPOOL);
-    if (sliceInfos.length == 0) {
-      return;
-    }
-
-    sliceInfos = sliceInfos.sort((s1, s2) => s2.slice.created - s1.slice.created);
-    sliceInfos = sliceInfos.filter((s1, i) => i < 3);
-
-    for (let i = 0; i < sliceInfos.length; i++) {
-      const slice = sliceInfos[i];
-
-      await this.executeCompleteSliceByHash(blockTree, slice.slice.hash);
-    }
-  }
-
-  async executeCompleteSliceByHash(blockTree: BlockTree, hash: string) {
-    const slice = blockTree.getSliceInfo(hash);
-    if (!slice) throw new Error(`slice not found - ${hash}`);
-
-    let lastBlockSlice: Blocks | null = null;
-    const blocks = blockTree.blockInfoList.filter(info => info.status === BlockchainStatus.TX_MINED && info.block.height === slice.slice.blockHeight - 1);
-    if (blocks.length === 1) {
-      lastBlockSlice = blocks[0];
-    } else {
-      const imaginaryBlock = new Block();
-      imaginaryBlock.height = slice.slice.blockHeight - 1;
-      imaginaryBlock.chain = blockTree.chain;
-      imaginaryBlock.version = '2';
-      imaginaryBlock.created = Math.floor(Date.now() / 1000);
-      imaginaryBlock.lastHash = BlockTree.ZERO_HASH;
-      imaginaryBlock.hash = BlockTree.ZERO_HASH;
-      lastBlockSlice = {
-        block: imaginaryBlock,
-        status: BlockchainStatus.TX_MINED,
-        countTrys: 0,
-        isComplete: true,
-        isExecuted: true,
-        isImmutable: true,
-        distance: '0',
-      }
-    }
-
+  async executeCompleteSlice(blockTree: BlockTree, lastContextHash: string, sliceInfo: Slices) {
+    await this.environmentProvider.consolide(blockTree, lastContextHash);
+    const ctx = this.transactionsProvider.createContext(blockTree, EnvironmentContext.MAIN_CONTEXT_HASH, sliceInfo.slice.blockHeight);
     let error = false;
-    if (lastBlockSlice === null) {
-      error = false;
-      this.logger.error(`Slice lastblock not found - ${slice.slice.blockHeight - 1}`);
-      slice.status = BlockchainStatus.TX_FAILED;
-    } else {
-      const ctx = this.transactionsProvider.createContext(blockTree, lastBlockSlice);
-      slice.outputs = [];
-      for (let j = 0; j < slice.slice.transactions.length && !error; j++) {
-        const txHash = slice.slice.transactions[j];
-        let txInfo = blockTree.getTxInfo(txHash);
-        if (!txInfo) {
-          await this.transactionsProvider.populateTxInfo(blockTree, txHash);
-          txInfo = blockTree.getTxInfo(txHash);
-        }
-        if (!txInfo) throw new Error(`Slice not complete - ${slice.slice.hash}`);
-        const output = await this.transactionsProvider.simulateTransaction(txInfo.tx, slice.slice, ctx);
-        slice.outputs.push(output);
+    try {
+      sliceInfo.outputs = [];
+      for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
+        const txHash = sliceInfo.slice.transactions[j];
+        let txInfo = await this.transactionsProvider.getTxInfo(txHash);
+        const output = await this.transactionsProvider.simulateTransaction(txInfo.tx, sliceInfo.slice, ctx);
+        sliceInfo.outputs.push(output);
         if (output.error) {
           this.logger.error(output.error)
           error = true;
         }
       }
-      await this.transactionsProvider.disposeContext(ctx);
-    }
+      if (error) {
+        this.logger.error(`Slice has invalid transactions - hash: ${sliceInfo.slice.hash}`)
+        sliceInfo.status = BlockchainStatus.TX_FAILED;
+      } else {
+        sliceInfo.isExecuted = true;
+        this.environmentProvider.commit(ctx.envContext);
+        await this.environmentProvider.push(ctx.envContext, sliceInfo.slice.hash);
+        this.logger.verbose(`exec-slices: exec slice - height: ${sliceInfo.slice.blockHeight} - txs: ${sliceInfo.slice.transactionsCount} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
+        
+        if(blockTree.bestSlice) {
+          if(blockTree.bestSlice.blockHeight < sliceInfo.slice.blockHeight ||
+            blockTree.bestSlice.height < sliceInfo.slice.height ||
+            blockTree.bestSlice.height == sliceInfo.slice.height && blockTree.bestSlice.transactionsCount < sliceInfo.slice.transactionsCount) {
+            blockTree.bestSlice = sliceInfo.slice;
+            sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
+          }
+        } else if(sliceInfo.slice.blockHeight > blockTree.currentMinnedBlock.height) {
+          blockTree.bestSlice = sliceInfo.slice;
+        }
 
-
-    if (error) {
-      this.logger.error(`Slice has invalid transactions - hash: ${slice.slice.hash}`)
-      slice.status = BlockchainStatus.TX_FAILED;
-    } else {
-      slice.isExecuted = true;
-      this.logger.verbose(`exec-slices: exec slice - height: ${slice.slice.blockHeight} - hash: ${slice.slice.hash.substring(0, 10)}...`)
+        for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
+          const txHash = sliceInfo.slice.transactions[j];
+          let txInfo = await this.transactionsProvider.getTxInfo(txHash);
+          txInfo.status = BlockchainStatus.TX_CONFIRMED;
+          txInfo.output = sliceInfo.outputs[j];
+          await this.transactionsProvider.updateTransaction(txInfo);
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(`Error: ${err.message}`, err);
+      sliceInfo.status = BlockchainStatus.TX_FAILED;
+      error = true;
     }
-    await this.updateSlice(slice);
+    await this.updateSlice(sliceInfo);
+    await this.transactionsProvider.disposeContext(ctx);
+    return error;
   }
 
   async getSlice(sliceHash: string): Promise<Slices | null> {
@@ -165,26 +144,22 @@ export class SlicesProvider {
     return await this.SliceRepository.findByChainAndStatus(chain, BlockchainStatus.TX_MEMPOOL);
   }
 
-  async populateSliceInfo(blockTree: BlockTree, hash: string) {
-    const slice = await this.SliceRepository.findByHash(hash);
-    if (slice) {
-      const sliceInfo: Slices = {
-        slice: new Slice(slice.slice),
-        status: slice.status,
-        isComplete: slice.isComplete,
-        isExecuted: slice.isExecuted,
-        blockHash: slice.blockHash,
-        outputs: slice.outputs,
-      }
-      blockTree.setSliceInfo(sliceInfo);
+  async getByHeight(chain: string, height: number) {
+    return await this.SliceRepository.findByChainAndBlockHeight(chain, height);
+  }
 
-      for (let j = 0; j < slice.slice.transactions.length; j++) {
-        const txHash = slice.slice.transactions[j];
-        await this.transactionsProvider.populateTxInfo(blockTree, txHash);
-      }
-      return true;
+  async getSliceInfo(hash: string): Promise<Slices> {
+    const slice = await this.SliceRepository.findByHash(hash);
+    if (!slice) throw new Error(`slice not found ${hash}`);
+    const sliceInfo: Slices = {
+      slice: new Slice(slice.slice),
+      status: slice.status,
+      isComplete: slice.isComplete,
+      isExecuted: slice.isExecuted,
+      blockHash: slice.blockHash,
+      outputs: slice.outputs,
     }
-    return false;
+    return sliceInfo;
   }
 
   async updateSlice(infoSlice: Slices) {
@@ -196,31 +171,5 @@ export class SlicesProvider {
       bslice.outputs = infoSlice.outputs;
       await this.SliceRepository.save(bslice);
     }
-  }
-
-  async getBestSlice(blockTree: BlockTree, currentBlock: Block) {
-    let needFrom = '';
-    const lastBlockInfo = blockTree.getBlockInfo(currentBlock.lastHash);
-    if (lastBlockInfo) {
-      needFrom = lastBlockInfo.block.from;
-    } else {
-      needFrom = currentBlock.from;
-    }
-
-    const slices = blockTree.sliceInfoList.filter(info => info.isExecuted === true && info.status === BlockchainStatus.TX_MEMPOOL && info.slice.blockHeight === currentBlock.height + 1);
-    let bestSlice: Slices | null = null;
-    for (let i = 0; i < slices.length; i++) {
-      const slice = slices[i];
-      if (slice.slice.from === needFrom) {
-        if (slice.slice.end) {
-          return slice;
-        }
-        if (bestSlice === null ||
-          slice.slice.transactions.length > bestSlice.slice.transactions.length) {
-          bestSlice = slice;
-        }
-      }
-    }
-    return bestSlice;
   }
 }

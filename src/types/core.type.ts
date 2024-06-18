@@ -1,5 +1,4 @@
 import Network from "../core/network.core";
-import { Blocks, Slices } from "../models";
 import { BlocksProvider, ChainsProvider, EnvironmentProvider, SlicesProvider, TransactionsProvider } from "../services";
 import { ConfigProvider } from "../services/configs.service";
 import { MinnerProvider } from "../services/minner.service";
@@ -21,8 +20,6 @@ export class CoreContext {
     configsProvider;
     walletProvider;
 
-    bestSlice: Slices | undefined;
-    lastBlock: Blocks | undefined;
     blockTime: number = 60;
 
     constructor(applicationContext: ApplicationContext, network: Network, blockTree: BlockTree) {

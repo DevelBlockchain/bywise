@@ -24,7 +24,6 @@ export default class InvalideteOldTransactions {
                 tx.status = BlockchainStatus.TX_FAILED;
                 tx.output = new TransactionOutputDTO();
                 tx.output.error = 'TIMEOUT';
-                this.coreContext.applicationContext.logger.verbose(`blocks service - transactions invalidated by time ${tx.tx.created} < ${now - 120}`)
                 await this.coreContext.transactionsProvider.updateTransaction(tx);
             }
         }

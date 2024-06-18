@@ -1,4 +1,4 @@
-import Database from "../datasource/database";
+import Database, { SaveRequest } from "../datasource/database";
 import { Environment } from "../models";
 
 export class EnvironmentRepository {
@@ -9,6 +9,15 @@ export class EnvironmentRepository {
         this.db = db;
     }
 
+    async saveMany(env: Environment[]) {
+        let batch: SaveRequest[] = [];
+        env.forEach(env => {
+            batch.push({ key: `${this.table}-${env.chain}-key-${env.key}-${env.hash}`, data: env });
+            batch.push({ key: `${this.table}-${env.chain}-hash-${env.hash}-${env.key}`, data: env });
+        })
+        await this.db.saveMany(batch);
+    }
+
     async save(env: Environment) {
         await this.db.saveMany([
             { key: `${this.table}-${env.chain}-key-${env.key}-${env.hash}`, data: env },
@@ -16,12 +25,16 @@ export class EnvironmentRepository {
         ])
     }
 
-    async findByChainAndKey(chain: string, key: string): Promise<Environment[]> {
-        return await this.db.find(`${this.table}-${chain}-key-${key}`, 1000000000);
+    async findByChainAndKey(chain: string, key: string, limit: number = 1000000000): Promise<Environment[]> {
+        return await this.db.find(`${this.table}-${chain}-key-${key}`, limit);
     }
 
-    async findByChainAndHash(chain: string, hash: string): Promise<Environment[]> {
-        return await this.db.find(`${this.table}-${chain}-hash-${hash}`, 1000000000);
+    async findByChainAndHash(chain: string, hash: string, limit: number = 1000000000): Promise<Environment[]> {
+        return await this.db.find(`${this.table}-${chain}-hash-${hash}`, limit);
+    }
+    
+    async findByChainAndHashAndKey(chain: string, hash: string, key: string, limit: number = 1000000000): Promise<Environment[]> {
+        return await this.db.find(`${this.table}-${chain}-hash-${hash}-${key}`, limit);
     }
 
     async get(chain: string, key: string, hash: string): Promise<Environment | null> {

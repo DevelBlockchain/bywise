@@ -5,6 +5,8 @@ import PipelineChain from '../core/pipeline-chain.core';
 import Network from '../core/network.core';
 import { Block, Slice, Tx } from '@bywise/web3';
 import { RequestKeys, RoutingKeys } from '../datasource/message-queue';
+import { BlockTree } from '../types/environment.types';
+import { Slices } from '../models';
 
 class Core implements Task {
 
@@ -65,32 +67,17 @@ class Core implements Task {
     async start() {
         this.applicationContext.mq.addMessageListener(RoutingKeys.new_tx, async (message: any) => {
             if (this.network.web3.network.isConnected) {
-                const tx = new Tx(message);
-                const pipelineChain = this.runChains.get(tx.chain);
-                if (pipelineChain) {
-                    pipelineChain.coreContext.transactionsProvider.populateTxInfo(pipelineChain.coreContext.blockTree, tx.hash);
-                }
-                await this.network.web3.transactions.sendTransaction(tx);
+                await this.network.web3.transactions.sendTransaction(message);
             }
         });
         this.applicationContext.mq.addMessageListener(RoutingKeys.new_slice, async (message: any) => {
             if (this.network.web3.network.isConnected) {
-                const slice = new Slice(message);
-                const pipelineChain = this.runChains.get(slice.chain);
-                if (pipelineChain) {
-                    pipelineChain.coreContext.slicesProvider.populateSliceInfo(pipelineChain.coreContext.blockTree, slice.hash);
-                }
-                await this.network.web3.slices.sendSlice(slice);
+                await this.network.web3.slices.sendSlice(message);
             }
         });
         this.applicationContext.mq.addMessageListener(RoutingKeys.new_block, async (message: any) => {
             if (this.network.web3.network.isConnected) {
-                const block = new Block(message);
-                const pipelineChain = this.runChains.get(block.chain);
-                if (pipelineChain) {
-                    pipelineChain.coreContext.blockProvider.populateBlockInfo(pipelineChain.coreContext.blockTree, block.hash);
-                }
-                await this.network.web3.blocks.sendBlock(block);
+                await this.network.web3.blocks.sendBlock(message);
             }
         });
         this.applicationContext.mq.addMessageListener(RoutingKeys.find_tx, async (message: any) => {
@@ -130,14 +117,18 @@ class Core implements Task {
             }
         });
         this.applicationContext.mq.addRequestListener(RequestKeys.test_connection, async (message: any) => {
-            return await this.network.web3.network.testConnections();
+            let isConnected = await this.network.web3.network.testConnections();
+            if(!isConnected) {
+                await this.network.web3.network.tryConnection();
+            }
+            return isConnected;
         });
 
-        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx, simulateWallet: boolean }) => {
+        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx }) => {
             const tx = new Tx(data.tx);
             const pipelineChain = this.runChains.get(tx.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.executeSimulation(tx, data.simulateWallet);
+                return await pipelineChain.executeTransactionsTask.executeSimulation(tx);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
@@ -155,6 +146,36 @@ class Core implements Task {
             const pipelineChain = this.runChains.get(data.chain);
             if (pipelineChain) {
                 return await pipelineChain.executeTransactionsTask.getContract(data.address);
+            } else {
+                throw new Error(`Node does not work with this chain`);
+            }
+        });
+        this.applicationContext.mq.addRequestListener(RequestKeys.get_confirmed_slices, async (data: { chain: string }) => {
+            const pipelineChain = this.runChains.get(data.chain);
+            if (pipelineChain) {
+                const currentBlock = pipelineChain.coreContext.blockTree.currentMinnedBlock;
+                let from = currentBlock.from;
+                if (currentBlock.lastHash !== BlockTree.ZERO_HASH) {
+                    const lastLastBlock = await pipelineChain.coreContext.blockProvider.getBlockInfo(currentBlock.lastHash);
+                    from = lastLastBlock.block.from;
+                }
+                const bestSlices = await pipelineChain.coreContext.blockTree.getBestSlice(from, currentBlock.height + 1);
+                const slices: Slices[] = [];
+                let end = false;
+                for (let i = 0; i < bestSlices.length; i++) {
+                    const slice = bestSlices[i];
+                    const sliceInfo = await pipelineChain.coreContext.slicesProvider.getSliceInfo(slice.hash);
+                    if (!sliceInfo.isExecuted) {
+                        break;
+                    }
+                    if (sliceInfo.slice.end) {
+                        end = true;
+                        slices.push(sliceInfo);
+                        break;
+                    }
+                    slices.push(sliceInfo);
+                }
+                return slices.reverse();
             } else {
                 throw new Error(`Node does not work with this chain`);
             }

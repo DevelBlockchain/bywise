@@ -1,208 +1,162 @@
 import { Block, Slice, SliceData, Tx, TxType } from "@bywise/web3";
 import { RequestKeys } from "../datasource/message-queue";
-import { Blocks, Slices } from "../models";
-import { BlockchainStatus, CoreContext, TransactionOutputDTO } from "../types";
-import { BlockTree } from "../types/environment.types";
+import { BlockchainStatus, CoreContext, SimulateDTO, TransactionOutputDTO } from "../types";
+import { BlockTree, EnvironmentContext } from "../types/environment.types";
 import helper from "../utils/helper";
 import PipelineChain from "./pipeline-chain.core";
+import { Slices } from "../models";
+
+const TIME_LIMIT_SLICE = 5000;
 
 export default class MintSlices {
     public isRun = true;
-    public isRunStream = false;
     private coreContext;
+    private SliceRepository;
+    private TransactionRepository;
+    private transactionsProvider;
+    private environmentProvider;
     private pipelineChain;
-    private lastHash = '';
 
 
     constructor(coreContext: CoreContext, pipelineChain: PipelineChain) {
         this.coreContext = coreContext;
         this.pipelineChain = pipelineChain;
+        this.SliceRepository = coreContext.applicationContext.database.SliceRepository;
+        this.TransactionRepository = coreContext.applicationContext.database.TransactionRepository;
+        this.transactionsProvider = coreContext.transactionsProvider;
+        this.environmentProvider = coreContext.environmentProvider;
     }
 
     async start() {
-        const lastBlock = this.coreContext.lastBlock;
-        if (!lastBlock) throw new Error(`lastBlock block not found`);
-
-        const mainWallet = await this.coreContext.walletProvider.getMainWallet();
-        let slices = await this.coreContext.applicationContext.database.SliceRepository.findByChainAndStatus(this.coreContext.chain, BlockchainStatus.TX_MEMPOOL);
-        slices = this.coreContext.blockTree.sliceInfoList.filter(info => info.slice.blockHeight === lastBlock.block.height + 1 && info.slice.from === mainWallet.address);
-
-        let bestSlice: Slices | null = null;
-        for (let i = 0; i < slices.length; i++) {
-            const slice = slices[i];
-            if (bestSlice === null || slice.slice.transactions.length > bestSlice.slice.transactions.length) {
-                bestSlice = slice;
-                if (bestSlice.slice.end) {
-                    break;
-                }
-            }
-        }
-
-        if (bestSlice && !bestSlice.slice.end) {
-            this.coreContext.applicationContext.logger.verbose(`mint slice - RECOVER slice stream at block ${lastBlock.block.height + 1}`)
-            this.sliceStream(lastBlock, bestSlice.slice.transactions, bestSlice.slice.transactionsData ? bestSlice.slice.transactionsData : []);
-        }
     }
 
     async run() {
-        const lastBlock = this.coreContext.lastBlock;
-        if (!lastBlock) throw new Error(`lastBlock block not found`);
+        const currentMinnedBlock = this.coreContext.blockTree.currentMinnedBlock;
 
-        if (this.lastHash === lastBlock.block.hash) {
-            return;
-        }
-        this.lastHash = lastBlock.block.hash;
-
-        const mainWallet = await this.coreContext.walletProvider.getMainWallet();
-        const slices = this.coreContext.blockTree.sliceInfoList.filter(info => info.slice.blockHeight === lastBlock.block.height + 1 && info.slice.from === mainWallet.address);
-
-        if (slices.length > 0) {
-            return; // already started
-        }
-
-        let isMiner = await this.isSliceMinner(lastBlock);
+        let isMiner = await this.isSliceMinner(currentMinnedBlock);
         if (!isMiner) {
             return; // not is slice minner for this block
         }
 
-        const now = helper.getNow();
-        if (now >= lastBlock.block.created + this.coreContext.blockTime) {
+        const isConnected = await this.coreContext.applicationContext.mq.request(RequestKeys.test_connection, {
+            chain: this.coreContext.chain
+        })
+        if (!isConnected) {
+            this.coreContext.applicationContext.logger.error(`mint slice - Node has disconnected!`)
+            this.pipelineChain.stop().then(() => {
+                this.pipelineChain.start();
+            });
+            return;
+        }
+
+        if (helper.getNow() >= currentMinnedBlock.created + this.coreContext.blockTime * 2) {
             return; // too late
         }
 
-        await this.startSliceStream(lastBlock);
-    }
-
-    async stop() {
-        this.isRun = false;
-        while (this.isRunStream) {
-            await helper.sleep(100);
-        }
-    }
-
-    async isSliceMinner(lastBlock: Blocks) {
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
-        let isMining = false;
-        if (lastBlock.block.lastHash === BlockTree.ZERO_HASH) {
-            if (lastBlock.block.from === mainWallet.address) {
-                isMining = true;
-            }
-        } else {
-            const lastlastBlock = this.coreContext.blockTree.getBlockInfo(lastBlock.block.lastHash);
-            if (!lastlastBlock) throw new Error(`lastlastBlock block not found`);
+        let slices = await this.SliceRepository.findByChainAndBlockHeight(this.coreContext.chain, currentMinnedBlock.height + 1);
+        slices = slices.filter(
+            info => info.slice.from === mainWallet.address
+        ).sort(
+            (a, b) => a.slice.height - b.slice.height
+        );
 
-            if (lastlastBlock.block.lastHash === BlockTree.ZERO_HASH) {
-                if (lastlastBlock.block.from === mainWallet.address) {
-                    isMining = true;
-                }
-            } else {
-                const lastlastlastBlock = this.coreContext.blockTree.getBlockInfo(lastBlock.block.lastHash);
-                if (!lastlastlastBlock) throw new Error(`lastlastlastBlock block not found`);
-                if (lastlastlastBlock.block.from === mainWallet.address) {
-                    isMining = true;
-                }
+        const transactions: Map<string, boolean> = new Map();
+        let end = false;
+        let lastSliceHeight: number = -1;
+        let lastSliceHash: string = currentMinnedBlock.hash;
+        for (let i = 0; i < slices.length; i++) {
+            const sliceInfo = slices[i];
+            lastSliceHeight = sliceInfo.slice.height;
+            lastSliceHash = sliceInfo.slice.hash;
+            if (sliceInfo.slice.end) {
+                end = true;
+            }
+            for (let j = 0; j < sliceInfo.slice.transactions.length; j++) {
+                const txHash = sliceInfo.slice.transactions[j];
+                transactions.set(txHash, true);
             }
         }
-        return isMining;
-    }
+        if (end) {
+            return;
+        }
 
-    async startSliceStream(lastBlock: Blocks) {
-        this.isRunStream = true;
-        this.coreContext.applicationContext.logger.verbose(`mint slice - start slice stream at block ${lastBlock.block.height + 1}`)
-
-        const mainWallet = await this.coreContext.walletProvider.getMainWallet();
-        const tx = new Tx();
-        tx.version = '2';
-        tx.chain = this.coreContext.chain;
-        tx.from = [mainWallet.address];
-        tx.to = [mainWallet.address];
-        tx.amount = ['0'];
-        tx.fee = '0';
-        tx.type = TxType.TX_BLOCKCHAIN_COMMAND;
-        tx.data = {
-            name: 'start-slice',
-            input: [`${lastBlock.block.height + 1}`]
-        };
-        tx.foreignKeys = [];
-        tx.created = Math.floor(Date.now() / 1000);
-        tx.hash = tx.toHash();
-        tx.sign = [await mainWallet.signHash(tx.hash)];
-        const txInfo = await this.coreContext.transactionsProvider.saveNewTransaction(tx);
-        await this.coreContext.transactionsProvider.populateTxInfo(this.coreContext.blockTree, tx.hash);
-
-        this.sliceStream(lastBlock, [txInfo.tx.hash], []);
-    }
-
-    private async sliceStream(lastBlock: Blocks, transactions: string[], transactionsData: SliceData[]) {
-        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, lastBlock);
-        ctx.simulateWallet = false;
+        let outputs: TransactionOutputDTO[] = [];
+        let newTransactions: string[] = [];
+        let transactionsData: SliceData[] = [];
+        await this.environmentProvider.consolide(this.coreContext.blockTree, lastSliceHash);
+        const ctx = this.transactionsProvider.createContext(this.coreContext.blockTree, EnvironmentContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
         ctx.enableReadProxy = true;
         ctx.enableWriteProxy = true;
-        let end = false;
-        const countExec = new Map<string, number>();
-        const mainWallet = await this.coreContext.walletProvider.getMainWallet();
 
-        for (let i = 0; i < transactions.length; i++) {
-            const txHash = transactions[i];
-            const txInfo = await this.coreContext.applicationContext.database.TransactionRepository.findByHash(txHash);
-            if (!txInfo) throw new Error('mint slice - txInfo not found');
+        if (lastSliceHeight == -1) {
+            const tx = new Tx();
+            tx.version = '2';
+            tx.chain = this.coreContext.chain;
+            tx.from = [mainWallet.address];
+            tx.to = [mainWallet.address];
+            tx.amount = ['0'];
+            tx.fee = '0';
+            tx.type = TxType.TX_BLOCKCHAIN_COMMAND;
+            tx.data = {
+                name: 'start-slice',
+                input: [`${currentMinnedBlock.height + 1}`]
+            };
+            tx.foreignKeys = [];
+            tx.created = Math.floor(Date.now() / 1000);
+            tx.hash = tx.toHash();
+            tx.sign = [await mainWallet.signHash(tx.hash)];
+            const txInfo = await this.coreContext.transactionsProvider.saveNewTransaction(tx);
 
-            const output = await this.coreContext.transactionsProvider.simulateTransaction(txInfo.tx, {
+            let output = await this.coreContext.transactionsProvider.simulateTransaction(txInfo.tx, {
                 from: mainWallet.address,
                 transactionsData: []
             }, ctx);
             if (output.error) {
-                this.coreContext.applicationContext.logger.error('mint slice - ' + output.error)
-                throw new Error('mint slice - error added TX');
+                throw new Error(`mint slice - can not create start-slice transaction - ${output.error}`);
+            } else {
+                if (ctx.proxyMock.length > 0) {
+                    transactionsData.push({
+                        hash: txInfo.tx.hash,
+                        data: ctx.proxyMock
+                    });
+                }
+                transactions.set(txInfo.tx.hash, true);
+                newTransactions.push(txInfo.tx.hash);
+                outputs.push(output);
+                this.coreContext.environmentProvider.commit(ctx.envContext);
             }
         }
 
-        let mint = true;
-        let uptime = new Date().getTime();
-        let addTransactions = 0;
-        const LIMIT_BY_NEW_SLICE = 1000;
-        do {
-            const mempool = await this.coreContext.applicationContext.database.TransactionRepository.findByChainAndStatus(lastBlock.block.chain, BlockchainStatus.TX_MEMPOOL);
-            const now = helper.getNow();
+        const uptime = new Date().getTime();
+        let currentTime = new Date().getTime();
+        let executedTime = 0;
+        while ((currentTime - uptime) < TIME_LIMIT_SLICE) {
+            const mempool = await this.TransactionRepository.findByChainAndStatus(currentMinnedBlock.chain, BlockchainStatus.TX_MEMPOOL, 1000);
 
-            if (now >= lastBlock.block.created + this.coreContext.blockTime) {
-                end = true;
-                mint = true;
-                this.coreContext.applicationContext.logger.verbose(`mint slice - mint by END`)
-            }
             let countSimulatedTransactions = 0;
-            let simulateUptime = new Date().getTime();
-            for (let i = 0; i < mempool.length && (new Date().getTime() - simulateUptime) < 1000; i++) {
+            for (let i = 0; i < mempool.length && (currentTime - uptime) < TIME_LIMIT_SLICE && currentTime / 1000 < currentMinnedBlock.created + this.coreContext.blockTime; i++) {
+                currentTime = new Date().getTime();
                 const txInfo = mempool[i];
-                if (!transactions.includes(txInfo.tx.hash)) {
-                    if (txInfo.tx.created < now - 60) {
-                        this.coreContext.applicationContext.logger.verbose(`mint slice - ignore transaction by time ${txInfo.tx.created} < ${now - 60}`);
+                if (!transactions.has(txInfo.tx.hash)) {
+                    transactions.set(txInfo.tx.hash, true);
+                    if (txInfo.tx.created < currentTime / 1000 - 60) {
+                        this.coreContext.applicationContext.logger.verbose(`mint slice - ignore transaction by time ${txInfo.tx.created} < ${currentTime / 1000 - 60}`);
                         txInfo.status = BlockchainStatus.TX_FAILED;
                         txInfo.output = new TransactionOutputDTO();
                         txInfo.output.error = 'TIMEOUT';
                         await this.coreContext.transactionsProvider.updateTransaction(txInfo);
                     } else {
-                        countSimulatedTransactions++;
-                        await this.coreContext.transactionsProvider.createSubContext(ctx);
                         let output = await this.coreContext.transactionsProvider.simulateTransaction(txInfo.tx, {
                             from: mainWallet.address,
                             transactionsData: []
                         }, ctx);
                         if (output.error) {
-                            let count = countExec.get(txInfo.tx.hash);
-                            if (count === undefined) {
-                                count = 0;
-                            }
-                            count++;
-                            countExec.set(txInfo.tx.hash, count);
-                            if (count >= 10) {
-                                txInfo.status = BlockchainStatus.TX_FAILED;
-                                txInfo.output = output;
-                                await this.coreContext.transactionsProvider.updateTransaction(txInfo);
-                                this.coreContext.applicationContext.logger.verbose(`mint slice - invalidate transaction ${txInfo.tx.hash}`)
-                            }
-                            this.coreContext.applicationContext.logger.verbose('mint slice - ERROR: ' + output.error + ' - ' + count)
-                            await this.coreContext.transactionsProvider.disposeSubContext(ctx);
+                            txInfo.status = BlockchainStatus.TX_FAILED;
+                            txInfo.output = output;
+                            await this.coreContext.transactionsProvider.updateTransaction(txInfo);
+                            this.coreContext.environmentProvider.deleteCommit(ctx.envContext);
+                            this.coreContext.applicationContext.logger.verbose(`mint slice - invalidate transaction ${txInfo.tx.hash} - "${output.error}"`)
                         } else {
                             if (ctx.proxyMock.length > 0) {
                                 transactionsData.push({
@@ -210,76 +164,132 @@ export default class MintSlices {
                                     data: ctx.proxyMock
                                 });
                             }
-                            transactions.push(txInfo.tx.hash);
-                            addTransactions++;
+                            newTransactions.push(txInfo.tx.hash);
+                            outputs.push(output);
+                            this.coreContext.environmentProvider.commit(ctx.envContext);
                         }
+                        countSimulatedTransactions++;
+                        const spendTime = new Date().getTime() - currentTime;
+                        if (spendTime > 100) {
+                            this.coreContext.applicationContext.logger.warn(`mint slice - slow transaction: ${spendTime} - ${txInfo.tx.hash}`);
+                        }
+                        executedTime += spendTime;
                     }
                 }
+                if (!this.pipelineChain.isRun) return;
             }
-            simulateUptime = new Date().getTime() - simulateUptime;
-            if (countSimulatedTransactions > 0)
-                this.coreContext.applicationContext.logger.verbose(`mint slice - ${(countSimulatedTransactions / (simulateUptime / 1000)).toFixed(2)} TPS - simulate ${countSimulatedTransactions} transactions in ${simulateUptime / 1000}`)
+            if (!this.pipelineChain.isRun) return;
+            await helper.sleep(10);
+            currentTime = new Date().getTime();
 
-            if (new Date().getTime() - uptime > 5000 && addTransactions > 0) {
-                mint = true;
-            }
+            if (currentTime / 1000 >= currentMinnedBlock.created + this.coreContext.blockTime) {
+                const tx = new Tx();
+                tx.version = '2';
+                tx.chain = this.coreContext.chain;
+                tx.from = [mainWallet.address];
+                tx.to = [mainWallet.address];
+                tx.amount = ['0'];
+                tx.fee = '0';
+                tx.type = TxType.TX_BLOCKCHAIN_COMMAND;
+                tx.data = {
+                    name: 'end-slice',
+                    input: [`${currentMinnedBlock.height + 1}`]
+                };
+                tx.foreignKeys = [];
+                tx.created = Math.floor(Date.now() / 1000);
+                tx.hash = tx.toHash();
+                tx.sign = [await mainWallet.signHash(tx.hash)];
+                const txInfo = await this.coreContext.transactionsProvider.saveNewTransaction(tx);
 
-            if (addTransactions >= LIMIT_BY_NEW_SLICE) {
-                mint = true;
+                let output = await this.coreContext.transactionsProvider.simulateTransaction(txInfo.tx, {
+                    from: mainWallet.address,
+                    transactionsData: []
+                }, ctx);
+                if (output.error) {
+                    throw new Error(`mint slice - can not create end-slice transaction - ${output.error}`);
+                } else {
+                    if (ctx.proxyMock.length > 0) {
+                        transactionsData.push({
+                            hash: txInfo.tx.hash,
+                            data: ctx.proxyMock
+                        });
+                    }
+                    transactions.set(txInfo.tx.hash, true);
+                    newTransactions.push(txInfo.tx.hash);
+                    outputs.push(output);
+                    this.coreContext.environmentProvider.commit(ctx.envContext);
+                    end = true;
+                    this.coreContext.applicationContext.logger.verbose(`mint slice - mint by END`)
+                }
+                break;
             }
-
-            if (now >= lastBlock.block.created + this.coreContext.blockTime * 1.5) {
-                end = true;
-                mint = false;
-                this.coreContext.applicationContext.logger.verbose(`mint slice - SKIP slice end ${lastBlock.block.height + 1}`)
-            }
-
-            if (mint) {
-                await this.mintSlice(transactions, transactionsData, lastBlock.block, end);
-                uptime = new Date().getTime();
-                addTransactions = 0;
-                mint = false;
-            }
-            await helper.sleep(100);
-        } while (!end && this.isRun);
-        await this.coreContext.transactionsProvider.disposeContext(ctx);
-        this.isRunStream = false;
+        }
+        if (newTransactions.length > 0) {
+            lastSliceHeight++;
+            this.coreContext.applicationContext.logger.verbose(`mint slice - ${(newTransactions.length / (executedTime / 1000)).toFixed(2)} TPS - simulate ${newTransactions.length} transactions in ${executedTime / 1000}`)
+            const sliceInfo = await this.mintSlice(lastSliceHeight, newTransactions, transactionsData, currentMinnedBlock, end);
+            await this.saveExecutedSlices(sliceInfo, outputs, ctx);
+        }
+        await this.transactionsProvider.disposeContext(ctx);
     }
 
-    private async mintSlice(transactions: string[], transactionsData: SliceData[], lastBlock: Block, end: boolean) {
-        const isConnected = await this.coreContext.applicationContext.mq.request(RequestKeys.test_connection, {
-            chain: this.coreContext.chain
-        })
-        if (!isConnected) {
-            this.coreContext.applicationContext.logger.verbose(`mint slice - Node has disconnected!`)
-            this.pipelineChain.stop().then(() => {
-                this.pipelineChain.start();
-            });
-            return;
+    async isSliceMinner(currentMinnedBlock: Block) {
+        const mainWallet = await this.coreContext.walletProvider.getMainWallet();
+        let isMining = false;
+        if (currentMinnedBlock.lastHash === BlockTree.ZERO_HASH) {
+            if (currentMinnedBlock.from === mainWallet.address) {
+                isMining = true;
+            }
+        } else {
+            const lastBlock = await this.coreContext.blockProvider.getBlockInfo(currentMinnedBlock.lastHash);
+            if (lastBlock.block.from === mainWallet.address) {
+                isMining = true;
+            }
         }
+        return isMining;
+    }
 
+    private async mintSlice(height: number, transactions: string[], transactionsData: SliceData[], currentMinnedBlock: Block, end: boolean): Promise<Slices> {
+        if (transactions.length === 0) throw new Error(`mint slice without transactions`);
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
 
         const slice = new Slice();
-        slice.height = 0;
+        slice.height = height;
         slice.transactionsCount = transactions.length;
-        slice.blockHeight = lastBlock.height + 1;
+        slice.blockHeight = currentMinnedBlock.height + 1;
         slice.transactions = transactions;
         slice.transactionsData = transactionsData.length === 0 ? undefined : transactionsData;
         slice.version = '2';
-        slice.chain = lastBlock.chain;
+        slice.chain = currentMinnedBlock.chain;
         slice.from = mainWallet.address;
         slice.created = Math.floor(Date.now() / 1000);
         slice.end = end;
         slice.hash = slice.toHash();
         slice.sign = await mainWallet.signHash(slice.hash);
 
-        this.coreContext.applicationContext.logger.verbose(`mint slice - height: ${slice.blockHeight} - txs: ${slice.transactions.length} - end: ${slice.end} - hash: ${slice.hash.substring(0, 10)}...`)
+        this.coreContext.applicationContext.logger.info(`mint slice - height: ${slice.blockHeight}/${slice.height} - txs: ${slice.transactions.length} - end: ${slice.end} - hash: ${slice.hash.substring(0, 10)}...`);
         const bslice = await this.coreContext.slicesProvider.saveNewSlice(slice);
         bslice.isComplete = true;
-        await this.coreContext.slicesProvider.updateSlice(bslice);
-        await this.coreContext.slicesProvider.populateSliceInfo(this.coreContext.blockTree, slice.hash);
 
-        return slice;
+        await this.coreContext.slicesProvider.updateSlice(bslice);
+        this.coreContext.blockTree.addSlice(slice);
+        return bslice;
+    }
+
+    private async saveExecutedSlices(sliceInfo: Slices, outputs: TransactionOutputDTO[], ctx: SimulateDTO) {
+        sliceInfo.isExecuted = true;
+        sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
+        sliceInfo.outputs = outputs;
+        this.environmentProvider.commit(ctx.envContext);
+        await this.environmentProvider.push(ctx.envContext, sliceInfo.slice.hash);
+        for (let j = 0; j < sliceInfo.slice.transactions.length; j++) {
+            const txHash = sliceInfo.slice.transactions[j];
+            let txInfo = await this.transactionsProvider.getTxInfo(txHash);
+            txInfo.status = BlockchainStatus.TX_CONFIRMED;
+            txInfo.output = sliceInfo.outputs[j];
+            await this.transactionsProvider.updateTransaction(txInfo);
+        }
+        await this.coreContext.slicesProvider.updateSlice(sliceInfo);
+        this.coreContext.blockTree.bestSlice = sliceInfo.slice;
     }
 }

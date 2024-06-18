@@ -190,7 +190,7 @@ const main = async () => {
             const zeroBlock = await helper.createNewBlockZero('local', deployWallet, [
                 ChainConfig.addAdmin(deployWallet.address),
                 ChainConfig.addValidator(deployWallet.address),
-                ChainConfig.setBalance(deployWallet.address, '1000000'),
+                ChainConfig.setBalance(deployWallet.address, '20000'),
                 ChainConfig.setConfig('blockTime', '30'),
                 ChainConfig.setConfig('feeBasic', '1'),
                 ChainConfig.setConfig('feeCoefAmount', '0'),
