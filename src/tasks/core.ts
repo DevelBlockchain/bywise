@@ -117,7 +117,11 @@ class Core implements Task {
             }
         });
         this.applicationContext.mq.addRequestListener(RequestKeys.test_connection, async (message: any) => {
-            return await this.network.web3.network.testConnections();
+            let isConnected = await this.network.web3.network.testConnections();
+            if(!isConnected) {
+                await this.network.web3.network.tryConnection();
+            }
+            return isConnected;
         });
 
         this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx }) => {
