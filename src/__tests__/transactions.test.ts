@@ -19,6 +19,7 @@ const port0 = Math.floor(Math.random() * 7000 + 3000);
 const wallet = new Wallet();
 
 const ERCCode = fs.readFileSync('./assets/ERC20.js', 'utf8');
+const ERCCodeTestContract = fs.readFileSync('./assets/test_contract.js', 'utf8');
 
 beforeAll(async () => {
     const nodeWallet = new Wallet();
@@ -485,6 +486,226 @@ describe('contracts', () => {
         output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(output.error).toEqual(undefined);
         expect(output.output).toEqual("Banana");
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
+
+    test('cost - hardwork', async () => {
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+
+        let tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCodeTestContract }
+        );
+        tx.isValid();
+
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
+
+        let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "hardwork", inputs: ['100'] }]
+        );
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual(495000);
+        expect(output.cost).toEqual(3);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "hardwork", inputs: ['1000'] }]
+        );
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual(499500000);
+        expect(output.cost).toEqual(201);
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
+
+    test('cost - multiple calls', async () => {
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+
+        let tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCodeTestContract }
+        );
+        tx.isValid();
+
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
+
+        let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        tx = new Tx();
+        tx.chain = chain;
+        tx.version = '2';
+        tx.type = TxType.TX_CONTRACT_EXE;
+        tx.from.push(wallet.address);
+        tx.foreignKeys = [];
+        tx.fee = '1';
+        tx.data = [
+            { method: 'setValue', inputs: [`1`] },
+        ];
+        tx.to.push(contractAddress);
+        tx.amount.push('0');
+        tx.created = Math.floor(new Date().getTime() / 1000);
+        tx.hash = tx.toHash();
+        tx.sign.push(await wallet.signHash(tx.hash));
+
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual('1');
+        expect(output.cost).toEqual(8);
+
+        tx = new Tx();
+        tx.chain = chain;
+        tx.version = '2';
+        tx.type = TxType.TX_CONTRACT_EXE;
+        tx.from.push(wallet.address);
+        tx.foreignKeys = [];
+        tx.fee = '1';
+        tx.data = [];
+        for (let i = 0; i < 10; i++) {
+            tx.data.push({ method: 'setValue', inputs: [`1`] });
+            tx.to.push(contractAddress);
+            tx.amount.push('0');
+        }
+        tx.created = Math.floor(new Date().getTime() / 1000);
+        tx.hash = tx.toHash();
+        tx.sign.push(await wallet.signHash(tx.hash));
+
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual('1');
+        expect(output.cost).toEqual(80);
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
+
+    test('cost - call other contracs', async () => {
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+        const contractAddress2 = BywiseHelper.getBWSAddressContract();
+
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
+
+        let tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCodeTestContract }
+        );
+        tx.isValid();
+        let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress: contractAddress2, code: ERCCodeTestContract }
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        tx = new Tx();
+        tx.chain = chain;
+        tx.version = '2';
+        tx.type = TxType.TX_CONTRACT_EXE;
+        tx.from.push(wallet.address);
+        tx.foreignKeys = [];
+        tx.fee = '1';
+        tx.data = [
+            { method: 'increment', inputs: [contractAddress2] },
+        ];
+        tx.to.push(contractAddress);
+        tx.amount.push('0');
+        tx.created = Math.floor(new Date().getTime() / 1000);
+        tx.hash = tx.toHash();
+        tx.sign.push(await wallet.signHash(tx.hash));
+
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual('1');
+        expect(output.cost).toEqual(85);
+
+        tx = new Tx();
+        tx.chain = chain;
+        tx.version = '2';
+        tx.type = TxType.TX_CONTRACT_EXE;
+        tx.from.push(wallet.address);
+        tx.foreignKeys = [];
+        tx.fee = '1';
+        tx.data = [
+            { method: 'incrementMultipleTimes', inputs: [contractAddress2, '10'] },
+        ];
+        tx.to.push(contractAddress);
+        tx.amount.push('0');
+        tx.created = Math.floor(new Date().getTime() / 1000);
+        tx.hash = tx.toHash();
+        tx.sign.push(await wallet.signHash(tx.hash));
+
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual('11');
+        expect(output.cost).toEqual(589);
+
+        tx = new Tx();
+        tx.chain = chain;
+        tx.version = '2';
+        tx.type = TxType.TX_CONTRACT_EXE;
+        tx.from.push(wallet.address);
+        tx.foreignKeys = [];
+        tx.fee = '1';
+        tx.data = [];
+        for (let i = 0; i < 10; i++) {
+            tx.data.push({ method: 'increment', inputs: [contractAddress2] });
+            tx.to.push(contractAddress);
+            tx.amount.push('0');
+        }
+        tx.created = Math.floor(new Date().getTime() / 1000);
+        tx.hash = tx.toHash();
+        tx.sign.push(await wallet.signHash(tx.hash));
+
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual('21');
+        expect(output.cost).toEqual(850);
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);
