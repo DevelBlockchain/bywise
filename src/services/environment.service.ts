@@ -5,9 +5,11 @@ import { ApplicationContext } from "../types/task.type";
 export class EnvironmentProvider {
 
     private EnvironmentRepository;
+    private logger;
 
     constructor(applicationContext: ApplicationContext) {
         this.EnvironmentRepository = applicationContext.database.EnvironmentRepository;
+        this.logger = applicationContext.logger;
     }
 
     private async getFromContextEnv(envContext: EnvironmentContext, key: string): Promise<Environment> {
@@ -261,7 +263,7 @@ export class EnvironmentProvider {
     }
 
     public async clearMainContext(chain: string) {
-        console.log('######## clearMainContext')
+        this.logger.warn(`EnvironmentProvider.clearMainContext`);
         let delEnvs: Environment[] = [];
         do {
             delEnvs = await this.EnvironmentRepository.findByChainAndHash(chain, EnvironmentContext.MAIN_CONTEXT_HASH, 10000);
