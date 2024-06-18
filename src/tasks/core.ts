@@ -171,7 +171,7 @@ class Core implements Task {
                     }
                     slices.push(sliceInfo);
                 }
-                return slices;
+                return slices.reverse();
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
