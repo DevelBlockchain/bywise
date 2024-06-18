@@ -1,13 +1,12 @@
 import { Tx } from "@bywise/web3";
 import { CoreContext, SimulateDTO } from "../types";
 import helper from "../utils/helper";
-import { EnvironmentContext } from "../types/environment.types";
 
 export default class ExecuteTransactions {
     public isRun = true;
     public busy = false;
     private coreContext;
-    private lastHash = '';
+    private currentHash = '';
     private nextBlockHeight = -1;
     private currentContext: SimulateDTO | undefined;
 
@@ -25,21 +24,20 @@ export default class ExecuteTransactions {
     async run() {
         let currentHash = this.coreContext.blockTree.getLastContextHash();
 
-        if (this.lastHash == currentHash) {
+        if (this.currentHash == currentHash) {
             return;
         }
 
-        this.lastHash = currentHash;
+        this.currentHash = currentHash;
         this.nextBlockHeight = this.coreContext.blockTree.currentMinnedBlock.height + 1;
 
         await this.updateContext();
     }
 
     private async updateContext() {
-        this.coreContext.applicationContext.logger.verbose(`update main context - hash: ${this.lastHash.substring(0, 10)}...`);
+        this.coreContext.applicationContext.logger.verbose(`update main context - hash: ${this.currentHash.substring(0, 10)}...`);
 
-        await this.coreContext.environmentProvider.consolide(this.coreContext.blockTree, this.lastHash);
-        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, EnvironmentContext.MAIN_CONTEXT_HASH, this.nextBlockHeight);
+        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, this.currentHash, this.nextBlockHeight);
 
         await this.waitBusy();
         const oldContext = this.currentContext;
