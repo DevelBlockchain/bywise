@@ -1,5 +1,5 @@
 import { Block, Wallet } from "@bywise/web3";
-import { Blocks, Slices } from "../models";
+import { Slices } from "../models";
 import BigNumber from "bignumber.js";
 import { CoreContext } from "../types";
 import helper from "../utils/helper";

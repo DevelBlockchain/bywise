@@ -21,7 +21,7 @@
   "author": "Devel Blockchain <contact@develblockchain.com>",
   "license": "MIT",
   "dependencies": {
-    "@bywise/web3": "^1.0.4",
+    "@bywise/web3": "^1.0.5",
     "bignumber.js": "^9.1.2",
     "body-parser": "^1.20.0",
     "cors": "^2.8.5",
@@ -36,7 +36,7 @@
     "quickjs-emscripten": "^0.21.2",
     "randomstring": "^1.2.2",
     "seedrandom": "^3.0.5",
-    "web3": "^4.8.0",
+    "web3": "^4.10.0",
     "winston": "^3.13.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
