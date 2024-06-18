@@ -100,7 +100,7 @@ export default class MintBlocks {
             chain: this.coreContext.chain
         })
         if (!isConnected) {
-            this.coreContext.applicationContext.logger.verbose(`ConsensusAlgorithm: Node has disconnected!`)
+            this.coreContext.applicationContext.logger.error(`mint-blocks - Node has disconnected!`)
             this.pipelineChain.stop().then(() => {
                 this.pipelineChain.start();
             });
