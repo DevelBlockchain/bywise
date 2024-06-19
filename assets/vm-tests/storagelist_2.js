@@ -1,4 +1,4 @@
-import { StorageMap, StorageList } from 'bywise-utils.js';
+import { StorageMap, StorageList } from 'bywise-utils';
 
 function test(name, expected, received) {
     if (expected !== received) throw `Failed test ${name} - expected: "${expected}" - received: "${received}"`

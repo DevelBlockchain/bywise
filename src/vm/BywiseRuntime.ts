@@ -13,10 +13,12 @@ const PRESET = [
     "Date = EditDate;",
 ].join('\n');
 const FILE_BYWISE_UTILS = fs.readFileSync(path.join(__dirname, '../../imports/bywise-utils.mjs'), "utf-8")
+const FILE_BYWISE_UTILS_V2 = fs.readFileSync(path.join(__dirname, '../../imports/bywise-utils-v2.mjs'), "utf-8")
 const FILE_BIGNUMBER = fs.readFileSync(path.join(__dirname, '../../imports/bignumber.mjs'), "utf-8")
 const imports = [
     { module: "bignumber.js", binary: FILE_BIGNUMBER },
-    { module: "bywise-utils.js", binary: FILE_BYWISE_UTILS }
+    { module: "bywise-utils.js", binary: FILE_BYWISE_UTILS },
+    { module: "bywise-utils", binary: FILE_BYWISE_UTILS_V2 }
 ]
 
 
