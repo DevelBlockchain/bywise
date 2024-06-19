@@ -225,12 +225,14 @@ export default class BywiseRuntime {
         const runtimeModule = await BywiseRuntime.getModule(true);
         let br = new BywiseRuntimeInstance(runtimeModule.module, blockchain);
         try {
+            br.interruptCycles = 1;
             let bcc = await br.execContract(getContract, ctx, contractAddress, sender, value, code);
-            ctx.output.cost += br.interruptCycles + 1;
+            ctx.output.cost += br.interruptCycles;
             await br.dispose();
             runtimeModule.busy = false;
             return bcc;
         } catch (err) {
+            ctx.output.cost += br.interruptCycles;
             await br.dispose();
             runtimeModule.busy = false;
             throw err;
@@ -253,6 +255,7 @@ export default class BywiseRuntime {
             runtimeModule.busy = false;
             return result;
         } catch (err) {
+            ctx.output.cost += br.interruptCycles;
             runtimeModule.busy = false;
             throw err;
         }
@@ -279,6 +282,7 @@ export default class BywiseRuntime {
             runtimeModule.busy = false;
             return result;
         } catch (err) {
+            brSubcontext.interruptCycles = br.interruptCycles + 14;
             runtimeModule.busy = false;
             throw err;
         }
