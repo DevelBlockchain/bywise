@@ -87,6 +87,7 @@ describe('basic tests', () => {
     test('set balance', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -117,6 +118,7 @@ describe('basic tests', () => {
     test('add balance', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -149,6 +151,7 @@ describe('basic tests', () => {
     test('sub balance', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -197,6 +200,7 @@ describe('basic tests', () => {
         let wallet2 = new Wallet();
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
         let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
         expect(balance.balance.toString()).toEqual('0');
@@ -261,6 +265,7 @@ describe('set configs', () => {
     test('set basic fee', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -843,6 +848,7 @@ describe('contracts', () => {
         const contractAddress = BywiseHelper.getBWSAddressContract();
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(

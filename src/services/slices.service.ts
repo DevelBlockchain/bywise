@@ -79,8 +79,8 @@ export class SlicesProvider {
   }
 
   async executeCompleteSlice(blockTree: BlockTree, lastContextHash: string, sliceInfo: Slices) {
-    await this.environmentProvider.consolide(blockTree, lastContextHash);
-    const ctx = this.transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, sliceInfo.slice.blockHeight);
+    await this.environmentProvider.consolide(blockTree, lastContextHash, CompiledContext.SLICE_CONTEXT_HASH);
+    const ctx = this.transactionsProvider.createContext(blockTree, CompiledContext.SLICE_CONTEXT_HASH, sliceInfo.slice.blockHeight);
     let error = false;
     try {
       sliceInfo.outputs = [];

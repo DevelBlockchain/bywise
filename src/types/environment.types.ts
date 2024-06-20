@@ -221,6 +221,7 @@ export class BlockTree {
 export enum CompiledContext {
     MAIN_CONTEXT_HASH = 'main_context',
     SLICE_CONTEXT_HASH = 'slice_context',
+    SLICE_MINT_CONTEXT_HASH = 'slice_mint_context',
 }
 
 export class EnvironmentContext {

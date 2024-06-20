@@ -25,16 +25,20 @@ export class EnvironmentRepository {
         ])
     }
 
-    async findByChainAndKey(chain: string, key: string, limit: number = 1000000000): Promise<Environment[]> {
-        return await this.db.find(`${this.table}-${chain}-key-${key}`, limit);
+    async findByChainAndKey(chain: string, key: string, limit: number, offset: number): Promise<Environment[]> {
+        return await this.db.find(`${this.table}-${chain}-key-${key}`, limit, offset);
     }
 
-    async findByChainAndHash(chain: string, hash: string, limit: number = 1000000000): Promise<Environment[]> {
-        return await this.db.find(`${this.table}-${chain}-hash-${hash}`, limit);
+    async findByChainAndHash(chain: string, hash: string, limit: number, offset: number): Promise<Environment[]> {
+        return await this.db.find(`${this.table}-${chain}-hash-${hash}`, limit, offset);
     }
     
-    async findByChainAndHashAndKey(chain: string, hash: string, key: string, limit: number = 1000000000, offset: number = 0): Promise<Environment[]> {
+    async findByChainAndHashAndKey(chain: string, hash: string, key: string, limit: number, offset: number): Promise<Environment[]> {
         return await this.db.find(`${this.table}-${chain}-hash-${hash}-${key}`, limit, offset);
+    }
+
+    async countByChainAndHash(chain: string, hash: string): Promise<number> {
+        return await this.db.count(`${this.table}-${chain}-hash-${hash}`);
     }
 
     async countByChainAndHashAndKey(chain: string, hash: string, key: string): Promise<number> {

@@ -122,15 +122,28 @@ export default class PipelineChain implements Task {
         this.runWorkersCount--;
     }
 
-    private async mintSlicesAndExecuteSlices() {
+    private async mintSlices() {
         this.runWorkersCount++;
-        // use EnvironmentContext.MAIN_CONTEXT_HASH
         try {
-            const executeSlices = new ExecuteSlices(this.coreContext);
             const mintSlices = new MintSlices(this.coreContext, this);
             await mintSlices.start();
-            while (this.isRun && executeSlices.isRun && mintSlices.isRun) {
+            while (this.isRun && mintSlices.isRun) {
                 await mintSlices.run();
+
+                await helper.sleep(DEFAULT_DELAY);
+            }
+        } catch (err: any) {
+            this.coreContext.applicationContext.logger.error(`error core.mintSlices chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.stop();
+        }
+        this.runWorkersCount--;
+    }
+    
+    private async executeSlices() {
+        this.runWorkersCount++;
+        try {
+            const executeSlices = new ExecuteSlices(this.coreContext);
+            while (this.isRun && executeSlices.isRun) {
                 await executeSlices.run();
 
                 await helper.sleep(DEFAULT_DELAY);
@@ -196,10 +209,11 @@ export default class PipelineChain implements Task {
         await this.runSyncChain();
 
         this.keepSync();
-        this.executeBlocks();
-        this.executeTransactions();
-        this.mintSlicesAndExecuteSlices();
         this.mintBlocks();
+        this.executeBlocks();
+        this.mintSlices();
+        this.executeSlices();
+        this.executeTransactions();
         this.voteBlocks();
         this.consensusAlgorithm();
         this.invalidateTransactions();

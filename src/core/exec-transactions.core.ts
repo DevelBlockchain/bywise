@@ -40,7 +40,7 @@ export default class ExecuteTransactions {
     private async updateContext() {
         this.coreContext.applicationContext.logger.verbose(`update main context - hash: ${this.currentHash.substring(0, 10)}...`);
 
-        await this.coreContext.environmentProvider.consolide(this.coreContext.blockTree, this.currentHash);
+        await this.coreContext.environmentProvider.consolide(this.coreContext.blockTree, this.currentHash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, CompiledContext.MAIN_CONTEXT_HASH, this.nextBlockHeight);
 
         await this.waitBusy();
