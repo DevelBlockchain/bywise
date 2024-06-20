@@ -1,5 +1,5 @@
 import { Environment } from "../models";
-import { BlockTree, EnvironmentContext } from "../types/environment.types";
+import { BlockTree, CompiledContext, EnvironmentContext } from "../types/environment.types";
 import { ApplicationContext } from "../types/task.type";
 
 export class EnvironmentProvider {
@@ -12,59 +12,9 @@ export class EnvironmentProvider {
         this.logger = applicationContext.logger;
     }
 
-    private async getFromContextEnv(envContext: EnvironmentContext, key: string): Promise<Environment> {
-        let env: Environment | null = null;
-        let getEnv = envContext.setStageKeys.get(key);
-        if (getEnv !== undefined) {
-            env = getEnv;
-        }
-        if(env == null) {
-            getEnv = envContext.setMainKeys.get(key);
-            if (getEnv !== undefined) {
-                env = getEnv;
-            }
-        }
-        if(env == null) {
-            getEnv = envContext.getStageKeys.get(key);
-            if (getEnv !== undefined) {
-                env = getEnv;
-            }
-        }
-        if(env == null) {
-            getEnv = envContext.getMainKeys.get(key);
-            if (getEnv !== undefined) {
-                env = getEnv;
-            }
-        }
-        if (env == null) {
-            if (envContext.fromContextHash === EnvironmentContext.MAIN_CONTEXT_HASH) {
-                const main_context_env = await this.EnvironmentRepository.get(envContext.blockTree.chain, key, EnvironmentContext.MAIN_CONTEXT_HASH);
-                if (main_context_env) {
-                    env = main_context_env;
-                }
-            } else {
-                const slowEnvs = await this.EnvironmentRepository.findByChainAndKey(envContext.blockTree.chain, key);
-                const slowEnv = this.findEnv(slowEnvs, envContext.blockTree, envContext.fromContextHash, key);
-                if (slowEnv) {
-                    env = slowEnv;
-                }
-            }
-        }
-        if (env == null) {
-            env = {
-                chain: envContext.blockTree.chain,
-                key: key,
-                hash: envContext.fromContextHash,
-                value: null,
-            }
-        }
-        envContext.getStageKeys.set(key, env);
-        return env;
-    }
-
-    private findEnv(envs: Environment[], blockTree: BlockTree, contextHash: string, key: string): Environment | undefined {
+    private findEnv(envs: Environment[], blockTree: BlockTree, contextHash: string, key: string): Environment | null {
         if (envs.length == 0) {
-            return undefined;
+            return null;
         }
         for (let i = 0; i < envs.length; i++) {
             const env = envs[i];
@@ -74,40 +24,11 @@ export class EnvironmentProvider {
         }
         if (contextHash !== BlockTree.ZERO_HASH) {
             const lastHash = blockTree.getLastHash(contextHash);
-            if (lastHash === contextHash) return undefined;
+            if (lastHash === contextHash) return null;
             return this.findEnv(envs, blockTree, lastHash, key);
         } else {
-            return undefined;
+            return null;
         }
-    }
-
-    async getSlowList(blockTree: BlockTree, contextHash: string, key: string): Promise<Environment[]> {
-        const envs = await this.EnvironmentRepository.findByChainAndKey(blockTree.chain, key);
-        const added: string[] = [];
-        const values: Environment[] = [];
-        while (contextHash !== BlockTree.ZERO_HASH) {
-            envs.forEach(env => {
-                if (env.hash === contextHash) {
-                    if (!added.includes(env.key)) {
-                        values.push(env);
-                        added.push(env.key);
-                    }
-                }
-            })
-            contextHash = blockTree.getLastHash(contextHash);
-        }
-        envs.forEach(env => {
-            if (env.hash === BlockTree.ZERO_HASH) {
-                if (!added.includes(env.key)) {
-                    values.push(env);
-                    added.push(env.key);
-                }
-            }
-        })
-        return values.map(env => {
-            env.key = env.key.replace(key + '-', '');
-            return env;
-        });
     }
 
     async hasSlow(blockTree: BlockTree, contextHash: string, key: string): Promise<boolean> {
@@ -130,16 +51,99 @@ export class EnvironmentProvider {
         }
     }
 
-    async getList(envContext: EnvironmentContext, key: string): Promise<Environment[]> {
+    private async getFromContextEnv(envContext: EnvironmentContext, key: string): Promise<Environment> {
+        let env: Environment | null = null;
+        let getEnv = envContext.setStageKeys.get(key);
+        if (getEnv !== undefined) {
+            env = getEnv;
+        }
+        if (env == null) {
+            getEnv = envContext.setMainKeys.get(key);
+            if (getEnv !== undefined) {
+                env = getEnv;
+            }
+        }
+        if (env == null) {
+            getEnv = envContext.getStageKeys.get(key);
+            if (getEnv !== undefined) {
+                env = getEnv;
+            }
+        }
+        if (env == null) {
+            getEnv = envContext.getMainKeys.get(key);
+            if (getEnv !== undefined) {
+                env = getEnv;
+            }
+        }
+        if (env == null) {
+            if (envContext.fromContextHash === CompiledContext.MAIN_CONTEXT_HASH) {
+                const main_context_env = await this.EnvironmentRepository.get(envContext.blockTree.chain, key, CompiledContext.MAIN_CONTEXT_HASH);
+                if (main_context_env) {
+                    env = main_context_env;
+                }
+            } else if (envContext.fromContextHash === CompiledContext.SLICE_CONTEXT_HASH) {
+                const main_context_env = await this.EnvironmentRepository.get(envContext.blockTree.chain, key, CompiledContext.SLICE_CONTEXT_HASH);
+                if (main_context_env) {
+                    env = main_context_env;
+                }
+            } else {
+                throw new Error(`invalid context`);
+            }
+        }
+        if (env == null) {
+            env = {
+                chain: envContext.blockTree.chain,
+                key: key,
+                hash: envContext.fromContextHash,
+                value: null,
+            }
+        }
+        envContext.getStageKeys.set(key, env);
+        return env;
+    }
+
+    async hasFromMainContext(blockTree: BlockTree, key: string): Promise<boolean> {
+        const env = await this.EnvironmentRepository.get(blockTree.chain, key, CompiledContext.MAIN_CONTEXT_HASH);
+        if (!env || env.value === null) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    async getFromMainContext(blockTree: BlockTree, key: string): Promise<string> {
+        const env = await this.EnvironmentRepository.get(blockTree.chain, key, CompiledContext.MAIN_CONTEXT_HASH);
+        if (env && env.value !== null) {
+            return env.value;
+        } else {
+            return '';
+        }
+    }
+
+    async getList(envContext: EnvironmentContext, key: string, limit: number, offset: number): Promise<Environment[]> {
         let envs: Environment[];
-        if (envContext.fromContextHash === EnvironmentContext.MAIN_CONTEXT_HASH) {
-            envs = await this.EnvironmentRepository.findByChainAndHashAndKey(envContext.blockTree.chain, BlockTree.ZERO_HASH, key);
+        if (envContext.fromContextHash === CompiledContext.MAIN_CONTEXT_HASH) {
+            envs = await this.EnvironmentRepository.findByChainAndHashAndKey(envContext.blockTree.chain, CompiledContext.MAIN_CONTEXT_HASH, key, limit, offset);
             envs = envs.map(env => {
                 env.key = env.key.replace(key + '-', '');
                 return env;
             });
         } else {
-            envs = await this.getSlowList(envContext.blockTree, envContext.fromContextHash, key);
+            throw new Error(`getList only work on MAIN_CONTEXT`);
+        }
+        return envs;
+    }
+
+    async getListSize(envContext: EnvironmentContext, key: string): Promise<Environment[]> {
+        let envs: Environment[];
+        if (envContext.fromContextHash === CompiledContext.MAIN_CONTEXT_HASH) {
+            envs = await this.EnvironmentRepository.findByChainAndHashAndKey(envContext.blockTree.chain, CompiledContext.MAIN_CONTEXT_HASH, key);
+            envs = envs.map(env => {
+                env.key = env.key.replace(key + '-', '');
+                return env;
+            });
+        } else {
+            throw new Error(`getList only work on MAIN_CONTEXT`);
         }
         return envs;
     }
@@ -164,7 +168,7 @@ export class EnvironmentProvider {
         const newEnv: Environment = {
             chain: envContext.blockTree.chain,
             key: key,
-            hash: EnvironmentContext.MAIN_CONTEXT_HASH,
+            hash: CompiledContext.MAIN_CONTEXT_HASH,
             value: value,
         };
         envContext.setStageKeys.set(newEnv.key, newEnv);
@@ -174,7 +178,7 @@ export class EnvironmentProvider {
         const newEnv: Environment = {
             chain: envContext.blockTree.chain,
             key: key,
-            hash: EnvironmentContext.MAIN_CONTEXT_HASH,
+            hash: CompiledContext.MAIN_CONTEXT_HASH,
             value: null,
         };
         envContext.setStageKeys.set(newEnv.key, newEnv);
@@ -226,7 +230,7 @@ export class EnvironmentProvider {
     }
 
     async getLastConsolidatedContextHash(blockTree: BlockTree) {
-        const main_context_last_hash_env = await this.EnvironmentRepository.get(blockTree.chain, `config-last_hash`, EnvironmentContext.MAIN_CONTEXT_HASH);
+        const main_context_last_hash_env = await this.EnvironmentRepository.get(blockTree.chain, `config-last_hash`, CompiledContext.MAIN_CONTEXT_HASH);
         let lastHash: string = BlockTree.ZERO_HASH;
         if (main_context_last_hash_env && main_context_last_hash_env.value) {
             lastHash = main_context_last_hash_env.value;
@@ -238,7 +242,7 @@ export class EnvironmentProvider {
         await this.EnvironmentRepository.save({
             chain: blockTree.chain,
             key: `config-last_hash`,
-            hash: EnvironmentContext.MAIN_CONTEXT_HASH,
+            hash: CompiledContext.MAIN_CONTEXT_HASH,
             value: contextHash,
         });
     }
@@ -259,14 +263,14 @@ export class EnvironmentProvider {
             const lastHash = blockTree.getLastHash(toContextHash);
             await this.consolideFromHash(blockTree, fromContextHash, lastHash);
         }
-        await this.mergeContext(blockTree.chain, toContextHash, EnvironmentContext.MAIN_CONTEXT_HASH);
+        await this.mergeContext(blockTree.chain, toContextHash, CompiledContext.MAIN_CONTEXT_HASH);
     }
 
     public async clearMainContext(chain: string) {
         this.logger.warn(`EnvironmentProvider.clearMainContext`);
         let delEnvs: Environment[] = [];
         do {
-            delEnvs = await this.EnvironmentRepository.findByChainAndHash(chain, EnvironmentContext.MAIN_CONTEXT_HASH, 10000);
+            delEnvs = await this.EnvironmentRepository.findByChainAndHash(chain, CompiledContext.MAIN_CONTEXT_HASH, 10000);
             await this.EnvironmentRepository.delMany(delEnvs);
         } while (delEnvs.length > 0);
     }

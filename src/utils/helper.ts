@@ -4,7 +4,7 @@ import fs from 'fs';
 import randomstring from 'randomstring';
 import { Block, Slice, Tx, TxType, Wallet, BlockPack } from '@bywise/web3';
 import { SimulateDTO, ZeroBlockConfig } from '../types';
-import { BlockTree, EnvironmentContext } from '../types/environment.types';
+import { BlockTree, CompiledContext, EnvironmentContext } from '../types/environment.types';
 
 const wait = async () => {
     await new Promise((resolve) => {
@@ -176,7 +176,7 @@ const createSimulationContext = (chain: string) => {
     const blockTree = new BlockTree(chain);
     blockTree.addBlock(block);
 
-    const envContext = new EnvironmentContext(blockTree, block.height, simulationId);
+    const envContext = new EnvironmentContext(blockTree, block.height, CompiledContext.MAIN_CONTEXT_HASH);
     return new SimulateDTO(envContext);
 }
 

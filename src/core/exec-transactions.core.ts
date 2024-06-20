@@ -1,6 +1,7 @@
 import { Tx } from "@bywise/web3";
 import { CoreContext, SimulateDTO } from "../types";
 import helper from "../utils/helper";
+import { CompiledContext } from "../types/environment.types";
 
 export default class ExecuteTransactions {
     public isRun = true;
@@ -37,7 +38,8 @@ export default class ExecuteTransactions {
     private async updateContext() {
         this.coreContext.applicationContext.logger.verbose(`update main context - hash: ${this.currentHash.substring(0, 10)}...`);
 
-        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, this.currentHash, this.nextBlockHeight);
+        await this.coreContext.environmentProvider.consolide(this.coreContext.blockTree, this.currentHash);
+        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, CompiledContext.MAIN_CONTEXT_HASH, this.nextBlockHeight);
 
         await this.waitBusy();
         const oldContext = this.currentContext;

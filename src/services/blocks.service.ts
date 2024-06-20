@@ -3,7 +3,7 @@ import { Block, BywiseHelper, Slice, Tx, BlockPack } from '@bywise/web3';
 import { ApplicationContext } from '../types/task.type';
 import { BlockchainStatus } from '../types';
 import { MinnerProvider } from './minner.service';
-import { BlockTree, EnvironmentContext } from '../types/environment.types';
+import { BlockTree, CompiledContext } from '../types/environment.types';
 import { EnvironmentProvider } from "./environment.service";
 import { RoutingKeys } from "../datasource/message-queue";
 import { Blocks } from "../models";
@@ -362,7 +362,7 @@ export class BlocksProvider {
       sliceInfo = await this.slicesProvider.syncSliceByHash(blockTree, slice.hash);
       await this.slicesProvider.executeCompleteSlice(blockTree, lastContextHash, sliceInfo);
 
-      await this.environmentProvider.mergeContext(blockTree.chain, slice.hash, EnvironmentContext.MAIN_CONTEXT_HASH);
+      await this.environmentProvider.mergeContext(blockTree.chain, slice.hash, CompiledContext.MAIN_CONTEXT_HASH);
       await this.environmentProvider.setLastConsolidatedContextHash(blockTree, slice.hash);
       lastContextHash = slice.hash;
     }

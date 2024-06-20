@@ -1,7 +1,7 @@
 import { Block, Wallet } from '@bywise/web3';
 import Bywise from '../bywise';
 import { EnvironmentProvider } from '../services/environment.service';
-import { BlockTree, EnvironmentContext } from '../types/environment.types';
+import { BlockTree, CompiledContext, EnvironmentContext } from '../types/environment.types';
 import helper from '../utils/helper';
 
 var bywise: Bywise;
@@ -84,7 +84,7 @@ afterAll(async () => {
 describe('local operations', () => {
 
     test('set and get', async () => {
-        const envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        const envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
 
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.set(envContext, 'variable2', 'value2');
@@ -101,7 +101,7 @@ describe('local operations', () => {
     });
 
     test('set and overwrite', async () => {
-        const envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        const envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
 
         let value = await environmentProvider.get(envContext, 'variable1');
         expect(value).toStrictEqual('');
@@ -118,7 +118,7 @@ describe('local operations', () => {
     });
 
     test('has and set', async () => {
-        const envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        const envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
 
         let has1 = await environmentProvider.has(envContext, 'variable1');
         environmentProvider.set(envContext, 'variable1', 'value1');
@@ -131,7 +131,7 @@ describe('local operations', () => {
     });
 
     test('set, delete, has, get', async () => {
-        const envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        const envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
 
         let has = await environmentProvider.has(envContext, 'variable1');
         let value = await environmentProvider.get(envContext, 'variable1');
@@ -157,7 +157,7 @@ describe('local operations', () => {
     });
 
     test('delete commit', async () => {
-        const envContext5 = new EnvironmentContext(blockTree, 5, 'block_5');
+        const envContext5 = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH);
 
         environmentProvider.set(envContext5, 'variable1', 'value1');
         environmentProvider.set(envContext5, 'variable2', 'value2');
@@ -178,7 +178,7 @@ describe('local operations', () => {
     });
 
     test('commit', async () => {
-        const envContext5 = new EnvironmentContext(blockTree, 5, 'block_5');
+        const envContext5 = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH);
 
         environmentProvider.set(envContext5, 'variable1', 'value1');
         environmentProvider.set(envContext5, 'variable2', 'value2');
@@ -220,14 +220,14 @@ describe('local operations', () => {
 describe('distinct context operations', () => {
 
     test('distinct context', async () => {
-        const envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        const envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
 
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.set(envContext, 'variable2', 'value2');
         environmentProvider.commit(envContext);
         await envContext.dispose();
 
-        const envContextOther = new EnvironmentContext(blockTree, 1, 'block_1');
+        const envContextOther = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         let loadVar1 = await environmentProvider.get(envContextOther, 'variable1');
         let loadVar2 = await environmentProvider.get(envContextOther, 'variable2');
         expect(loadVar1).toStrictEqual('');
@@ -236,7 +236,7 @@ describe('distinct context operations', () => {
     });
 
     test('push', async () => {
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         let loadVar1 = await environmentProvider.get(envContext, 'variable1');
         let loadVar2 = await environmentProvider.get(envContext, 'variable2');
         expect(loadVar1).toStrictEqual('');
@@ -248,18 +248,18 @@ describe('distinct context operations', () => {
         expect(slowLoadVar1).toStrictEqual('');
         expect(slowLoadVar2).toStrictEqual('');
 
-        envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.set(envContext, 'variable2', 'value2');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_1');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         loadVar1 = await environmentProvider.get(envContext, 'variable1');
         loadVar2 = await environmentProvider.get(envContext, 'variable2');
-        expect(loadVar1).toStrictEqual('value1');
-        expect(loadVar2).toStrictEqual('value2');
+        expect(loadVar1).toStrictEqual('');
+        expect(loadVar2).toStrictEqual('');
         await envContext.dispose();
 
         slowLoadVar1 = await environmentProvider.getSlow(blockTree, 'block_1', 'variable1');
@@ -272,7 +272,7 @@ describe('distinct context operations', () => {
         let slowLoadValue = await environmentProvider.getSlow(blockTree, 'block_1', 'variable1');
         expect(slowLoadValue).toStrictEqual('');
 
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
 
         slowLoadValue = await environmentProvider.getSlow(blockTree, 'block_1', 'variable1');
@@ -302,8 +302,8 @@ describe('distinct context operations', () => {
     });
 
     test('two contexts same time', async () => {
-        const envContext5 = new EnvironmentContext(blockTree, 5, 'block_5');
-        const envContext5Other = new EnvironmentContext(blockTree, 5, 'block_5');
+        const envContext5 = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH);
+        const envContext5Other = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH);
 
         environmentProvider.set(envContext5, 'variable1', 'value1');
         environmentProvider.set(envContext5, 'variable2', 'value2');
@@ -333,9 +333,9 @@ describe('distinct context operations', () => {
     });
 
     test('test context cache', async () => {
-        let envContext1 = new EnvironmentContext(blockTree, 1, 'block_1');
-        let envContext2 = new EnvironmentContext(blockTree, 1, 'block_1');
-        let envContext3 = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext1 = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
+        let envContext2 = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
+        let envContext3 = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
 
         environmentProvider.set(envContext1, 'variable1', 'value1');
         environmentProvider.commit(envContext1);
@@ -343,7 +343,7 @@ describe('distinct context operations', () => {
         let value = await environmentProvider.get(envContext2, 'variable1');
         expect(value).toStrictEqual(''); // before push
 
-        await environmentProvider.push(envContext1, 'block_1');
+        await environmentProvider.push(envContext1, CompiledContext.MAIN_CONTEXT_HASH);
 
         value = await environmentProvider.get(envContext2, 'variable1');
         expect(value).toStrictEqual(''); // before push - get from cache
@@ -359,13 +359,14 @@ describe('distinct context operations', () => {
 describe('distinct blocks operations', () => {
 
     test('set and get', async () => {
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_1');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        await environmentProvider.consolide(blockTree, 'block_1');
+        envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         let loadVar = await environmentProvider.get(envContext, 'variable1');
         await envContext.dispose();
 
@@ -373,35 +374,40 @@ describe('distinct blocks operations', () => {
     });
 
     test('set and get overwrite blocks', async () => {
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_1');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 2, 'block_2');
+        await environmentProvider.consolide(blockTree, 'block_2');
+        envContext = new EnvironmentContext(blockTree, 2, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value2');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_2');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 3, 'block_3');
+        await environmentProvider.consolide(blockTree, 'block_3');
+        envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value3');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        await environmentProvider.consolide(blockTree, 'block_1');
+        envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         let value = await environmentProvider.get(envContext, 'variable1');
         expect(value).toStrictEqual('value1');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 2, 'block_2');
+        await environmentProvider.consolide(blockTree, 'block_2');
+        envContext = new EnvironmentContext(blockTree, 2, CompiledContext.MAIN_CONTEXT_HASH);
         value = await environmentProvider.get(envContext, 'variable1');
         expect(value).toStrictEqual('value2');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 3, 'block_3');
+        await environmentProvider.consolide(blockTree, 'block_3');
+        envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         value = await environmentProvider.get(envContext, 'variable1');
         expect(value).toStrictEqual('value3');
         await envContext.dispose();
@@ -411,19 +417,19 @@ describe('distinct blocks operations', () => {
     });
 
     test('set and get overwrite blocks - slow', async () => {
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_1');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 2, 'block_2');
+        envContext = new EnvironmentContext(blockTree, 2, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value2');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_2');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 3, 'block_3');
+        envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value3');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3');
@@ -440,37 +446,41 @@ describe('distinct blocks operations', () => {
     });
 
     test('has and set', async () => {
-        let envContext = new EnvironmentContext(blockTree, 2, 'block_2');
+        let envContext = new EnvironmentContext(blockTree, 2, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_2');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        await environmentProvider.consolide(blockTree, 'block_1');
+        envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         let has1 = await environmentProvider.has(envContext, 'variable1');
         expect(has1).toEqual(false);
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 2, 'block_2');
+        await environmentProvider.consolide(blockTree, 'block_2');
+        envContext = new EnvironmentContext(blockTree, 2, CompiledContext.MAIN_CONTEXT_HASH);
         let has2 = await environmentProvider.has(envContext, 'variable1');
         expect(has2).toEqual(true);
         await envContext.dispose();
     });
 
     test('set, delete, has, get', async () => {
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_1');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 2, 'block_2');
+        await environmentProvider.consolide(blockTree, 'block_2');
+        envContext = new EnvironmentContext(blockTree, 2, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.delete(envContext, 'variable1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_2');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        await environmentProvider.consolide(blockTree, 'block_1');
+        envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         let has = await environmentProvider.has(envContext, 'variable1');
         let value = await environmentProvider.get(envContext, 'variable1');
         expect(has).toEqual(true);
@@ -478,7 +488,8 @@ describe('distinct blocks operations', () => {
         await envContext.dispose();
 
 
-        envContext = new EnvironmentContext(blockTree, 2, 'block_2');
+        await environmentProvider.consolide(blockTree, 'block_2');
+        envContext = new EnvironmentContext(blockTree, 2, CompiledContext.MAIN_CONTEXT_HASH);
         has = await environmentProvider.has(envContext, 'variable1');
         value = await environmentProvider.get(envContext, 'variable1');
         expect(has).toEqual(false);
@@ -490,19 +501,19 @@ describe('distinct blocks operations', () => {
 describe('soft fork operations', () => {
 
     test('set and get', async () => {
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_1');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 3, 'block_3');
+        envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value3');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 1, 'block_3.1');
+        envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value3.1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3.1');
@@ -525,7 +536,7 @@ describe('soft fork operations', () => {
     });
 
     test('has and set', async () => {
-        let envContext = new EnvironmentContext(blockTree, 3, 'block_3.1');
+        let envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value3.1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3.1');
@@ -539,19 +550,19 @@ describe('soft fork operations', () => {
     });
 
     test('set, delete, has, get', async () => {
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_1');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 3, 'block_3');
+        envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value3');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 1, 'block_3.1');
+        envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value3.1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3.1');
@@ -572,7 +583,7 @@ describe('soft fork operations', () => {
         expect(has).toStrictEqual(true);
         expect(value).toStrictEqual('value3');
 
-        envContext = new EnvironmentContext(blockTree, 1, 'block_3.1');
+        envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.delete(envContext, 'variable1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3.1');
@@ -596,44 +607,39 @@ describe('soft fork operations', () => {
 
 describe('consolide tests', () => {
     test('set and get from main_context', async () => {
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_1');
 
         environmentProvider.set(envContext, 'variable1', 'value2');
         environmentProvider.commit(envContext);
-        await environmentProvider.push(envContext, EnvironmentContext.MAIN_CONTEXT_HASH); // save value2 on main_context
+        await environmentProvider.push(envContext, CompiledContext.MAIN_CONTEXT_HASH); // save value2 on main_context
         await envContext.dispose();
 
         let value = await environmentProvider.getSlow(blockTree, 'block_5', 'variable1');
         expect(value).toStrictEqual('value1');
 
-        envContext = new EnvironmentContext(blockTree, 5, 'block_5');
-        value = await environmentProvider.get(envContext, 'variable1');
-        expect(value).toStrictEqual('value1');
-        await envContext.dispose();
-
-        envContext = new EnvironmentContext(blockTree, 5, EnvironmentContext.MAIN_CONTEXT_HASH);
+        envContext = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH);
         value = await environmentProvider.get(envContext, 'variable1');
         expect(value).toStrictEqual('value2');
         await envContext.dispose();
     });
 
     test('consolide main_context', async () => {
-        let envContext = new EnvironmentContext(blockTree, 0, 'block_0');
+        let envContext = new EnvironmentContext(blockTree, 0, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable0', 'first_blockchain');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_0');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 2, 'block_2');
+        envContext = new EnvironmentContext(blockTree, 2, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'middle_blockchain');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_2');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 5, 'block_5');
+        envContext = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable2', 'last_block_blockchain');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_5');
@@ -646,27 +652,17 @@ describe('consolide tests', () => {
         value = await environmentProvider.getSlow(blockTree, 'block_5', 'variable2');
         expect(value).toStrictEqual('last_block_blockchain');
 
-        envContext = new EnvironmentContext(blockTree, 5, 'block_5'); // enviroment from old block
+        envContext = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH); // enviroment from old block
         value = await environmentProvider.get(envContext, 'variable0');
-        expect(value).toStrictEqual('first_blockchain');
+        expect(value).toStrictEqual('');
         value = await environmentProvider.get(envContext, 'variable1');
-        expect(value).toStrictEqual('middle_blockchain');
+        expect(value).toStrictEqual('');
         value = await environmentProvider.get(envContext, 'variable2');
-        expect(value).toStrictEqual('last_block_blockchain'); // It will only be set in block 5
-        await envContext.dispose();
-
-        envContext = new EnvironmentContext(blockTree, 5, EnvironmentContext.MAIN_CONTEXT_HASH); // enviroment from main_context
-        value = await environmentProvider.get(envContext, 'variable0');
-        expect(value).toStrictEqual(''); // main_context is empty
-        value = await environmentProvider.get(envContext, 'variable1');
-        expect(value).toStrictEqual(''); // main_context is empty
-        value = await environmentProvider.get(envContext, 'variable2');
-        expect(value).toStrictEqual(''); // main_context is empty
+        expect(value).toStrictEqual('');
         await envContext.dispose();
 
         await environmentProvider.consolide(blockTree, blockTree.currentMinnedBlock.hash); // populate main_context
-
-        envContext = new EnvironmentContext(blockTree, 5, EnvironmentContext.MAIN_CONTEXT_HASH); // enviroment from main_context
+        envContext = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH); // enviroment from main_context
         value = await environmentProvider.get(envContext, 'variable0');
         expect(value).toStrictEqual('first_blockchain');
         value = await environmentProvider.get(envContext, 'variable1');
@@ -677,19 +673,19 @@ describe('consolide tests', () => {
     });
 
     test('consolide main_context - soft fork', async () => {
-        let envContext = new EnvironmentContext(blockTree, 3, 'block_3');
+        let envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable0', 'value0');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 4, 'block_4');
+        envContext = new EnvironmentContext(blockTree, 4, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable0', 'value0.1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_4');
         await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 3, 'block_3.1');
+        envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3.1');
@@ -697,7 +693,7 @@ describe('consolide tests', () => {
 
         await environmentProvider.consolide(blockTree, 'block_5'); // populate main_context
 
-        envContext = new EnvironmentContext(blockTree, 5, EnvironmentContext.MAIN_CONTEXT_HASH); // enviroment from main_context
+        envContext = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH); // enviroment from main_context
         let value = await environmentProvider.get(envContext, 'variable0');
         expect(value).toStrictEqual('value0.1');
         value = await environmentProvider.get(envContext, 'variable1');
@@ -706,7 +702,7 @@ describe('consolide tests', () => {
 
         await environmentProvider.consolide(blockTree, 'block_4.1'); // clear main_context and set block_4.1
 
-        envContext = new EnvironmentContext(blockTree, 5, EnvironmentContext.MAIN_CONTEXT_HASH); // enviroment from main_context
+        envContext = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH); // enviroment from main_context
         value = await environmentProvider.get(envContext, 'variable0');
         expect(value).toStrictEqual('');
         value = await environmentProvider.get(envContext, 'variable1');
@@ -715,7 +711,7 @@ describe('consolide tests', () => {
     });
 
     test('consolide main_context - only last blocks', async () => {
-        let envContext = new EnvironmentContext(blockTree, 3, 'block_3');
+        let envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable0', 'value0');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3');
@@ -723,7 +719,7 @@ describe('consolide tests', () => {
 
         await environmentProvider.consolide(blockTree, 'block_4'); // populate main_context zero to block_4
 
-        envContext = new EnvironmentContext(blockTree, 3, 'block_3');
+        envContext = new EnvironmentContext(blockTree, 3, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable0', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_3');
@@ -731,7 +727,7 @@ describe('consolide tests', () => {
 
         await environmentProvider.consolide(blockTree, 'block_5'); // populate main_context block_4 to block_5
 
-        envContext = new EnvironmentContext(blockTree, 5, EnvironmentContext.MAIN_CONTEXT_HASH);
+        envContext = new EnvironmentContext(blockTree, 5, CompiledContext.MAIN_CONTEXT_HASH);
         let value = await environmentProvider.get(envContext, 'variable0');
         expect(value).toStrictEqual('value0');
         await envContext.dispose();
@@ -1283,27 +1279,25 @@ describe('slice operations', () => {
         ];
         slices.forEach(s => blockTree.addSlice(s));
 
-        let envContext = new EnvironmentContext(blockTree, 1, 'block_1');
+        let envContext = new EnvironmentContext(blockTree, 1, CompiledContext.MAIN_CONTEXT_HASH);
         environmentProvider.set(envContext, 'variable0', 'value0');
         environmentProvider.set(envContext, 'variable1', 'value1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'block_1');
-        await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 6, 'slice_1');
         environmentProvider.set(envContext, 'variable1', 'slice_value_1');
         environmentProvider.set(envContext, 'variable2', 'slice_value_2');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'slice_1');
-        await envContext.dispose();
 
-        envContext = new EnvironmentContext(blockTree, 6, 'slice_2');
         environmentProvider.delete(envContext, 'variable1');
         environmentProvider.commit(envContext);
         await environmentProvider.push(envContext, 'slice_2');
         await envContext.dispose();
 
         let value = await environmentProvider.getSlow(blockTree, 'block_1', 'variable1');
+        expect(value).toStrictEqual('value1');
+        value = await environmentProvider.getSlow(blockTree, 'block_5', 'variable1');
         expect(value).toStrictEqual('value1');
         value = await environmentProvider.getSlow(blockTree, 'slice_0', 'variable1');
         expect(value).toStrictEqual('value1');
@@ -1315,24 +1309,38 @@ describe('slice operations', () => {
         expect(value).toStrictEqual('');
         value = await environmentProvider.getSlow(blockTree, 'slice_2', 'variable2');
         expect(value).toStrictEqual('slice_value_2');
-
-        envContext = new EnvironmentContext(blockTree, 6, 'slice_2'); 
+        
+        envContext = new EnvironmentContext(blockTree, 6, CompiledContext.MAIN_CONTEXT_HASH); 
+        value = await environmentProvider.get(envContext, 'variable0');
+        expect(value).toStrictEqual('');
         value = await environmentProvider.get(envContext, 'variable1');
         expect(value).toStrictEqual('');
+        value = await environmentProvider.get(envContext, 'variable2');
+        expect(value).toStrictEqual('');
+        await envContext.dispose();
+
+        await environmentProvider.consolide(blockTree, 'block_5');
+        envContext = new EnvironmentContext(blockTree, 6, CompiledContext.MAIN_CONTEXT_HASH); 
+        value = await environmentProvider.get(envContext, 'variable0');
+        expect(value).toStrictEqual('value0');
+        value = await environmentProvider.get(envContext, 'variable1');
+        expect(value).toStrictEqual('value1');
+        value = await environmentProvider.get(envContext, 'variable2');
+        expect(value).toStrictEqual('');
+        await envContext.dispose();
+
+        await environmentProvider.consolide(blockTree, 'slice_1');
+        envContext = new EnvironmentContext(blockTree, 6, CompiledContext.MAIN_CONTEXT_HASH); 
+        value = await environmentProvider.get(envContext, 'variable0');
+        expect(value).toStrictEqual('value0');
+        value = await environmentProvider.get(envContext, 'variable1');
+        expect(value).toStrictEqual('slice_value_1');
         value = await environmentProvider.get(envContext, 'variable2');
         expect(value).toStrictEqual('slice_value_2');
         await envContext.dispose();
-        
-        envContext = new EnvironmentContext(blockTree, 6, EnvironmentContext.MAIN_CONTEXT_HASH); 
-        value = await environmentProvider.get(envContext, 'variable1');
-        expect(value).toStrictEqual('');
-        value = await environmentProvider.get(envContext, 'variable2');
-        expect(value).toStrictEqual('');
-        await envContext.dispose();
 
         await environmentProvider.consolide(blockTree, 'slice_2');
-
-        envContext = new EnvironmentContext(blockTree, 6, EnvironmentContext.MAIN_CONTEXT_HASH); 
+        envContext = new EnvironmentContext(blockTree, 6, CompiledContext.MAIN_CONTEXT_HASH); 
         value = await environmentProvider.get(envContext, 'variable0');
         expect(value).toStrictEqual('value0');
         value = await environmentProvider.get(envContext, 'variable1');
