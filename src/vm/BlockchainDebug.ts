@@ -2,7 +2,7 @@ import { BywiseHelper } from '@bywise/web3';
 import BigNumber from 'bignumber.js';
 import { ETHProxyData } from '../models';
 import { ETHProvider } from '../services/eth.service';
-import { ApplicationContext } from '../types';
+import { ApplicationContext, TransactionEventEntry } from '../types';
 import BlockchainInterface, { BlockchainAction, TransactionMessage } from './BlockchainInterface';
 import BywiseRuntime from './BywiseRuntime';
 
@@ -92,10 +92,21 @@ export default class BlockchainDebug implements BlockchainInterface {
     }
 
     emitEvent = async (tx: TransactionMessage, event: string, data: string): Promise<string> => {
+        if (!tx.ctx.tx) throw new Error('BVM: event hash not found');
+        const eventEntries: TransactionEventEntry[] = [];
+        const entries = Object.entries(JSON.parse(data));
+        for (let j = 0; j < entries.length; j++) {
+            const [entryKey, entryValue] = entries[j];
+            if (!/^[a-zA-Z0-9_]{1,64}$/.test(entryKey)) throw new Error(`BVM: invalid event key - "${entryKey}"`);
+            if (typeof entryValue !== 'string') throw new Error(`BVM: invalid event typeof - "${typeof entryValue}"`);
+            if (!/^[a-zA-Z0-9_\.]{1,64}$/.test(entryValue)) throw new Error(`BVM: invalid event value - "${entryValue}"`);
+            eventEntries.push({ key: entryKey, value: entryValue });
+        }
         tx.ctx.output.events.push({
-            from: tx.contractAddress,
-            event: event,
-            data: data
+            contractAddress: tx.contractAddress,
+            eventName: event,
+            entries: eventEntries,
+            hash: tx.ctx.tx.hash
         })
         return '';
     }

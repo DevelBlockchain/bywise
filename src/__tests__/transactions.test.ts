@@ -389,7 +389,7 @@ describe('contracts', () => {
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);
-    
+
     test('contract call other contracs', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
@@ -436,7 +436,7 @@ describe('contracts', () => {
         output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(output.error).toEqual(undefined);
         expect(output.output).toEqual("");
-        
+
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -474,7 +474,7 @@ describe('contracts', () => {
         output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(output.error).toEqual(undefined);
         expect(output.output).toEqual("Banana");
-        
+
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -488,6 +488,69 @@ describe('contracts', () => {
         output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(output.error).toEqual(undefined);
         expect(output.output).toEqual("Banana");
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
+
+    test('contract events', async () => {
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
+
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+        let tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            {
+                contractAddress: contractAddress, code: `
+                import BywiseUtils from 'bywise-utils';
+                class TestContract {
+                    setValue(newValue) {
+                        const sender = BywiseUtils.getTxSender();
+                        BywiseUtils.emit("setValue", {
+                            sender: sender,
+                            new_value: newValue
+                        });
+                    }
+                }
+                BywiseUtils.exportContract(new TestContract());`
+            }
+        );
+        tx.isValid();
+        let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "setValue", inputs: ["Banana"] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.events).toEqual([{
+            entries: [
+                {
+                    key: "sender",
+                    value: wallet.address,
+                },
+                {
+                    key: "new_value",
+                    value: "Banana",
+                },
+            ],
+            eventName: "setValue",
+            contractAddress: contractAddress,
+            hash: tx.hash,
+        }]);
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);

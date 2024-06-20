@@ -185,7 +185,6 @@ class Database {
     public ServiceRepository;
     public VotesRepository;
     public ETHRepository;
-    public EventsRepository;
 
     private constructor(path: string, mq: MessageQueue, logger: Logger) {
         this.mq = mq;
@@ -205,7 +204,6 @@ class Database {
         this.ServiceRepository = new repositories.ServiceRepository(this);
         this.VotesRepository = new repositories.VotesRepository(this);
         this.ETHRepository = new repositories.ETHRepository(this);
-        this.EventsRepository = new repositories.EventsRepository(this);
     }
 
     async saveMany(arr: SaveRequest[]): Promise<void> {

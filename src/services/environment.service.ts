@@ -134,18 +134,12 @@ export class EnvironmentProvider {
         return envs;
     }
 
-    async getListSize(envContext: EnvironmentContext, key: string): Promise<Environment[]> {
-        let envs: Environment[];
+    async getListSize(envContext: EnvironmentContext, key: string): Promise<number> {
         if (envContext.fromContextHash === CompiledContext.MAIN_CONTEXT_HASH) {
-            envs = await this.EnvironmentRepository.findByChainAndHashAndKey(envContext.blockTree.chain, CompiledContext.MAIN_CONTEXT_HASH, key);
-            envs = envs.map(env => {
-                env.key = env.key.replace(key + '-', '');
-                return env;
-            });
+            return await this.EnvironmentRepository.countByChainAndHashAndKey(envContext.blockTree.chain, CompiledContext.MAIN_CONTEXT_HASH, key);
         } else {
             throw new Error(`getList only work on MAIN_CONTEXT`);
         }
-        return envs;
     }
 
     async has(envContext: EnvironmentContext, key: string): Promise<boolean> {

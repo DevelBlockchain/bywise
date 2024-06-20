@@ -1,12 +1,13 @@
 import BigNumber from 'bignumber.js';
 import BlockchainInterface, { BlockchainAction, TransactionMessage } from './BlockchainInterface';
 import { EnvironmentProvider } from '../services/environment.service';
-import { ApplicationContext } from '../types';
+import { ApplicationContext, TransactionEvent, TransactionEventEntry } from '../types';
 import { WalletProvider } from '../services/wallet.service';
 import { ETHProvider } from '../services/eth.service';
 import BywiseRuntime from './BywiseRuntime';
 import { ETHAction, ETHProxyData } from '../models';
 import { BywiseHelper } from '@bywise/web3';
+import { EventsProvider } from '../services/events.service';
 
 export default class BlockchainBywise implements BlockchainInterface {
 
@@ -14,11 +15,13 @@ export default class BlockchainBywise implements BlockchainInterface {
     static readonly MAX_KEY_LENGTH = 2048;
 
     environmentProvider;
+    eventsProvider;
     walletProvider;
     ethProvider;
 
     constructor(applicationContext: ApplicationContext) {
         this.environmentProvider = new EnvironmentProvider(applicationContext);
+        this.eventsProvider = new EventsProvider(applicationContext);
         this.walletProvider = new WalletProvider(applicationContext);
         this.ethProvider = new ETHProvider(applicationContext);
     }
@@ -70,14 +73,25 @@ export default class BlockchainBywise implements BlockchainInterface {
         return '';
     }
 
-    emitEvent = async (tx: TransactionMessage, event: string, data: string): Promise<string> => {
-        JSON.parse(data);
-        
-        tx.ctx.output.events.push({
-            from: tx.contractAddress,
-            event: event,
-            data: data
-        })
+    emitEvent = async (tx: TransactionMessage, eventName: string, data: string): Promise<string> => {
+        if (!tx.ctx.tx) throw new Error('BVM: event hash not found');
+        const eventEntries: TransactionEventEntry[] = [];
+        const entries = Object.entries(JSON.parse(data));
+        for (let j = 0; j < entries.length; j++) {
+            const [entryKey, entryValue] = entries[j];
+            if (!/^[a-zA-Z0-9_]{1,64}$/.test(entryKey)) throw new Error(`BVM: invalid event key - "${entryKey}"`);
+            if (typeof entryValue !== 'string') throw new Error(`BVM: invalid event typeof - "${typeof entryValue}"`);
+            if (!/^[a-zA-Z0-9_\.]{1,64}$/.test(entryValue)) throw new Error(`BVM: invalid event value - "${entryValue}"`);
+            eventEntries.push({ key: entryKey, value: entryValue });
+        }
+        const event: TransactionEvent = {
+            contractAddress: tx.contractAddress,
+            eventName: eventName,
+            entries: eventEntries,
+            hash: tx.ctx.tx.hash
+        }
+        await this.eventsProvider.saveEvents(tx.ctx.envContext, event);
+        tx.ctx.output.events.push(event);
         return '';
     }
 

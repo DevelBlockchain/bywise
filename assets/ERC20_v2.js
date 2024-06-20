@@ -74,7 +74,7 @@ class ERC20 {
         isValidAddress(to);
         checkAmountIsInteger(amount);
 
-        let spender = BywiseUtils.getSender();
+        let spender = BywiseUtils.getTxSender();
 
         this._decreaseAllowance(spender, from, amount);
         this._transfer(from, to, amount);
@@ -85,7 +85,7 @@ class ERC20 {
         isValidAddress(spender);
         checkAmountIsInteger(amount);
 
-        let owner = BywiseUtils.getSender();
+        let owner = BywiseUtils.getTxSender();
         this._approve(spender, owner, amount);
         return true;
     }

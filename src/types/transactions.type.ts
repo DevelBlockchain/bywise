@@ -92,10 +92,16 @@ export type VariableDTO = {
   value: any;
 }
 
+export type TransactionEventEntry = {
+  key: string;
+  value: string;
+}
+
 export type TransactionEvent = {
-  from: string;
-  event: string;
-  data: string;
+  contractAddress: string;
+  eventName: string;
+  entries: TransactionEventEntry[];
+  hash: string;
 }
 
 export class TransactionOutputDTO {
