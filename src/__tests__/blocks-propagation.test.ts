@@ -9,7 +9,7 @@ var node0: Bywise;
 var node1: Bywise;
 var node2: Bywise;
 var b0: BlockPack;
-const blockDelay = 1000;
+const blockDelay = 3000;
 const chain = 'local';
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 const port1 = Math.floor(Math.random() * 7000 + 3000);

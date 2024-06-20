@@ -1,5 +1,4 @@
-import BigNumber from 'bignumber.js';
-import BywiseUtils, {StorageValue, StorageMap, StorageList } from 'bywise-utils.js';
+import BywiseUtils, { StorageValue, StorageMap } from 'bywise-utils';
 
 const TOKEN_NAME = "SimpleToken";
 const TOKEN_SYMBOL = "TKN";
@@ -28,8 +27,7 @@ class ERC20 {
     constructor(name, symbolToken) {
         this._name = name;
         this._symbolToken = symbolToken;
-
-        this._mint(BywiseUtils.getTxSender(), (new BigNumber(INITIAL_AMOUNT).multipliedBy(10 ** this.decimals())));
+        this._mint(BywiseUtils.getTxSender(), (BigInt(INITIAL_AMOUNT) * BigInt(10 ** parseInt(this.decimals()))));
     }
 
     name() {  // @view
@@ -50,16 +48,16 @@ class ERC20 {
 
     balanceOf(account) { // @view
         isValidAddress(account);
-        return this._balances.getBigNumber(account);
+        return this._balances.get(account);
     }
 
     allowance(owner, spender) {  // @view
         isValidAddress(owner);
         isValidAddress(spender);
         if (this._allowances.has(owner)) {
-            return this._allowances.getStorageMap(owner).getBigNumber(spender);
+            return this._allowances.getStorageMap(owner).get(spender);
         }
-        return new BigNumber('0');
+        return '0';
     }
 
     transfer(recipient, amount) {
@@ -93,25 +91,30 @@ class ERC20 {
     }
 
     _transfer(from, to, amount) { // @private
-        amount = new BigNumber(amount);
+        amount = BigInt(amount);
 
-        let fromBalance = this._balances.getBigNumber(from);
-        if (amount.isGreaterThan(fromBalance)) throw new Error('insuficient funds');
-        this._balances.set(from, fromBalance.minus(amount))
+        let fromBalance = BigInt(this._balances.get(from));
+        if (amount > fromBalance) throw new Error('insuficient funds');
+        fromBalance -= amount;
+        this._balances.set(from, fromBalance.toString())
         
-        let toBalance = this._balances.getBigNumber(to);
-        this._balances.set(to, toBalance.plus(amount))
+        let toBalance = BigInt(this._balances.get(to));
+        toBalance += amount;
+        this._balances.set(to, toBalance.toString())
     }
 
     _mint(recipient, amount) { // @private
         isValidAddress(recipient);
         checkAmountIsInteger(amount);
 
-        amount = new BigNumber(amount);
+        amount = BigInt(amount);
 
-        let recipientBalance = this._balances.getBigNumber(recipient);
-        this._balances.set(recipient, recipientBalance.plus(amount));
-        this._totalSupply.set(this._totalSupply.getBigNumber().plus(amount));
+        let recipientBalance = BigInt(this._balances.get(recipient));
+        recipientBalance += amount;
+        this._balances.set(recipient, recipientBalance.toString());
+        let totalSupply = BigInt(this._totalSupply.get());
+        totalSupply += amount;
+        this._totalSupply.set(totalSupply.toString());
     }
 
     _approve(spender, owner, amount) { // @private
@@ -122,11 +125,11 @@ class ERC20 {
     }
 
     _decreaseAllowance(spender, owner, amount) { // @private
-        amount = new BigNumber(amount);
-        const allowance = this.allowance(owner, spender);
-        if (amount.isGreaterThan(allowance)) throw new Error('decreased allowance below zero');
-
-        this._approve(spender, owner, allowance.minus(amount).toString())
+        amount = BigInt(amount);
+        let allowance = BigInt(this.allowance(owner, spender));
+        if (amount > allowance) throw new Error('decreased allowance below zero');
+        allowance -= amount;
+        this._approve(spender, owner, allowance.toString())
     }
 }
 

@@ -13,10 +13,12 @@ const PRESET = [
     "Date = EditDate;",
 ].join('\n');
 const FILE_BYWISE_UTILS = fs.readFileSync(path.join(__dirname, '../../imports/bywise-utils.mjs'), "utf-8")
+const FILE_BYWISE_UTILS_V2 = fs.readFileSync(path.join(__dirname, '../../imports/bywise-utils-v2.mjs'), "utf-8")
 const FILE_BIGNUMBER = fs.readFileSync(path.join(__dirname, '../../imports/bignumber.mjs'), "utf-8")
 const imports = [
     { module: "bignumber.js", binary: FILE_BIGNUMBER },
-    { module: "bywise-utils.js", binary: FILE_BYWISE_UTILS }
+    { module: "bywise-utils.js", binary: FILE_BYWISE_UTILS },
+    { module: "bywise-utils", binary: FILE_BYWISE_UTILS_V2 }
 ]
 
 
@@ -80,7 +82,7 @@ export class BywiseRuntimeInstance {
         const blockchainHandle = this.ctx.newObject();
         this.blockchain.exposeMethods().forEach(method => {
             const func = this.ctx.newAsyncifiedFunction(method.name, async (...parans) => {
-                this.interruptCycles++;
+                this.interruptCycles+=7;
                 if (!this.tx) throw new Error('transaction message not found');
                 if (this.write) {
                     const decodedParans = parans.map(this.ctx.getString);
@@ -91,7 +93,6 @@ export class BywiseRuntimeInstance {
                 } else {
                     return this.ctx.newString(this.calls[this.callsCount++]);
                 }
-
             });
             this.ctx.setProp(blockchainHandle, method.name, func)
             this.globalComponents.push(func);
@@ -226,11 +227,14 @@ export default class BywiseRuntime {
         const runtimeModule = await BywiseRuntime.getModule(true);
         let br = new BywiseRuntimeInstance(runtimeModule.module, blockchain);
         try {
+            br.interruptCycles = 1;
             let bcc = await br.execContract(getContract, ctx, contractAddress, sender, value, code);
+            ctx.output.cost += br.interruptCycles;
             await br.dispose();
             runtimeModule.busy = false;
             return bcc;
         } catch (err) {
+            ctx.output.cost += br.interruptCycles;
             await br.dispose();
             runtimeModule.busy = false;
             throw err;
@@ -247,11 +251,13 @@ export default class BywiseRuntime {
         }
         try {
             br.bywiseVirtualMachineStack = 0;
-            br.interruptCycles = 0;
+            br.interruptCycles = 1;
             let result = await br.execStartedContract(getContract, ctx, contractAddress, bcc, sender, value, code);
+            ctx.output.cost += br.interruptCycles;
             runtimeModule.busy = false;
             return result;
         } catch (err) {
+            ctx.output.cost += br.interruptCycles;
             runtimeModule.busy = false;
             throw err;
         }
@@ -274,10 +280,11 @@ export default class BywiseRuntime {
             br.bywiseVirtualMachineStack = bywiseVirtualMachineStack;
             br.interruptCycles = brSubcontext.interruptCycles;
             let result = await br.execStartedContract(getContract, ctx, contractAddress, bcc, sender, value, code);
-            brSubcontext.interruptCycles = br.interruptCycles;
+            brSubcontext.interruptCycles = br.interruptCycles + 14;
             runtimeModule.busy = false;
             return result;
         } catch (err) {
+            brSubcontext.interruptCycles = br.interruptCycles + 14;
             runtimeModule.busy = false;
             throw err;
         }
