@@ -19,6 +19,7 @@ const port0 = Math.floor(Math.random() * 7000 + 3000);
 const wallet = new Wallet();
 
 const ERCCode = fs.readFileSync('./assets/ERC20.js', 'utf8');
+const ERCCodeV2 = fs.readFileSync('./assets/ERC20_v2.js', 'utf8');
 const ERCCodeTestContract = fs.readFileSync('./assets/test_contract.js', 'utf8');
 
 beforeAll(async () => {
@@ -914,6 +915,20 @@ describe('stress testing', () => {
         let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(output.error).toEqual(undefined);
 
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "balanceOf", inputs: [wallet.address] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("5000000000000000000000");
+
         let uptime = new Date().getTime();
 
         for (let i = 0; i < 100; i++) {
@@ -924,7 +939,7 @@ describe('stress testing', () => {
             tx.to = [contractAddress];
             tx.amount = ['0'];
             tx.type = TxType.TX_CONTRACT_EXE;
-            tx.data = [{ method: 'transfer', inputs: [wallet.address, `0`] }];
+            tx.data = [{ method: 'transfer', inputs: [BywiseHelper.ZERO_ADDRESS, `1000000000000000000`] }];
             tx.foreignKeys = [];
             tx.created = helper.getNow();
             tx.fee = '0';
@@ -934,6 +949,121 @@ describe('stress testing', () => {
             output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
             expect(output.error).toEqual(undefined);
         }
+
+        uptime = (new Date().getTime() - uptime) / 1000;
+        expect(uptime).toBeLessThan(3);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "balanceOf", inputs: [wallet.address] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("4900000000000000000000");
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "balanceOf", inputs: [BywiseHelper.ZERO_ADDRESS] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("100000000000000000000");
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 30000);
+
+    test('contract transactions - BigInt', async () => {
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        const ctx = transactionsProvider.createContext(blockTree, currentMinnedBlock.hash, currentMinnedBlock.height + 1);
+
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+        let tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCodeV2 }
+        );
+        let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "balanceOf", inputs: [wallet.address] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("5000000000000000000000");
+
+        let uptime = new Date().getTime();
+
+        for (let i = 0; i < 100; i++) {
+            tx = new Tx();
+            tx.chain = chain;
+            tx.version = "2";
+            tx.from = [wallet.address];
+            tx.to = [contractAddress];
+            tx.amount = ['0'];
+            tx.type = TxType.TX_CONTRACT_EXE;
+            tx.data = [{ method: 'transfer', inputs: [BywiseHelper.ZERO_ADDRESS, `1000000000000000000`] }];
+            tx.foreignKeys = [];
+            tx.created = helper.getNow();
+            tx.fee = '0';
+            tx.hash = tx.toHash();
+            tx.sign = [''];
+
+            output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+            expect(output.error).toEqual(undefined);
+        }
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "balanceOf", inputs: [wallet.address] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("4900000000000000000000");
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "balanceOf", inputs: [BywiseHelper.ZERO_ADDRESS] }]
+        );
+        tx.isValid();
+        output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(output.error).toEqual(undefined);
+        expect(output.output).toEqual("100000000000000000000");
 
         uptime = (new Date().getTime() - uptime) / 1000;
         expect(uptime).toBeLessThan(3);
