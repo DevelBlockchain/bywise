@@ -1,7 +1,7 @@
 import { Block, Slice, SliceData, Tx, TxType } from "@bywise/web3";
 import { RequestKeys } from "../datasource/message-queue";
 import { BlockchainStatus, CoreContext, SimulateDTO, TransactionOutputDTO } from "../types";
-import { BlockTree, EnvironmentContext } from "../types/environment.types";
+import { BlockTree, CompiledContext } from "../types/environment.types";
 import helper from "../utils/helper";
 import PipelineChain from "./pipeline-chain.core";
 import { Slices } from "../models";
@@ -84,8 +84,8 @@ export default class MintSlices {
         let outputs: TransactionOutputDTO[] = [];
         let newTransactions: string[] = [];
         let transactionsData: SliceData[] = [];
-        await this.environmentProvider.consolide(this.coreContext.blockTree, lastSliceHash);
-        const ctx = this.transactionsProvider.createContext(this.coreContext.blockTree, EnvironmentContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
+        await this.environmentProvider.consolide(this.coreContext.blockTree, lastSliceHash, CompiledContext.SLICE_MINT_CONTEXT_HASH);
+        const ctx = this.transactionsProvider.createContext(this.coreContext.blockTree, CompiledContext.SLICE_MINT_CONTEXT_HASH, currentMinnedBlock.height + 1);
         ctx.enableReadProxy = true;
         ctx.enableWriteProxy = true;
 

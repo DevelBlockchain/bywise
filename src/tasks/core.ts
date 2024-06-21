@@ -118,7 +118,7 @@ class Core implements Task {
         });
         this.applicationContext.mq.addRequestListener(RequestKeys.test_connection, async (message: any) => {
             let isConnected = await this.network.web3.network.testConnections();
-            if(!isConnected) {
+            if (!isConnected) {
                 await this.network.web3.network.tryConnection();
             }
             return isConnected;
@@ -146,6 +146,22 @@ class Core implements Task {
             const pipelineChain = this.runChains.get(data.chain);
             if (pipelineChain) {
                 return await pipelineChain.executeTransactionsTask.getContract(data.address);
+            } else {
+                throw new Error(`Node does not work with this chain`);
+            }
+        });
+        this.applicationContext.mq.addRequestListener(RequestKeys.get_events, async (data: { chain: string, contractAddress: string, eventName: string, page: number }) => {
+            const pipelineChain = this.runChains.get(data.chain);
+            if (pipelineChain) {
+                return await pipelineChain.executeTransactionsTask.getEvents(data.contractAddress, data.eventName, data.page);
+            } else {
+                throw new Error(`Node does not work with this chain`);
+            }
+        });
+        this.applicationContext.mq.addRequestListener(RequestKeys.get_events_by_key, async (data: { chain: string, contractAddress: string, eventName: string, key: string, value: string, page: number }) => {
+            const pipelineChain = this.runChains.get(data.chain);
+            if (pipelineChain) {
+                return await pipelineChain.executeTransactionsTask.getEventsByKey(data.contractAddress, data.eventName, data.key, data.value, data.page);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }

@@ -3,7 +3,7 @@ import { VirtualMachineProvider } from './virtual-machine.service';
 import { Tx, TxType, Wallet, SliceData } from '@bywise/web3';
 import { ApplicationContext } from '../types/task.type';
 import { WalletProvider } from './wallet.service';
-import { BlockTree, EnvironmentContext } from '../types/environment.types';
+import { BlockTree, CompiledContext, EnvironmentContext } from '../types/environment.types';
 import { RoutingKeys } from '../datasource/message-queue';
 import { Transaction } from '../models';
 
@@ -21,8 +21,8 @@ export class TransactionsProvider {
     this.walletProvider = new WalletProvider(applicationContext);
   }
 
-  createContext(blockTree: BlockTree, lastContextHash: string, blockHeight: number) {
-    const envContext = new EnvironmentContext(blockTree, blockHeight, lastContextHash);
+  createContext(blockTree: BlockTree, contextHash: CompiledContext, blockHeight: number) {
+    const envContext = new EnvironmentContext(blockTree, blockHeight, contextHash);
     return new SimulateDTO(envContext);
   }
 

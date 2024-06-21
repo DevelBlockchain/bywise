@@ -21,6 +21,8 @@ export enum RequestKeys {
     get_contract = 'get_contract',
     get_info_wallet = 'get_info_wallet',
     get_confirmed_slices = 'get_confirmed_slices',
+    get_events = 'get_events',
+    get_events_by_key = 'get_events_by_key',
     simulate_tx = 'simulate_tx',
     db_save = 'db_save',
     db_save_many = 'db_save_many',

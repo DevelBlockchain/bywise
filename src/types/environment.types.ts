@@ -218,19 +218,23 @@ export class BlockTree {
     }
 }
 
-export class EnvironmentContext {
-    public static readonly MAIN_CONTEXT_HASH = 'main_context';
+export enum CompiledContext {
+    MAIN_CONTEXT_HASH = 'main_context',
+    SLICE_CONTEXT_HASH = 'slice_context',
+    SLICE_MINT_CONTEXT_HASH = 'slice_mint_context',
+}
 
+export class EnvironmentContext {
     public blockTree: BlockTree;
     public blockHeight: number;
-    public fromContextHash: string;
+    public fromContextHash: CompiledContext;
     public executedContracts: Map<string, BywiseRuntimeInstance> = new Map();
     public setMainKeys: Map<string, Environment> = new Map();
     public getMainKeys: Map<string, Environment> = new Map();
     public setStageKeys: Map<string, Environment> = new Map();
     public getStageKeys: Map<string, Environment> = new Map();
 
-    constructor(blockTree: BlockTree, blockHeight: number, fromContextHash: string) {
+    constructor(blockTree: BlockTree, blockHeight: number, fromContextHash: CompiledContext) {
         this.blockTree = blockTree;
         this.blockHeight = blockHeight;
         this.fromContextHash = fromContextHash;

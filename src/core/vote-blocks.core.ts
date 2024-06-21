@@ -28,14 +28,14 @@ export default class VoteBlocks {
         }
         this.blockHeight = currentBlock.height;
 
-        const isMinner = await this.coreContext.configsProvider.isSlowValidator(this.coreContext.blockTree, currentBlock.hash, currentBlock.height, mainWallet.address);
+        const isMinner = await this.coreContext.configsProvider.isValidatorFromMainContext(this.coreContext.blockTree, currentBlock.height, mainWallet.address);
         if (!isMinner) {
             this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
             this.isRun = false;
             return;
         }
-        const minValue = await this.coreContext.configsProvider.getSlowConfigByName(this.coreContext.blockTree, currentBlock.hash, currentBlock.height, 'min-bws-block');
-        const balanceDTO = await this.coreContext.walletProvider.getSlowWalletBalance(this.coreContext.blockTree, currentBlock.hash, mainWallet.address);
+        const minValue = await this.coreContext.configsProvider.getConfigByNameFromMainContext(this.coreContext.blockTree, currentBlock.height, 'min-bws-block');
+        const balanceDTO = await this.coreContext.walletProvider.getWalletBalanceFromMainContext(this.coreContext.blockTree, mainWallet.address);
         if (balanceDTO.balance.isLessThan(new BigNumber(minValue.value))) {
             return;
         }
