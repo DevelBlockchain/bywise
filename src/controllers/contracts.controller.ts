@@ -20,7 +20,7 @@ export default async function contractsController(app: express.Express, apiConte
         type: 'post',
         controller: 'ContractsController',
         description: 'Simulate enviroment',
-        security: false,
+        securityType: ['node'],
         body: {
             type: 'object',
             properties: [
@@ -162,7 +162,7 @@ export default async function contractsController(app: express.Express, apiConte
         type: 'get',
         controller: 'ContractsController',
         description: 'Get contract by address',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'address', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
@@ -196,7 +196,7 @@ export default async function contractsController(app: express.Express, apiConte
         type: 'get',
         controller: 'ContractsController',
         description: 'Get contract events',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'contractAddress', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },

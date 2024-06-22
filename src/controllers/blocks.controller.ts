@@ -13,7 +13,7 @@ export default async function blocksController(app: express.Express, apiContext:
         type: 'get',
         controller: 'BlocksController',
         description: 'Count blocks',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'status', in: 'query', pattern: /^mined|mempool|invalidated$/ },
@@ -45,7 +45,7 @@ export default async function blocksController(app: express.Express, apiContext:
         type: 'get',
         controller: 'BlocksController',
         description: 'Get blocks list',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'limit', in: 'query', pattern: /^[0-9]+$/ },
@@ -92,7 +92,7 @@ export default async function blocksController(app: express.Express, apiContext:
         type: 'get',
         controller: 'BlocksController',
         description: 'Get blocks list',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'height', in: 'path', pattern: /^[0-9]+$/ },
@@ -124,7 +124,7 @@ export default async function blocksController(app: express.Express, apiContext:
         type: 'get',
         controller: 'BlocksController',
         description: 'Get block by hash',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
         ],
@@ -147,7 +147,7 @@ export default async function blocksController(app: express.Express, apiContext:
         type: 'get',
         controller: 'BlocksController',
         description: 'Get slice by block hash',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
         ],
@@ -179,7 +179,7 @@ export default async function blocksController(app: express.Express, apiContext:
         type: 'get',
         controller: 'BlocksController',
         description: 'Get mined block with all slices and transactions by height',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'height', in: 'path', pattern: /^[0-9]{1,10}$/ },
@@ -219,7 +219,7 @@ export default async function blocksController(app: express.Express, apiContext:
         type: 'post',
         controller: 'BlocksController',
         description: 'Insert new block',
-        security: false,
+        securityType: ['node'],
         body: {
             $ref: SCHEMA_TYPES.BlockDTO
         },

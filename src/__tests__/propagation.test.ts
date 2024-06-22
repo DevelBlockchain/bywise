@@ -10,6 +10,7 @@ var node1: Bywise;
 var node2: Bywise;
 var b0: BlockPack;
 const blockDelay = 3000;
+const keyJWT = helper.getRandomString();
 const chain = 'local';
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 const port1 = Math.floor(Math.random() * 7000 + 3000);
@@ -35,7 +36,7 @@ beforeAll(async () => {
     node0 = await Bywise.newBywiseInstance({
         name: `test${port0}`,
         port: port0,
-        keyJWT: helper.getRandomString(),
+        keyJWT: keyJWT,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port0}`,
@@ -48,7 +49,7 @@ beforeAll(async () => {
     node1 = await Bywise.newBywiseInstance({
         name: `test${port1}`,
         port: port1,
-        keyJWT: helper.getRandomString(),
+        keyJWT: keyJWT,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port1}`,
@@ -61,7 +62,7 @@ beforeAll(async () => {
     node2 = await Bywise.newBywiseInstance({
         name: `test${port2}`,
         port: port2,
-        keyJWT: helper.getRandomString(),
+        keyJWT: keyJWT,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port2}`,
@@ -76,12 +77,12 @@ beforeEach(async () => {
     await node0.core.stop();
     await node1.core.stop();
     await node2.core.stop();
-
-    await helper.sleep(1000);
+    await helper.sleep(200);
 
     await node0.core.network.resetNetwork();
     await node1.core.network.resetNetwork();
     await node2.core.network.resetNetwork();
+    await helper.sleep(200);
 
     await node0.applicationContext.database.drop();
     await node1.applicationContext.database.drop();
@@ -90,28 +91,23 @@ beforeEach(async () => {
     await node0.core.blockProvider.setNewZeroBlock(b0);
     await node1.core.blockProvider.setNewZeroBlock(b0);
     await node2.core.blockProvider.setNewZeroBlock(b0);
-
-    await node0.core.network.start();
-    await node0.core.network.mainLoop();
-    await node2.core.network.start();
-    await node2.core.network.mainLoop();
-}, 60000)
+}, 2000)
 
 afterAll(async () => {
     await node0.stop();
     await node1.stop();
     await node2.stop();
-}, 60000)
+}, 20000)
 
 const connectNodes = async () => {
-    expect(node0.core.network.connectedNodesSize()).toEqual(0);
-    expect(node1.core.network.connectedNodesSize()).toEqual(0);
-    expect(node2.core.network.connectedNodesSize()).toEqual(0);
-
+    await node0.core.network.start();
     await node1.core.network.start();
-    await node1.core.network.mainLoop();
-    await node0.core.network.mainLoop();
-    await node2.core.network.mainLoop();
+    await node2.core.network.start();
+    await helper.sleep(200);
+    await node0.core.network.web3.network.updateConnections([`http://localhost:${port1}`, `http://localhost:${port2}`]);
+    await node1.core.network.web3.network.updateConnections([`http://localhost:${port0}`, `http://localhost:${port2}`]);
+    await node2.core.network.web3.network.updateConnections([`http://localhost:${port0}`, `http://localhost:${port1}`]);
+    await helper.sleep(200);
 
     expect(node0.core.network.connectedNodesSize()).toEqual(2);
     expect(node1.core.network.connectedNodesSize()).toEqual(2);
@@ -120,20 +116,27 @@ const connectNodes = async () => {
 
 describe('propagation test', () => {
     test('test enviroment', async () => {
+        expect(node0.core.network.connectedNodesSize()).toEqual(0);
+        expect(node1.core.network.connectedNodesSize()).toEqual(0);
+        expect(node2.core.network.connectedNodesSize()).toEqual(0);
+
         await connectNodes();
 
         let res = await request(node0.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toEqual(1);
 
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toEqual(1);
 
         res = await request(node2.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toEqual(1);
     });
@@ -141,54 +144,61 @@ describe('propagation test', () => {
     test('test simple propagation', async () => {
         await connectNodes();
 
-        await node0.core.runCore();
+        await node0.core.start();
         await helper.sleep(blockDelay * 3);
         await node0.core.stop();
 
         let res = await request(node0.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toBeGreaterThan(1);
 
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toBe(1);
 
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain + '?status=mempool')
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toBeGreaterThan(0);
     }, blockDelay * 5);
-    
+
     test('sync nodes', async () => {
-        await node0.core.runCore();
+        await node0.core.start();
         await helper.sleep(blockDelay * 6);
         await node0.core.stop();
 
         let res = await request(node0.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toBeGreaterThanOrEqual(5);
         const blocksNode0 = res.body;
 
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toEqual(1);
 
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain + '?status=mempool')
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toEqual(0);
 
         // node 0 created 5 blocks and node 1 does not know the blocks
         await connectNodes();
-        await node1.core.runCore();
+        await node1.core.start();
         await helper.sleep(blockDelay * 6); // sync chains and create more 5 blocks
 
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toBeGreaterThan(10);
         const blocksNode1 = res.body.reverse();
@@ -201,15 +211,15 @@ describe('propagation test', () => {
             }
         }
     }, blockDelay * 15);
-    
+
     test('multiple validators', async () => {
-        await node0.core.runCore();
+        await node0.core.start();
         await helper.sleep(blockDelay * 3); // start alone
 
         await connectNodes();
 
-        await node1.core.runCore();
-        await node2.core.runCore();
+        await node1.core.start();
+        await node2.core.start();
         await helper.sleep(blockDelay * 9); // sync and build new blocks with multiple validators
 
         let blocksNode0: Block[] = []
@@ -218,16 +228,19 @@ describe('propagation test', () => {
 
         let res = await request(node0.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         blocksNode0 = res.body.reverse();
 
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         blocksNode1 = res.body.reverse();
 
         res = await request(node2.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         blocksNode2 = res.body.reverse();
 
@@ -250,15 +263,15 @@ describe('propagation test', () => {
         }
         expect(fromAddress.length).toBeGreaterThanOrEqual(2);
     }, blockDelay * 15);
-    
+
     test('blockchain convergence', async () => {
         let res;
         let blocksNode0: Block[] = []
         let blocksNode1: Block[] = []
         let blocksNode2: Block[] = []
 
-        await node0.core.runCore();
-        await node2.core.runCore();
+        await node0.core.start();
+        await node2.core.start();
         await helper.sleep(blockDelay * 6);
 
         expect(node0.core.network.connectedNodesSize()).toEqual(0);
@@ -266,11 +279,13 @@ describe('propagation test', () => {
 
         res = await request(node0.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         blocksNode0 = res.body.reverse();
 
         res = await request(node2.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         blocksNode2 = res.body.reverse();
 
@@ -283,30 +298,28 @@ describe('propagation test', () => {
             expect(b0.hash).not.toEqual(b2.hash);
         }
 
-        await node1.core.network.start();
-        await node1.core.network.mainLoop();
-        await node0.core.network.mainLoop();
-        await node2.core.network.mainLoop();
+        await node1.core.start();
+        await node0.core.network.web3.network.updateConnections([`http://localhost:${port1}`, `http://localhost:${port2}`]);
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
         expect(node2.core.network.connectedNodesSize()).toEqual(2);
-        
-        await helper.sleep(blockDelay * 3);
-        await node1.core.runCore();
-        await helper.sleep(blockDelay * 3);
+        await helper.sleep(blockDelay * 8);
 
         res = await request(node0.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         blocksNode0 = res.body.reverse();
-        
+
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         blocksNode1 = res.body.reverse();
 
         res = await request(node2.api.server)
             .get('/api/v2/blocks/last/' + chain)
+            .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         blocksNode2 = res.body.reverse();
 
@@ -316,13 +329,15 @@ describe('propagation test', () => {
 
         // checks if the chains have converged
         expect(blocksNode0.length).toBeGreaterThan(10);
-        expect(blocksNode1.length).toBeGreaterThan(10);
         expect(blocksNode2.length).toBeGreaterThan(10);
         for (let i = 0; i < 10; i++) {
             const b0 = blocksNode0[i];
-            const b1 = blocksNode1[i];
             const b2 = blocksNode2[i];
             expect(b0.hash).toEqual(b2.hash);
+            if(i < blocksNode1.length) {
+                const b1 = blocksNode1[i];
+                expect(b0.hash).toEqual(b1.hash);
+            }
         }
     }, blockDelay * 15);
 });

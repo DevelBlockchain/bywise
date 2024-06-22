@@ -15,7 +15,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'get',
         controller: 'TransactionsController',
         description: 'Count transactions',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'searchBy', in: 'query', pattern: /^address|from|to|key|status$/ },
@@ -87,7 +87,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'get',
         controller: 'TransactionsController',
         description: 'Get transactions list',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'searchBy', in: 'query', pattern: /^address|from|to|key|status$/ },
@@ -164,7 +164,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'get',
         controller: 'TransactionsController',
         description: 'Get transaction by hash',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
         ],
@@ -188,7 +188,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'post',
         controller: 'TransactionsController',
         description: 'Calculate transaction fee',
-        security: false,
+        securityType: ['node'],
         body: {
             type: 'object',
             properties: [
@@ -229,7 +229,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'post',
         controller: 'TransactionsController',
         description: 'Insert new transactions',
-        security: false,
+        securityType: ['node'],
         body: {
             $ref: SCHEMA_TYPES.TxDTO
         },

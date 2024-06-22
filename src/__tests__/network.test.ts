@@ -8,6 +8,7 @@ var bywise: Bywise;
 var test1: Bywise;
 var test2: Bywise;
 var authProvide: AuthProvider;
+const keyJWT = helper.getRandomString();
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 const port1 = Math.floor(Math.random() * 7000 + 3000);
 const port2 = Math.floor(Math.random() * 7000 + 3000);
@@ -16,7 +17,7 @@ beforeAll(async () => {
     bywise = await Bywise.newBywiseInstance({
         name: `test${port0}`,
         port: port0,
-        keyJWT: helper.getRandomString(),
+        keyJWT: keyJWT,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port0}`,
@@ -76,7 +77,6 @@ describe('node connect', () => {
         expect(bywise.core.network.web3.network.isConnected).toEqual(false);
 
         await bywise.core.network.start();
-        await bywise.core.network.mainLoop();
 
         const nodesSize = bywise.core.network.connectedNodesSize();
         expect(nodesSize).toEqual(0);
@@ -125,8 +125,8 @@ describe('node connect', () => {
             address: test1.applicationContext.mainWallet.address,
             host: `http://127.0.0.1:${port0}`,
             version: '2',
-            expire: Math.floor((new Date().getTime() + 10 * 60 * 1000) / 1000),
-            token: await authProvide.createNodeToken(),
+            expire: Math.floor((new Date().getTime() + 60 * 1000) / 1000),
+            token: await authProvide.createNodeToken(60),
         });
         const res = await request(bywise.api.server)
             .post('/api/v2/nodes/handshake')
@@ -173,12 +173,19 @@ describe('client connect', () => {
             .set('authorization', `Node ${helper.getRandomString()}`);
         expect(res.status).toEqual(401);
     });
+    
+    test('tryToken default token', async () => {
+        let res = await request(bywise.api.server)
+            .get('/api/v2/nodes/try-token')
+            .set('authorization', `Node ${keyJWT}`);
+        expect(res.status).toEqual(200);
+    });
 })
 
 describe('client network discovery', () => {
 
     beforeEach(async () => {
-        await bywise.core.network.mainLoop();
+        await bywise.core.network.start();
 
         const nodesSize = bywise.core.network.connectedNodesSize();
         expect(nodesSize).toEqual(0);
@@ -207,19 +214,19 @@ describe('node network discovery', () => {
         expect(test1.core.network.connectedNodesSize()).toEqual(0);
         expect(test2.core.network.connectedNodesSize()).toEqual(0);
         
-        await test1.core.network.mainLoop(); // test1 connect with test2
+        await test1.core.network.start(); // test1 connect with test2
         
         expect(bywise.core.network.connectedNodesSize()).toEqual(0);
         expect(test1.core.network.connectedNodesSize()).toEqual(1);
         expect(test2.core.network.connectedNodesSize()).toEqual(1);
         
-        await test2.core.network.mainLoop(); // test2 connect with bywise
+        await test2.core.network.start(); // test2 connect with bywise
         
         expect(bywise.core.network.connectedNodesSize()).toEqual(1);
         expect(test1.core.network.connectedNodesSize()).toEqual(1);
         expect(test2.core.network.connectedNodesSize()).toEqual(2);
         
-        await bywise.core.network.mainLoop(); // bywise connect with test2 -> test1
+        await bywise.core.network.start(); // bywise connect with test2 -> test1
         
         expect(bywise.core.network.connectedNodesSize()).toEqual(2);
         expect(test1.core.network.connectedNodesSize()).toEqual(2);

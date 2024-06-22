@@ -15,7 +15,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'get',
         controller: 'SlicesController',
         description: 'Count slices',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'status', in: 'query', pattern: /^mined|mempool|invalidated$/ },
@@ -52,7 +52,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'get',
         controller: 'SlicesController',
         description: 'Get slices list',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'limit', in: 'query', pattern: /^[0-9]+$/ },
@@ -104,7 +104,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'get',
         controller: 'SlicesController',
         description: 'Get slice by hash',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
         ],
@@ -127,7 +127,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'get',
         controller: 'SlicesController',
         description: 'Get slice by hash',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
         ],
@@ -159,7 +159,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'post',
         controller: 'SlicesController',
         description: 'Insert new slice',
-        security: false,
+        securityType: ['node'],
         body: {
             $ref: SCHEMA_TYPES.SliceDTO
         },
