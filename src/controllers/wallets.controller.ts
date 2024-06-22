@@ -12,7 +12,7 @@ export default async function walletsController(app: express.Express, apiContext
         type: 'get',
         controller: 'WalletsController',
         description: 'Get address info by chain',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'address', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },

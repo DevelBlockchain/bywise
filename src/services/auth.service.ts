@@ -10,17 +10,16 @@ export default class AuthProvider {
         this.JWT = applicationContext.keyJWT;
     }
 
-    async createNodeToken(): Promise<string> {
+    async createNodeToken(expiresInSeconds: number): Promise<string> {
         return await this.createJWTToken({
             type: 'node',
             id: ''
-        }, 10 * 60 * 60 * 1000);
+        }, expiresInSeconds);
     }
 
     async createJWTToken(info: TokenInfo, expiresInSeconds: number): Promise<string> {
         return jwt.sign({
             ...info,
-            //iat: (Math.floor(Date.now() / 1000) - 30)
         }, this.JWT, {
             expiresIn: expiresInSeconds,
         });
@@ -28,6 +27,12 @@ export default class AuthProvider {
 
     async checkJWT(token: string): Promise<TokenInfo | null> {
         try {
+            if (token === this.JWT) {
+                return {
+                    type: 'node',
+                    id: ''
+                }
+            }
             const decode: any = jwt.verify(token, this.JWT);
             if (!decode) return null;
             return decode;

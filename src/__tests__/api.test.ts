@@ -72,7 +72,7 @@ describe('Tests before signup', () => {
             .set('authorization', `Bearer ${helper.getRandomString()}`);
         expect(res.status).toEqual(401);
         const expected = {
-            error: "Token invalid",
+            error: "Token expired",
         };
         expect(res.body).toEqual(expected);
     });
@@ -82,7 +82,7 @@ describe('Tests before signup', () => {
 
         const res = await request(bywise.api.server)
             .get('/api/v2/auth/me')
-            .set('authorization', `Bearer ${await authProvider.createNodeToken()}`);
+            .set('authorization', `Bearer ${await authProvider.createNodeToken(60)}`);
         expect(res.status).toEqual(200);
     });
 })

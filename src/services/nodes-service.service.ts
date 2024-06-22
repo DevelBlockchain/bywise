@@ -6,6 +6,8 @@ import { ChainsProvider } from './chains.service';
 import { WalletProvider } from './wallet.service';
 const pjson = require('./../../package.json');
 
+const EXPIRE = 240; // SECONDS
+
 export class NodesProvider {
 
   private authProvider;
@@ -21,14 +23,14 @@ export class NodesProvider {
   }
 
   createMyNode = async (): Promise<BywiseNode> => {
-    let token = await this.authProvider.createNodeToken();
+    let token = await this.authProvider.createNodeToken(EXPIRE);
     let account = await this.walletProvider.getMainWallet();
     let myNode = new BywiseNode({
       chains: await this.chainsProvider.getChains(),
       address: account.address,
       host: this.applicationContext.myHost,
       version: pjson.version,
-      expire: helper.getNow() + 10 * 60,
+      expire: helper.getNow() + EXPIRE / 2,
       token: token,
     });
     return myNode;
