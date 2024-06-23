@@ -80,9 +80,18 @@ export default class BlockchainBywise implements BlockchainInterface {
         for (let j = 0; j < entries.length; j++) {
             const [entryKey, entryValue] = entries[j];
             if (!/^[a-zA-Z0-9_]{1,64}$/.test(entryKey)) throw new Error(`BVM: invalid event key - "${entryKey}"`);
-            if (typeof entryValue !== 'string') throw new Error(`BVM: invalid event typeof - "${typeof entryValue}"`);
-            if (!/^[a-zA-Z0-9_\.]{1,64}$/.test(entryValue)) throw new Error(`BVM: invalid event value - "${entryValue}"`);
-            eventEntries.push({ key: entryKey, value: entryValue });
+            if (Array.isArray(entryValue)) {
+                for (let i = 0; i < entryValue.length; i++) {
+                    const value = entryValue[i];
+                    if (typeof value !== 'string') throw new Error(`BVM: invalid event typeof - "${typeof entryValue}"`);
+                    if (!/^[a-zA-Z0-9_\.]{1,64}$/.test(value)) throw new Error(`BVM: invalid event value - "${entryValue}"`);
+                    eventEntries.push({ key: entryKey, value: value });
+                }
+            } else {
+                if (typeof entryValue !== 'string') throw new Error(`BVM: invalid event typeof - "${typeof entryValue}"`);
+                if (!/^[a-zA-Z0-9_\.]{1,64}$/.test(entryValue)) throw new Error(`BVM: invalid event value - "${entryValue}"`);
+                eventEntries.push({ key: entryKey, value: entryValue });
+            }
         }
         const event: TransactionEvent = {
             contractAddress: tx.contractAddress,
