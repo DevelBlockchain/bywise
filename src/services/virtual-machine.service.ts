@@ -92,6 +92,7 @@ export class VirtualMachineProvider {
     if (tx.type === TxType.TX_CONTRACT) {
       const contractAddress = tx.data.contractAddress;
       const code = tx.data.code;
+      ctx.feeCostType = parseInt((await this.configsProvider.getByName(ctx.envContext, 'feeCostType')).value);
 
       if (typeof code !== 'string') throw new Error(`invalid code`);
       if (typeof contractAddress !== 'string') throw new Error(`invalid address`);
@@ -116,7 +117,11 @@ export class VirtualMachineProvider {
         contractAddress: contractAddress,
         abi: bcc.abi
       }
+      if(ctx.feeCostType == 0) {
+        ctx.output.cost = 0;
+      }
     } else if (tx.type === TxType.TX_CONTRACT_EXE) {
+      ctx.feeCostType = parseInt((await this.configsProvider.getByName(ctx.envContext, 'feeCostType')).value);
 
       for (let i = 0; i < tx.to.length; i++) {
         const to = tx.to[i];
@@ -127,6 +132,10 @@ export class VirtualMachineProvider {
           if (!contract.payable && !(new BigNumber(tx.amount[i])).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
           ctx.output.output = await BywiseRuntime.execInContract(this.blockchainBywise, getContract, ctx, to, contract.bcc, tx.from[0], tx.amount[i], contract.code);
         }
+      }
+
+      if(ctx.feeCostType == 0) {
+        ctx.output.cost = 0;
       }
     } else if (tx.type === TxType.TX_COMMAND) {
       let cmd = new CommandDTO(tx.data);

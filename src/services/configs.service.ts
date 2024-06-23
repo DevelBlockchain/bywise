@@ -82,6 +82,12 @@ export class ConfigProvider {
       value: "0",
       type: "number"
     }))
+    configs.push(new ConfigDTO({
+      chain: '',
+      name: "feeCostType",
+      value: "0",
+      type: "number"
+    }))
     return configs;
   }
 

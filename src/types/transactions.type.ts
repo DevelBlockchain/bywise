@@ -80,6 +80,7 @@ export class SimulateDTO {
   totalFee: BigNumber = new BigNumber(0);
   sliceFrom: string = '';
   nonce: number = 0;
+  feeCostType: number = 0;
   checkWalletBalance: boolean = true;
   enableWriteProxy: boolean = false;
   enableReadProxy: boolean = false;
