@@ -362,8 +362,8 @@ export class BlocksProvider {
       sliceInfo = await this.slicesProvider.syncSliceByHash(blockTree, slice.hash);
       await this.slicesProvider.executeCompleteSlice(blockTree, lastContextHash, sliceInfo);
 
-      await this.environmentProvider.mergeContext(blockTree.chain, slice.hash, CompiledContext.SLICE_MINT_CONTEXT_HASH);
-      await this.environmentProvider.setLastConsolidatedContextHash(blockTree, slice.hash, CompiledContext.SLICE_MINT_CONTEXT_HASH);
+      await this.environmentProvider.mergeContext(blockTree.chain, slice.hash, CompiledContext.SLICE_CONTEXT_HASH);
+      await this.environmentProvider.setLastConsolidatedContextHash(blockTree, slice.hash, CompiledContext.SLICE_CONTEXT_HASH);
       lastContextHash = slice.hash;
     }
 
@@ -371,7 +371,7 @@ export class BlocksProvider {
     await this.syncBlockByHash(blockTree, blockPack.block.hash);
     await this.executeCompleteBlockByHash(blockTree, blockPack.block.hash);
     await this.selectMinedBlock(blockTree, blockPack.block.hash);
-    await this.environmentProvider.setLastConsolidatedContextHash(blockTree, blockPack.block.hash, CompiledContext.SLICE_MINT_CONTEXT_HASH);
+    await this.environmentProvider.setLastConsolidatedContextHash(blockTree, blockPack.block.hash, CompiledContext.SLICE_CONTEXT_HASH);
   }
 
   async getBlockTree(chain: string) {
