@@ -27,6 +27,7 @@ beforeAll(async () => {
     const nodeWallet = new Wallet();
     b0 = await helper.createNewBlockZero(chain, nodeWallet, [
         ChainConfig.setConfig('blockTime', `30`),
+        ChainConfig.setConfig('feeCostType', `1`),
         ChainConfig.addAdmin(wallet.address),
         ChainConfig.addAdmin(nodeWallet.address),
         ChainConfig.addValidator(nodeWallet.address),
@@ -53,7 +54,6 @@ beforeAll(async () => {
 beforeEach(async () => {
     await bywise.applicationContext.database.drop();
     await bywise.core.blockProvider.setNewZeroBlock(b0);
-    await helper.sleep(500);
 }, 60000)
 
 afterAll(async () => {
@@ -372,6 +372,7 @@ describe('contracts', () => {
 
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
@@ -398,6 +399,7 @@ describe('contracts', () => {
     test('contract call other contracs', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         const saveValueContract = BywiseHelper.getBWSAddressContract();
@@ -500,6 +502,7 @@ describe('contracts', () => {
     test('contract events', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         const contractAddress = BywiseHelper.getBWSAddressContract();
@@ -576,6 +579,7 @@ describe('contracts', () => {
 
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
@@ -628,6 +632,7 @@ describe('contracts', () => {
 
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let output = await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
@@ -685,6 +690,7 @@ describe('contracts', () => {
 
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
@@ -785,6 +791,7 @@ describe('contracts', () => {
 
         const blockTree = await blocksProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
