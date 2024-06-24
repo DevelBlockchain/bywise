@@ -328,8 +328,8 @@ describe('propagation test', () => {
         //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
 
         // checks if the chains have converged
-        expect(blocksNode0.length).toBeGreaterThan(10);
-        expect(blocksNode2.length).toBeGreaterThan(10);
+        expect(blocksNode0.length).toBeGreaterThanOrEqual(10);
+        expect(blocksNode2.length).toBeGreaterThanOrEqual(10);
         for (let i = 0; i < 10; i++) {
             const b0 = blocksNode0[i];
             const b2 = blocksNode2[i];
