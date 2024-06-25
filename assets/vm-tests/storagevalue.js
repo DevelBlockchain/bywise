@@ -1,7 +1,7 @@
 import { StorageValue, StorageMap, StorageList } from 'bywise-utils.js';
 
 function test(name, expected, received) {
-    if (expected !== received) throw new Error(`Failed test ${name} - expected: "${expected}" - received: "${received}"`)
+    if (expected !== received) throw `Failed test ${name} - expected: "${expected}" - received: "${received}"`
 }
 
 const value = new StorageValue();

@@ -1,13 +1,16 @@
-import { BywiseHelper, Tx } from "@bywise/web3";
-import { Events } from "../models";
-import { BlockchainStatus, CoreContext, SimulateDTO } from "../types";
+import { Tx } from "@bywise/web3";
+import { CoreContext, SimulateDTO } from "../types";
 import helper from "../utils/helper";
+import { CompiledContext } from "../types/environment.types";
+
+const EVENT_PAGE_SIZE = 100;
 
 export default class ExecuteTransactions {
     public isRun = true;
     public busy = false;
     private coreContext;
-    private lastHash = '';
+    private currentHash = '';
+    private nextBlockHeight = -1;
     private currentContext: SimulateDTO | undefined;
 
     constructor(coreContext: CoreContext) {
@@ -16,88 +19,50 @@ export default class ExecuteTransactions {
 
     private async waitBusy() {
         while (this.busy) {
-            await helper.sleep(0);
+            await helper.sleep(10);
         }
         this.busy = true;
     }
 
     async run() {
+        let currentHash = this.coreContext.blockTree.getLastContextHash();
+
+        if (this.currentHash == currentHash) {
+            return;
+        }
+
+        this.currentHash = currentHash;
+        this.nextBlockHeight = this.coreContext.blockTree.currentMinnedBlock.height + 1;
+
         await this.updateContext();
     }
 
     private async updateContext() {
-        const lastBlock = this.coreContext.lastBlock;
-        if (!lastBlock) throw new Error(`lastBlock block not found`);
+        this.coreContext.applicationContext.logger.verbose(`update main context - hash: ${this.currentHash.substring(0, 10)}...`);
 
-        let currentHash;
+        await this.coreContext.environmentProvider.consolide(this.coreContext.blockTree, this.currentHash, CompiledContext.MAIN_CONTEXT_HASH);
+        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, CompiledContext.MAIN_CONTEXT_HASH, this.nextBlockHeight);
 
-        const bestSlice = await this.coreContext.slicesProvider.getBestSlice(this.coreContext.blockTree, lastBlock.block);
-        if (bestSlice === null) {
-            currentHash = '';
-        } else {
-            currentHash = bestSlice.slice.hash;
+        await this.waitBusy();
+        const oldContext = this.currentContext;
+        this.currentContext = ctx;
+        if (oldContext) {
+            await this.coreContext.transactionsProvider.disposeContext(oldContext);
         }
-        if (this.lastHash !== currentHash) {
-            this.lastHash = currentHash;
-
-            this.coreContext.applicationContext.logger.info(`update main context`);
-
-
-            if (bestSlice) {
-                const constEvents: Events[] = [];
-                const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, lastBlock);
-                for (let i = 0; i < bestSlice.slice.transactions.length; i++) {
-                    const txHash = bestSlice.slice.transactions[i];
-                    const txInfo = ctx.blockTree.getTxInfo(txHash);
-                    if (txInfo) {
-                        const output = await this.coreContext.transactionsProvider.simulateTransaction(txInfo.tx, bestSlice.slice, ctx);
-
-                        for (let j = 0; j < output.events.length; j++) {
-                            const txEvent = output.events[j];
-                            const event: Events = {
-                                id: BywiseHelper.makeHash(Buffer.from(`${txInfo.tx.chain}-${txInfo.tx.hash}-${j}`, 'utf-8').toString('hex')),
-                                chain: txInfo.tx.chain,
-                                hash: txInfo.tx.hash,
-                                create: txInfo.tx.created,
-                                index: j,
-                                from: txEvent.from,
-                                event: txEvent.event,
-                                data: txEvent.data,
-                            }
-                            constEvents.push(event);
-                        }
-                        txInfo.status = BlockchainStatus.TX_CONFIRMED;
-                        txInfo.isExecuted = true;
-                        txInfo.slicesHash = bestSlice.slice.hash;
-                        txInfo.output = output;
-                        await this.coreContext.transactionsProvider.updateTransaction(txInfo);
-                    }
-                }
-                await this.waitBusy();
-                await this.coreContext.applicationContext.database.EventsRepository.save(constEvents);
-                const oldContext = this.currentContext;
-                this.currentContext = ctx;
-                this.coreContext.bestSlice = bestSlice;
-                if (oldContext) {
-                    await this.coreContext.transactionsProvider.disposeContext(oldContext);
-                }
-                this.busy = false;
-            }
-        }
+        this.busy = false;
     }
 
     async getContract(address: string) {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
-        const bestSlice = this.coreContext.bestSlice;
 
-        if (!currentContext || !bestSlice) {
+        if (!currentContext) {
             this.busy = false;
             throw new Error('currentContext not found')
         }
 
-        const bcc = await this.coreContext.environmentProvider.get(currentContext.blockTree, currentContext.block.hash, address);
+        const bcc = await this.coreContext.environmentProvider.get(currentContext.envContext, address);
 
         this.busy = false;
         return bcc;
@@ -107,15 +72,14 @@ export default class ExecuteTransactions {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
-        const bestSlice = this.coreContext.bestSlice;
 
-        if (!currentContext || !bestSlice) {
+        if (!currentContext) {
             this.busy = false;
             throw new Error('currentContext not found')
         }
 
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.blockTree, currentContext.block.hash, address);
-        const infoDTO = await this.coreContext.walletProvider.getWalletInfo(currentContext.blockTree, currentContext.block.hash, address);
+        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.envContext, address);
+        const infoDTO = await this.coreContext.walletProvider.getWalletInfo(currentContext.envContext, address);
 
         this.busy = false;
         return {
@@ -125,25 +89,70 @@ export default class ExecuteTransactions {
         };
     }
 
-    async executeSimulation(tx: Tx, simulateWallet: boolean) {
+    async executeSimulation(tx: Tx) {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
-        const bestSlice = this.coreContext.bestSlice;
 
-        if (!currentContext || !bestSlice) {
+        if (!currentContext) {
+            this.busy = false;
+            throw new Error('currentContext not found')
+        }
+        currentContext.checkWalletBalance = false;
+        currentContext.enableReadProxy = true;
+        const output = await this.coreContext.transactionsProvider.simulateTransaction(tx, {
+            from: helper.getRandomHash(),
+            transactionsData: []
+        }, currentContext);
+        currentContext.checkWalletBalance = true;
+        currentContext.enableReadProxy = false;
+        this.coreContext.environmentProvider.deleteCommit(currentContext.envContext);
+
+        this.busy = false;
+        return output;
+    }
+
+    async getEventsByKey(contractAddress: string, eventName: string, key: string, value: string, page: number) {
+        await this.waitBusy();
+
+        const currentContext = this.currentContext;
+        if (!currentContext) {
             this.busy = false;
             throw new Error('currentContext not found')
         }
 
-        await this.coreContext.transactionsProvider.createSubContext(currentContext);
-        currentContext.simulateWallet = simulateWallet;
-        currentContext.enableReadProxy = true;
-        const output = await this.coreContext.transactionsProvider.simulateTransaction(tx, bestSlice.slice, currentContext);
-        currentContext.enableReadProxy = false;
-        await this.coreContext.transactionsProvider.disposeSubContext(currentContext);
+        const size = await this.coreContext.eventsProvider.countEventsByKey(currentContext.envContext, contractAddress, eventName, key, value);
+        const offset = EVENT_PAGE_SIZE * page;
+        const events = await this.coreContext.eventsProvider.findByEventAndKey(currentContext.envContext, contractAddress, eventName, key, value, EVENT_PAGE_SIZE, offset);
 
-        this.busy = false;
-        return output;
+        return {
+            page,
+            per_pages: EVENT_PAGE_SIZE,
+            total_pages: Math.floor(size / EVENT_PAGE_SIZE),
+            total_events: Math.floor(size),
+            events
+        };
+    }
+
+    async getEvents(contractAddress: string, eventName: string, page: number) {
+        await this.waitBusy();
+
+        const currentContext = this.currentContext;
+        if (!currentContext) {
+            this.busy = false;
+            throw new Error('currentContext not found')
+        }
+
+        const size = await this.coreContext.eventsProvider.countEvents(currentContext.envContext, contractAddress, eventName);
+        const offset = EVENT_PAGE_SIZE * page;
+        const events = await this.coreContext.eventsProvider.findByEvent(currentContext.envContext, contractAddress, eventName, EVENT_PAGE_SIZE, offset);
+
+        return {
+            page,
+            per_pages: EVENT_PAGE_SIZE,
+            total_pages: Math.floor(size / EVENT_PAGE_SIZE),
+            total_events: Math.floor(size),
+            events
+        };
     }
 }

@@ -7,7 +7,6 @@ import { RoutingKeys } from '../datasource/message-queue';
 export default class Network implements Task {
 
     public isRun: boolean = false;
-    private mainLoopInterval: any;
     private nodeProvider: NodesProvider;
     private chainsProvider: ChainsProvider;
     private applicationContext: ApplicationContext;
@@ -26,26 +25,27 @@ export default class Network implements Task {
             createConnection: () => this.nodeProvider.createMyNode(),
             getChains: this.chainsProvider.getChains
         });
-
     }
 
     public mainLoop = async () => {
-        const nodesSize = this.web3.network.connectedNodes.length;
-        const connectedNodes = await this.web3.network.tryConnection();
-        const knowNodes = this.web3.network.connectedNodes.map(n => ({
-            ...n,
-            token: undefined,
-            expire: undefined,
-        }));
-        await this.applicationContext.mq.send(RoutingKeys.know_nodes, knowNodes);
-        if (nodesSize !== connectedNodes) {
-            this.applicationContext.logger.info(`connected ${connectedNodes} nodes`);
+        while (this.isRun) {
+            await this.web3.network.updateConnections();
+            const knowNodes = this.web3.network.connectedNodes.map(n => ({
+                ...n,
+                token: undefined,
+                expire: undefined,
+            }));
+            this.applicationContext.logger.debug(`web3 - connections: ${knowNodes.length}`)
+            await this.applicationContext.mq.send(RoutingKeys.know_nodes, knowNodes);
+            for (let i = 0; i < 100 && this.isRun; i++) { // 10 seconds
+                await helper.sleep(100);
+            }
         }
-        await helper.sleep(100);
     }
 
     resetNetwork = async () => {
-        clearInterval(this.mainLoopInterval);
+        this.isRun = false;
+        await helper.sleep(100);
         this.web3 = new Web3({
             initialNodes: this.applicationContext.initialNodes,
             maxConnectedNodes: this.applicationContext.nodeLimit,
@@ -55,6 +55,7 @@ export default class Network implements Task {
             getChains: this.chainsProvider.getChains
         });
         await this.applicationContext.mq.send(RoutingKeys.know_nodes, []);
+        await helper.sleep(100);
     }
 
     connectedNodesSize = () => {
@@ -62,22 +63,24 @@ export default class Network implements Task {
     }
 
     async start() {
-        this.applicationContext.logger.info(`start web3 - initialNodes: ${this.applicationContext.initialNodes.join(", ")}`)
-        this.applicationContext.logger.info(`start web3 - host: ${this.applicationContext.myHost}`)
-        this.applicationContext.mq.addMessageListener(RoutingKeys.started_api, async (message: any) => {
+        if (!this.isRun) {
+            this.isRun = true;
+            this.applicationContext.mq.addMessageListener(RoutingKeys.started_api, async (message: any) => {
+                await this.web3.network.tryConnection();
+            });
+            this.applicationContext.mq.addMessageListener(RoutingKeys.new_node, async (message: any) => {
+                const node = new BywiseNode(message);
+                this.applicationContext.logger.verbose(`added new node`)
+                this.web3.network.addNode(node);
+            });
             await this.web3.network.tryConnection();
-        });
-        this.applicationContext.mq.addMessageListener(RoutingKeys.new_node, async (message: any) => {
-            const node = new BywiseNode(message);
-            this.applicationContext.logger.info(`added new node`)
-            this.web3.network.addNode(node);
-        });
-        this.mainLoopInterval = setInterval(this.mainLoop, 60000);
-        this.isRun = true;
+            this.applicationContext.logger.verbose(`start web3 - connections: ${this.web3.network.connectedNodes.length} -  initialNodes: ${this.applicationContext.initialNodes.join(", ")}`)
+            this.applicationContext.logger.info(`start web3 - host: ${this.applicationContext.myHost}`)
+            this.mainLoop();
+        }
     };
 
     async stop() {
         this.isRun = false;
-        clearInterval(this.mainLoopInterval);
     };
 }

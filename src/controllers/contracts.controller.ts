@@ -13,14 +13,14 @@ import helper from '../utils/helper';
 export default async function contractsController(app: express.Express, apiContext: ApiContext): Promise<void> {
     const router = express.Router();
     const TransactionRepository = apiContext.applicationContext.database.TransactionRepository;
-    const EventsRepository = apiContext.applicationContext.database.EventsRepository;
+    //const EventsRepository = apiContext.applicationContext.database.EventsRepository;
 
     metadataDocument.addPath({
         path: "/api/v2/contracts/simulate",
         type: 'post',
         controller: 'ContractsController',
         description: 'Simulate enviroment',
-        security: false,
+        securityType: ['node'],
         body: {
             type: 'object',
             properties: [
@@ -82,7 +82,7 @@ export default async function contractsController(app: express.Express, apiConte
 
                 const ctx = helper.createSimulationContext('local');
                 ctx.nonce = runtimeContext.nonce++;
-                ctx.block.height = runtimeContext.blockHeight;
+                ctx.envContext.blockHeight = runtimeContext.blockHeight;
                 ctx.tx = new Tx();
                 ctx.tx.version = '2';
                 ctx.tx.chain = 'local';
@@ -100,7 +100,7 @@ export default async function contractsController(app: express.Express, apiConte
                 const sendAmount = `${req.body.amount}`;
 
                 if (!contract.payable && !(new BigNumber(sendAmount)).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
-                
+
                 const output = await BywiseRuntime.execInContract(blockchainDebug, getContract, ctx, req.body.contractAddress, contract.bcc, req.body.from, sendAmount, contract.code);
 
                 runtimeContext.data = blockchainDebug.export();
@@ -116,7 +116,7 @@ export default async function contractsController(app: express.Express, apiConte
                 const contractAddress = body.contractAddress;
                 const ctx = helper.createSimulationContext('local');
                 ctx.nonce = runtimeContext.nonce++;
-                ctx.block.height = runtimeContext.blockHeight;
+                ctx.envContext.blockHeight = runtimeContext.blockHeight;
                 ctx.tx = new Tx();
                 ctx.tx.version = '2';
                 ctx.tx.chain = 'local';
@@ -162,7 +162,7 @@ export default async function contractsController(app: express.Express, apiConte
         type: 'get',
         controller: 'ContractsController',
         description: 'Get contract by address',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'address', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
@@ -192,17 +192,18 @@ export default async function contractsController(app: express.Express, apiConte
     });
 
     metadataDocument.addPath({
-        path: "/api/v2/contracts/events/{chain}/{address}/{event}",
+        path: "/api/v2/contracts/events/{chain}/{contractAddress}/{eventName}",
         type: 'get',
         controller: 'ContractsController',
         description: 'Get contract events',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'address', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'event', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'contractAddress', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'eventName', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'key', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'value', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'page', in: 'query', pattern: /^[0-9]+$/ },
         ],
         responses: [{
             code: 200,
@@ -214,19 +215,38 @@ export default async function contractsController(app: express.Express, apiConte
     })
     router.get('/contracts/events/:chain/:address/:event', async (req: express.Request, res: express.Response) => {
         const chain = req.params.chain;
-        const address = req.params.address;
-        const event = req.params.event;
+        const contractAddress = req.params.contractAddress;
+        const eventName = req.params.eventName;
+        const page = req.query.page ? parseInt(`${req.query.page}`) : 0;
 
-        if (req.query.key) {
-            const key = `${req.query.key}`;
-            const value = `${req.query.value}`;
-            const events = await EventsRepository.findByEventAndKey(chain, address, event, key, value, 100, 0);
-            return res.send(events);
-        } else {
-            const events = await EventsRepository.findByEvent(chain, address, event, 100, 0);
-            return res.send(events);
+        try {
+            const blockTree = apiContext.blockTree.get(chain);
+            if (!blockTree) return res.status(400).send({ error: `Node does not work with this chain` });
+
+            if (req.query.key && req.query.value) {
+                const key = `${req.query.key}`;
+                const value = `${req.query.value}`;
+                const output = await apiContext.applicationContext.mq.request(RequestKeys.get_events_by_key, {
+                    chain,
+                    contractAddress,
+                    eventName,
+                    key,
+                    value,
+                    page,
+                });
+                return res.send(output);
+            } else {
+                const output = await apiContext.applicationContext.mq.request(RequestKeys.get_events, {
+                    chain,
+                    contractAddress,
+                    eventName,
+                    page,
+                });
+                return res.send(output);
+            }
+        } catch (err: any) {
+            return res.status(400).send({ error: err.message });
         }
-
     });
 
     app.use('/api/v2', router);

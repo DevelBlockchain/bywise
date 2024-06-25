@@ -38,15 +38,14 @@ beforeAll(async () => {
         initialNodes: [`http://localhost:${port0}`]
     });
     await web3.network.tryConnection();
-    await helper.sleep(10000);
 }, 30000);
 
 afterAll(async () => {
     await node0.stop();
-}, 30000)
+}, 1000)
 
 describe('simple transactions', () => {
-    
+
     test('send transaction', async () => {
         let tx = new Tx();
         tx.version = '2';
@@ -66,22 +65,16 @@ describe('simple transactions', () => {
         let error = await web3.transactions.sendTransaction(tx);
         expect(error).toEqual(undefined);
 
+        await web3.transactions.waitConfirmation(tx.hash, 10000);
+
         let res = await web3.transactions.getTransactionByHash(tx.hash);
         expect(res !== undefined).toEqual(true);
         if (res !== undefined) {
-            expect(res.status).toEqual('mempool');
-            expect(res.hash).toEqual(tx.hash);
-        }
-
-        await web3.transactions.waitConfirmation(tx.hash, 10000);
-
-        res = await web3.transactions.getTransactionByHash(tx.hash);
-        expect(res !== undefined).toEqual(true);
-        if (res !== undefined) {
-            expect(res.status).toEqual('confirmed');
+            expect(res.status).not.toEqual('mempool');
+            expect(res.status == 'confirmed' || res.status == 'mined').toEqual(true);
         }
     }, 30000);
-
+    
     test('send add balance', async () => {
         const addr = new Wallet();
 
@@ -263,7 +256,7 @@ describe('simple transactions', () => {
         );
         const output = await web3.transactions.sendTransactionSync(tx);
         expect(output.output.contractAddress).toEqual(contractAddress);
-        
+
         // check name of contract
         let result = await web3.contracts.readContract(
             chain,
@@ -273,7 +266,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('SimpleToken');
-        
+
         // check total supply of contract
         result = await web3.contracts.readContract(
             chain,
@@ -283,7 +276,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('5000000000000000000000');
-        
+
         // get balance of deploy address
         result = await web3.contracts.readContract(
             chain,
@@ -293,7 +286,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('5000000000000000000000');
-        
+
         // get balance of deploy address
         result = await web3.contracts.readContract(
             chain,
@@ -303,7 +296,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('0');
-        
+
         // get balance of addr1
         result = await web3.contracts.readContract(
             chain,
@@ -313,7 +306,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('0');
-        
+
         // make transfer to addr1
         tx = await web3.transactions.buildSimpleTx(
             wallet,
@@ -324,7 +317,7 @@ describe('simple transactions', () => {
             [{ method: 'transfer', inputs: [addr1, '10000000'] }]
         );
         await web3.transactions.sendTransactionSync(tx);
-        
+
         // get balance of deploy address
         result = await web3.contracts.readContract(
             chain,
@@ -334,7 +327,7 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('4999999999999990000000');
-        
+
         // get balance of addr1
         result = await web3.contracts.readContract(
             chain,
@@ -392,9 +385,17 @@ describe('simple transactions', () => {
             TxType.TX_CONTRACT,
             { contractAddress, code: ERCCode }
         );
-        let output = await web3.transactions.sendTransactionSync(deployTx);
-        expect(output.output.contractAddress).toEqual(contractAddress);
+        await web3.transactions.sendTransaction(deployTx);
+        await web3.transactions.waitConfirmation(deployTx.hash, 10000);
+        let res = await web3.transactions.getTransactionByHash(deployTx.hash);
+        expect(res !== undefined).toEqual(true);
+        if (res !== undefined) {
+            expect(res.status).not.toEqual('mempool');
+            expect(res.status == 'confirmed' || res.status == 'mined').toEqual(true);
+            expect(res.output.output.contractAddress).toEqual(contractAddress);
+        }
 
+        let txs: Tx[] = []
         let total = 0;
         for (let i = 0; i < 30; i++) {
             const tx = await web3.transactions.buildSimpleTx(
@@ -407,19 +408,32 @@ describe('simple transactions', () => {
             );
             total += i;
             await web3.transactions.sendTransaction(tx);
+            txs.push(tx);
         }
 
-        let tx = await web3.transactions.buildSimpleTx(
-            wallet,
-            chain,
-            contractAddress,
-            '0',
-            TxType.TX_CONTRACT_EXE,
-            [{ method: 'transfer', inputs: [addr1, `1`] }]
-        );
-        total++;
-        await web3.transactions.sendTransactionSync(tx);
-        await helper.sleep(10000);
+        let hasMempool = true;
+        while (hasMempool) {
+            hasMempool = false;
+
+            for (let i = 0; i < txs.length; i++) {
+                const tx = txs[i];
+                let req = await web3.transactions.getTransactionByHash(tx.hash);
+                if (req && req.status == 'mempool') {
+                    hasMempool = true;
+                }
+            }
+            await helper.sleep(1000);
+        }
+
+        for (let i = 0; i < txs.length; i++) {
+            const tx = txs[i];
+            let req = await web3.transactions.getTransactionByHash(tx.hash);
+            expect(req !== undefined).toEqual(true);
+            if(req) {
+                expect(req.status).not.toEqual('mempool');
+                expect(req.output.error).toEqual(undefined);
+            }
+        }
 
         // get balance of addr1
         let result = await web3.contracts.readContract(

@@ -22,10 +22,13 @@ export default async function authController(app: express.Express, applicationCo
             body: {
                 type: 'object',
                 properties: [
-                    { name: 'message', type: 'string' },
+
+                    { name: 'message', type: 'string', example: 'OK' },
+                    { name: 'type', type: 'string', enum: ['user', 'node', 'token'], example: 'user'},
                     { name: 'id', type: 'string', example: '632c6484947ba8178426866e' },
-                    { name: 'type', type: 'string', enum: ['user', 'node', 'token'] },
-                    { name: 'time', type: 'string', example: '2022-09-22T14:04:57.966Z' }
+                    { name: 'iat', type: 'string', example: '1719159113' },
+                    { name: 'exp', type: 'string', example: '1719159113' },
+                    { name: 'time', type: 'string', example: '1719159113' }
                 ]
             },
         }]
@@ -53,10 +56,13 @@ export default async function authController(app: express.Express, applicationCo
             body: {
                 type: 'object',
                 properties: [
-                    { name: 'message', type: 'string' },
-                    { name: 'id', type: 'string', example: '632c6484947ba8178426866e' },
-                    { name: 'type', type: 'string', enum: ['user', 'node', 'token'] },
-                    { name: 'time', type: 'string', example: '2022-09-22T14:04:57.966Z' }
+                    { name: 'size', type: 'number', example: '22072'},
+                    {name: 'cpu', type: 'number', example: '34.18918918918919'},
+                    {name: 'memory', type: 'number', example: '247.33203125'},
+                    {name: 'total_heap_size', type: 'number', example: '184.8828125'},
+                    {name: 'used_heap_size', type: 'number', example: '179.84854125976562'},
+                    {name: 'heap_size_limit', type: 'number', example: '179.84854125976562'},
+                    {name: 'timestamp', type: 'number', example: '1719160195723'},
                 ]
             },
         }]

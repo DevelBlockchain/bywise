@@ -1,15 +1,17 @@
 import { ContractAbi } from "web3";
 import { ETHChain } from "../models"
 
-// const bywiseContractAddress = "BWS1MUf3fE542466114436c184ad1936CD72D3baeEA06c366";
-// TESTNET
-// Proxy: 0xD81fceB62Ab1EbF24a60CFE874C375958AaDDD70
-// Book: 0x75E7325B5609ecf5872898d42f50d0c8a2fA4f6D
-// Bridge: 0x05E13F64c93Ce35ceB157b1dC4b3c0d5C5EeA95e
-// MAINNET
-// Proxy: 0xb725Ecf61d9D41f22D56724907325bCe3c996184
-// Book: 0x5390d28fF5Fbd7F9F2fd02A2f9a62E77580436d6
-// Bridge: 0xdffB099A3E24747655A0b00B03CF652240Da633b
+/**
+ * const bywiseContractAddress = "BWS1MUf3fE542466114436c184ad1936CD72D3baeEA06c366";
+ * TESTNET
+ * Proxy: 0xD81fceB62Ab1EbF24a60CFE874C375958AaDDD70
+ * Book: 0x75E7325B5609ecf5872898d42f50d0c8a2fA4f6D
+ * Bridge: 0x05E13F64c93Ce35ceB157b1dC4b3c0d5C5EeA95e
+ * MAINNET
+ * Proxy: 0xb725Ecf61d9D41f22D56724907325bCe3c996184
+ * Book: 0x5390d28fF5Fbd7F9F2fd02A2f9a62E77580436d6
+ * Bridge: 0xdffB099A3E24747655A0b00B03CF652240Da633b
+ */
 
 export const ETHChains: ETHChain[] = [
 	{ proxy: '0x0000000000000000000000000000000000000000', cost: 100, name: 'Ethereum', symbol: 'ETH', chainID: 1, provider: 'https://mainnet.infura.io/v3/' },

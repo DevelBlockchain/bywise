@@ -3,6 +3,8 @@ import metadataDocument from '../metadata/metadataDocument';
 import { Slice, Tx } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
 import { ApiContext, BlockchainStatus } from '../types';
+import { Slices } from '../models';
+import { RequestKeys } from '../datasource/message-queue';
 
 export default async function slicesController(app: express.Express, apiContext: ApiContext): Promise<void> {
     const router = express.Router();
@@ -13,7 +15,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'get',
         controller: 'SlicesController',
         description: 'Count slices',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'status', in: 'query', pattern: /^mined|mempool|invalidated$/ },
@@ -31,13 +33,17 @@ export default async function slicesController(app: express.Express, apiContext:
     })
     router.get('/slices/count/:chain', async (req: express.Request, res: express.Response) => {
         let status: BlockchainStatus = BlockchainStatus.TX_MINED;
-        if(req.query.status === 'mempool') {
+        if (req.query.status === 'mempool') {
             status = BlockchainStatus.TX_MEMPOOL;
-        } else if(req.query.status === 'failed') {
+        } else if (req.query.status === 'failed') {
             status = BlockchainStatus.TX_FAILED;
         }
 
-        const count = await SliceRepository.count(req.params.chain, status);
+        let count = await SliceRepository.count(req.params.chain, status);
+        if (status === BlockchainStatus.TX_MINED) {
+            const confimedSlices: Slices[] = await apiContext.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: req.params.chain });
+            count += confimedSlices.length;
+        }
         return res.send({ count });
     });
 
@@ -46,7 +52,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'get',
         controller: 'SlicesController',
         description: 'Get slices list',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'limit', in: 'query', pattern: /^[0-9]+$/ },
@@ -70,9 +76,9 @@ export default async function slicesController(app: express.Express, apiContext:
         let limit = 100;
         let status: BlockchainStatus = BlockchainStatus.TX_MINED;
         let order: 'asc' | 'desc' = req.query.order === 'asc' ? 'asc' : 'desc';
-        if(req.query.status === 'mempool') {
+        if (req.query.status === 'mempool') {
             status = BlockchainStatus.TX_MEMPOOL;
-        } else if(req.query.status === 'failed') {
+        } else if (req.query.status === 'failed') {
             status = BlockchainStatus.TX_FAILED;
         }
         if (typeof req.query.offset === 'string') {
@@ -83,8 +89,14 @@ export default async function slicesController(app: express.Express, apiContext:
         }
         if (limit > 200) return res.status(400).send({ error: "invalid limit" });
 
-        const slices = await SliceRepository.find(req.params.chain, status, limit, offset, order);
-        return res.send(slices.map(slice => slice.slice));
+        const slices: Slice[] = [];
+        if (status === BlockchainStatus.TX_MINED) {
+            const confimedSlices: Slices[] = await apiContext.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: req.params.chain });
+            confimedSlices.forEach(sliceInfo => slices.push(sliceInfo.slice));
+        }
+        const findSlices = await SliceRepository.find(req.params.chain, status, limit, offset, order);
+        findSlices.forEach(sliceInfo => slices.push(sliceInfo.slice));
+        return res.send(slices);
     });
 
     metadataDocument.addPath({
@@ -92,7 +104,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'get',
         controller: 'SlicesController',
         description: 'Get slice by hash',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
         ],
@@ -115,7 +127,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'get',
         controller: 'SlicesController',
         description: 'Get slice by hash',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
         ],
@@ -147,7 +159,7 @@ export default async function slicesController(app: express.Express, apiContext:
         type: 'post',
         controller: 'SlicesController',
         description: 'Insert new slice',
-        security: false,
+        securityType: ['node'],
         body: {
             $ref: SCHEMA_TYPES.SliceDTO
         },

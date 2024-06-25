@@ -33,7 +33,7 @@ export default function authMiddleware(app: Express, applicationContext: Applica
 
         const decode = await authProvider.checkJWT(token);
         if (!decode) {
-            res.status(401).send({ error: "Token invalid" });
+            res.status(401).send({ error: "Token expired" });
             return;
         }
         req.context = decode;

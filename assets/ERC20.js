@@ -12,7 +12,7 @@ function checkAmountIsInteger(value) {
 }
 
 function isValidAddress(value) {
-    if (! /^(BWS1[MT][CU][0-9a-fA-F]{40}[0-9a-zA-Z]{0,64}[0-9a-fA-F]{3})$/.test(value)) {
+    if (! /^(BWS1[MT][CU][0-9a-fA-F]{40}[0-9a-zA-Z]{0,64}[0-9a-fA-F]{3})|(BWS000000000000000000000000000000000000000000000)$/.test(value)) {
         throw new Error(`invalid address - ${value}`);
     }
 }
@@ -76,7 +76,7 @@ class ERC20 {
         isValidAddress(to);
         checkAmountIsInteger(amount);
 
-        let spender = BywiseUtils.getSender();
+        let spender = BywiseUtils.getTxSender();
 
         this._decreaseAllowance(spender, from, amount);
         this._transfer(from, to, amount);
@@ -87,7 +87,7 @@ class ERC20 {
         isValidAddress(spender);
         checkAmountIsInteger(amount);
 
-        let owner = BywiseUtils.getSender();
+        let owner = BywiseUtils.getTxSender();
         this._approve(spender, owner, amount);
         return true;
     }
@@ -96,11 +96,10 @@ class ERC20 {
         amount = new BigNumber(amount);
 
         let fromBalance = this._balances.getBigNumber(from);
-        let toBalance = this._balances.getBigNumber(to);
-
         if (amount.isGreaterThan(fromBalance)) throw new Error('insuficient funds');
-
         this._balances.set(from, fromBalance.minus(amount))
+        
+        let toBalance = this._balances.getBigNumber(to);
         this._balances.set(to, toBalance.plus(amount))
     }
 

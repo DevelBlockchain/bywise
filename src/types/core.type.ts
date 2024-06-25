@@ -1,7 +1,7 @@
 import Network from "../core/network.core";
-import { Blocks, Slices } from "../models";
 import { BlocksProvider, ChainsProvider, EnvironmentProvider, SlicesProvider, TransactionsProvider } from "../services";
 import { ConfigProvider } from "../services/configs.service";
+import { EventsProvider } from "../services/events.service";
 import { MinnerProvider } from "../services/minner.service";
 import { WalletProvider } from "../services/wallet.service";
 import { BlockTree } from "./environment.types";
@@ -20,9 +20,8 @@ export class CoreContext {
     environmentProvider;
     configsProvider;
     walletProvider;
+    eventsProvider;
 
-    bestSlice: Slices | undefined;
-    lastBlock: Blocks | undefined;
     blockTime: number = 60;
 
     constructor(applicationContext: ApplicationContext, network: Network, blockTree: BlockTree) {
@@ -38,5 +37,6 @@ export class CoreContext {
         this.minnerProvider = new MinnerProvider(applicationContext);
         this.configsProvider = new ConfigProvider(applicationContext);
         this.walletProvider = new WalletProvider(applicationContext);
+        this.eventsProvider = new EventsProvider(applicationContext);
     }
 }

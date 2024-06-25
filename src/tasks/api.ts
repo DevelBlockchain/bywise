@@ -39,7 +39,7 @@ class Api implements Task {
     }
 
     private async addChain(chain: string) {
-        const blockTree = await this.apiCtx.blockProvider.getMainBlockTree(chain);
+        const blockTree = await this.apiCtx.blockProvider.getBlockTree(chain);
         this.apiCtx.blockTree.set(chain, blockTree);
         if (!this.apiCtx.chains.includes(chain)) {
             this.apiCtx.chains.push(chain)
@@ -105,7 +105,7 @@ class Api implements Task {
 
         if (!this.applicationContext.https) {
             this.server = this.app.listen(this.applicationContext.port, () => {
-                this.applicationContext.logger.info('Start server on port ' + this.applicationContext.port);
+                this.applicationContext.logger.verbose('Start server on port ' + this.applicationContext.port);
                 this.isRun = true;
             });
         } else {
@@ -115,7 +115,7 @@ class Api implements Task {
                 secureProtocol: 'TLSv1_2_method',
             }, this.app);
             this.server.listen(this.applicationContext.port, () => {
-                this.applicationContext.logger.info('Start server on port ' + this.applicationContext.port);
+                this.applicationContext.logger.verbose('Start server on port ' + this.applicationContext.port);
                 this.isRun = true;
             });
         }
@@ -128,7 +128,7 @@ class Api implements Task {
     async stop() {
         if (this.isRun) {
             await this.server.close();
-            this.applicationContext.logger.info('Stop server on port ' + this.applicationContext.port);
+            this.applicationContext.logger.verbose('Stop server on port ' + this.applicationContext.port);
         }
         this.isRun = false;
     };

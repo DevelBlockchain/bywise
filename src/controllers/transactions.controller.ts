@@ -15,7 +15,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'get',
         controller: 'TransactionsController',
         description: 'Count transactions',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'searchBy', in: 'query', pattern: /^address|from|to|key|status$/ },
@@ -87,7 +87,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'get',
         controller: 'TransactionsController',
         description: 'Get transactions list',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'searchBy', in: 'query', pattern: /^address|from|to|key|status$/ },
@@ -164,7 +164,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'get',
         controller: 'TransactionsController',
         description: 'Get transaction by hash',
-        security: false,
+        securityType: ['node'],
         parameters: [
             { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
         ],
@@ -180,12 +180,7 @@ export default async function transactionsController(app: express.Express, apiCo
         const hash = req.params.hash;
         const btx = await TransactionRepository.findByHash(hash);
         if (!btx) return res.status(404).send({ error: "Transaction not found" });
-        const blockTree = apiContext.blockTree.get(btx.tx.chain);
-        if (blockTree) {
-            apiContext.transactionsProvider.populateTxInfo(blockTree, hash);
-        }
-        let tx: any = btx.tx;
-        return res.send({ ...new Tx(tx), status: btx.status, output: btx.output });
+        return res.send({ ...btx.tx, status: btx.status, output: btx.output });
     });
 
     metadataDocument.addPath({
@@ -193,7 +188,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'post',
         controller: 'TransactionsController',
         description: 'Calculate transaction fee',
-        security: false,
+        securityType: ['node'],
         body: {
             type: 'object',
             properties: [
@@ -221,7 +216,7 @@ export default async function transactionsController(app: express.Express, apiCo
             const blockTree = apiContext.blockTree.get(tx.chain)
             if (!blockTree) return res.status(400).send({ error: `Node does not work with this chain` });
             tx.fee = '0';
-            const output = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, simulateWallet: true });
+            const output = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
 
             return res.send(output);
         } catch (err: any) {
@@ -234,7 +229,7 @@ export default async function transactionsController(app: express.Express, apiCo
         type: 'post',
         controller: 'TransactionsController',
         description: 'Insert new transactions',
-        security: false,
+        securityType: ['node'],
         body: {
             $ref: SCHEMA_TYPES.TxDTO
         },
@@ -251,11 +246,6 @@ export default async function transactionsController(app: express.Express, apiCo
         try {
             if (!apiContext.chains.includes(tx.chain)) {
                 return res.status(400).send({ error: `Node does not work with this chain` });
-            }
-
-            const output: TransactionOutputDTO = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, simulateWallet: false });
-            if (output.error) {
-                throw new Error(output.error);
             }
 
             const btx = await apiContext.transactionsProvider.saveNewTransaction(tx);
@@ -312,13 +302,11 @@ export default async function transactionsController(app: express.Express, apiCo
             tx.foreignKeys = body.foreignKeys;
             tx.created = Math.floor(Date.now() / 1000);
 
-            let output: TransactionOutputDTO = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, simulateWallet: true });
+            let output: TransactionOutputDTO = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
 
             tx.fee = output.feeUsed;
             tx.hash = tx.toHash();
             tx.sign = [await mainWallet.signHash(tx.hash)];
-
-            output = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, simulateWallet: false });
 
             if (output.error) {
                 throw new Error(output.error);

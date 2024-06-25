@@ -1,18 +1,21 @@
-import { Wallet, BlockPack } from '@bywise/web3';
+import { Wallet, BlockPack, Slice } from '@bywise/web3';
 import Bywise from '../bywise';
 import { ChainData, MinnerProvider } from '../services/minner.service';
 import helper from '../utils/helper';
+import { BlocksProvider, SlicesProvider } from '../services';
 
 const hash = '0000000000000000000000ff0000000000000000ff0000000000000000000000';
 const addrA = 'BWS1MU0000000000000000000000ff0000000000000000a25';
 const addrB = 'BWS1MU00ff000000000000000000000000000000000000d40';
+const wallet = new Wallet();
 var bywise: Bywise;
 var b0: BlockPack;
 var minnerProvider: MinnerProvider;
+var slicesProvider: SlicesProvider;
+var blocksProvider: BlocksProvider;
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 
 beforeAll(async () => {
-    const wallet = new Wallet();
     b0 = await helper.createNewBlockZero('local', wallet);
     bywise = await Bywise.newBywiseInstance({
         name: `test${port0}`,
@@ -27,6 +30,8 @@ beforeAll(async () => {
         startServices: [],
     });
     minnerProvider = new MinnerProvider(bywise.applicationContext);
+    slicesProvider = new SlicesProvider(bywise.applicationContext);
+    blocksProvider = new BlocksProvider(bywise.applicationContext);
 }, 30000)
 
 beforeEach(async () => {
@@ -73,7 +78,7 @@ describe('consensus algorithm', () => {
             minnerProvider.compareAddress(hash, addrA, invalidAddress);
         }).rejects.toThrow();
     });
-    
+
     test('compare address with invalid hash', async () => {
         const invalidHash = '0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
         await expect(async () => {
@@ -123,5 +128,161 @@ describe('consensus algorithm', () => {
         await expect(async () => {
             minnerProvider.compareChain(chainA, chainB);
         }).rejects.toThrow();
+    });
+})
+
+describe('get slices', () => {
+    test('consecutive slices', async () => {
+        let blockTree = await blocksProvider.setNewZeroBlock(b0);
+
+        let bestSlices = blockTree.getBestSlice(wallet.address, 1);
+        expect(bestSlices.length).toEqual(0);
+
+        const slices: Slice[] = [];
+        for (let i = 0; i <= 5; i++) {
+            const slice = new Slice();
+            slice.height = i;
+            slice.transactionsCount = 1;
+            slice.blockHeight = 1;
+            slice.transactions = [helper.getRandomHash()];
+            slice.transactionsData = [];
+            slice.version = '2';
+            slice.chain = 'local';
+            slice.from = wallet.address;
+            slice.created = Math.floor(Date.now() / 1000);
+            slice.end = i == 5;
+            slice.hash = slice.toHash();
+            slice.sign = await wallet.signHash(slice.hash);
+            const bslice = await slicesProvider.saveNewSlice(slice);
+            bslice.isComplete = true;
+            bslice.isExecuted = true;
+            await slicesProvider.updateSlice(bslice);
+            slices.push(slice);
+        }
+
+        blockTree = await blocksProvider.getBlockTree('local');
+        bestSlices = blockTree.getBestSlice(wallet.address, 1);
+
+        expect(bestSlices.length).toEqual(slices.length);
+
+        for (let i = 0; i < slices.length; i++) {
+            const slice = slices[i];
+            const bestSlice = bestSlices[i];
+            expect(bestSlice.hash).toEqual(slice.hash);
+        }
+    });
+
+    test('consecutive slices - missing one', async () => {
+        let blockTree = await blocksProvider.setNewZeroBlock(b0);
+
+        let bestSlices = blockTree.getBestSlice(wallet.address, 1);
+        expect(bestSlices.length).toEqual(0);
+
+        const slices: Slice[] = [];
+        for (let i = 0; i <= 5; i++) {
+            const slice = new Slice();
+            slice.height = i;
+            slice.transactionsCount = 1;
+            slice.blockHeight = 1;
+            slice.transactions = [helper.getRandomHash()];
+            slice.transactionsData = [];
+            slice.version = '2';
+            slice.chain = 'local';
+            slice.from = wallet.address;
+            slice.created = Math.floor(Date.now() / 1000);
+            slice.end = i == 5;
+            slice.hash = slice.toHash();
+            slice.sign = await wallet.signHash(slice.hash);
+            if (i !== 3) {
+                const bslice = await slicesProvider.saveNewSlice(slice);
+                bslice.isComplete = true;
+                bslice.isExecuted = true;
+                await slicesProvider.updateSlice(bslice);
+            }
+            slices.push(slice);
+        }
+
+        blockTree = await blocksProvider.getBlockTree('local');
+        bestSlices = blockTree.getBestSlice(wallet.address, 1);
+
+        expect(bestSlices.length).toEqual(3);
+
+        for (let i = 0; i < 3; i++) {
+            const slice = slices[i];
+            const bestSlice = bestSlices[i];
+            expect(bestSlice.hash).toEqual(slice.hash);
+        }
+    });
+
+    test('consecutive slices - with update', async () => {
+        let blockTree = await blocksProvider.setNewZeroBlock(b0);
+
+        // create first slices
+        for (let i = 0; i <= 5; i++) {
+            const slice = new Slice();
+            slice.height = i;
+            slice.transactionsCount = 1;
+            slice.blockHeight = 1;
+            slice.transactions = [helper.getRandomHash()];
+            slice.transactionsData = [];
+            slice.version = '2';
+            slice.chain = 'local';
+            slice.from = wallet.address;
+            slice.created = Math.floor(Date.now() / 1000);
+            slice.end = false;
+            slice.hash = slice.toHash();
+            slice.sign = await wallet.signHash(slice.hash);
+            const bslice = await slicesProvider.saveNewSlice(slice);
+            bslice.isComplete = true;
+            bslice.isExecuted = true;
+            await slicesProvider.updateSlice(bslice);
+        }
+
+        // update slices with more transactions
+        const slices: Slice[] = [];
+        for (let i = 0; i <= 5; i++) {
+            const slice = new Slice();
+            slice.height = i;
+            slice.transactionsCount = 2;
+            slice.blockHeight = 1;
+            slice.transactions = [helper.getRandomHash(), helper.getRandomHash()];
+            slice.transactionsData = [];
+            slice.version = '2';
+            slice.chain = 'local';
+            slice.from = wallet.address;
+            slice.created = Math.floor(Date.now() / 1000);
+            slice.end = i == 5;
+            slice.hash = slice.toHash();
+            slice.sign = await wallet.signHash(slice.hash);
+            const bslice = await slicesProvider.saveNewSlice(slice);
+            bslice.isComplete = true;
+            bslice.isExecuted = true;
+            await slicesProvider.updateSlice(bslice);
+            slices.push(slice);
+        }
+
+        blockTree = await blocksProvider.getBlockTree('local');
+        const bestSlices = blockTree.getBestSlice(wallet.address, 1);
+
+        expect(bestSlices.length).toEqual(slices.length);
+
+        for (let i = 0; i < slices.length; i++) {
+            const slice = slices[i];
+            const bestSlice = bestSlices[i];
+            expect(bestSlice.hash).toEqual(slice.hash);
+        }
+    });
+})
+
+describe('get blocktree', () => {
+    test('check build blocktree', async () => {
+        await expect(async () => {
+            await blocksProvider.getBlockTree('local');
+        }).rejects.toThrow('get first imutable block of local not found');
+
+        let blockTree = await blocksProvider.setNewZeroBlock(b0);
+
+        expect(blockTree.blockMap.size).toEqual(2);
+        expect(blockTree.sliceMap.size).toEqual(1);
     });
 })

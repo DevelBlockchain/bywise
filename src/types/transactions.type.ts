@@ -1,7 +1,6 @@
-
-import { TxType, Slice, Tx, Block } from '@bywise/web3';
+import { TxType, Slice, Tx } from '@bywise/web3';
 import BigNumber from "bignumber.js";
-import { BlockTree } from './environment.types';
+import { EnvironmentContext } from './environment.types';
 
 export enum BlockchainStatus {
   TX_MEMPOOL = 'mempool',
@@ -71,29 +70,18 @@ export type ValueBooleanDTO = {
 
 export class SimulateDTO {
 
-  constructor(blockTree: BlockTree, block: Block, simulationId?: string) {
-    this.blockTree = blockTree;
-    this.block = block;
-    this.sliceFrom = '';
-    if (simulationId) {
-      this.simulationIds = [simulationId];
-      this.simulationId = simulationId;
-      this.simulate = true;
-      this.simulateWallet = true;
-    }
+  constructor(envContext: EnvironmentContext) {
+    this.envContext = envContext;
   }
 
-  blockTree: BlockTree;
-  block: Block;
-  sliceFrom: string;
+  envContext: EnvironmentContext;
   slicesModels: Slice[] = [];
   transactionsModels: Tx[] = [];
   totalFee: BigNumber = new BigNumber(0);
-  simulationIds: string[] = [];
-  simulationId?: string;
+  sliceFrom: string = '';
   nonce: number = 0;
-  simulate: boolean = false;
-  simulateWallet: boolean = false;
+  feeCostType: number = 0;
+  checkWalletBalance: boolean = true;
   enableWriteProxy: boolean = false;
   enableReadProxy: boolean = false;
   proxyMock: string[] = [];
@@ -105,10 +93,16 @@ export type VariableDTO = {
   value: any;
 }
 
+export type TransactionEventEntry = {
+  key: string;
+  value: string;
+}
+
 export type TransactionEvent = {
-  from: string;
-  event: string;
-  data: string;
+  contractAddress: string;
+  eventName: string;
+  entries: TransactionEventEntry[];
+  hash: string;
 }
 
 export class TransactionOutputDTO {

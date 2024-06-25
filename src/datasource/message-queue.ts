@@ -20,6 +20,9 @@ export enum RequestKeys {
     test_connection = 'test_connection',
     get_contract = 'get_contract',
     get_info_wallet = 'get_info_wallet',
+    get_confirmed_slices = 'get_confirmed_slices',
+    get_events = 'get_events',
+    get_events_by_key = 'get_events_by_key',
     simulate_tx = 'simulate_tx',
     db_save = 'db_save',
     db_save_many = 'db_save_many',
@@ -169,9 +172,9 @@ export default class MessageQueue {
         if (worker_threads.parentPort) {
             worker_threads.parentPort.close()
         }
+        MessageQueue.postMethod = (value: any) => {};
         const nullVar: any = null;
         MessageQueue.eventEmitter = nullVar;
-        MessageQueue.postMethod = nullVar;
     }
 
     addMessageListener(key: RoutingKeys, action: MessageListener) {

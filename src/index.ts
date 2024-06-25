@@ -66,12 +66,14 @@ const main = async () => {
             console.log('   -https');
             console.log('   -name');
             console.log('   -new-chain');
+            console.log('   -new-chain-local');
             console.log('   -new-wallet');
             console.log('   -nodes');
             console.log('   -port');
             console.log('   -pnodes');
             console.log('   -key');
             console.log('   -reset');
+            console.log('   -start-debug');
             console.log('   -start');
             return
         }
@@ -181,6 +183,22 @@ const main = async () => {
                 ChainConfig.setConfig('feeCoefCost', '0.001'),
             ]);
             fs.writeFileSync(`${lastParam}.json`, JSON.stringify(zeroBlock), 'utf8');
+            console.log(`Created new chain ${lastParam}.json`)
+        }
+        if (getCmd('-new-chain-local')) {
+            const deployWallet = new Wallet({ seed: wallet });
+            const zeroBlock = await helper.createNewBlockZero('local', deployWallet, [
+                ChainConfig.addAdmin(deployWallet.address),
+                ChainConfig.addValidator(deployWallet.address),
+                ChainConfig.setBalance(deployWallet.address, '20000'),
+                ChainConfig.setConfig('blockTime', '30'),
+                ChainConfig.setConfig('feeBasic', '1'),
+                ChainConfig.setConfig('feeCoefAmount', '0'),
+                ChainConfig.setConfig('feeCoefSize', '0'),
+                ChainConfig.setConfig('feeCoefCost', '0'),
+            ]);
+            fs.writeFileSync(`local.json`, JSON.stringify(zeroBlock, null, 4), 'utf8');
+            console.log(`Created new chain local.json`)
         }
         if (getCmd('-chain', /^.+$/)) {
             if (fs.existsSync(lastParam)) {

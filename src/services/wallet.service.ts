@@ -3,7 +3,7 @@ import { ApplicationContext } from "../types/task.type";
 import { Wallet } from '@bywise/web3';
 import { BalanceDTO, WalletDTO } from "../types";
 import { EnvironmentProvider } from "./environment.service";
-import { BlockTree } from "../types/environment.types";
+import { BlockTree, EnvironmentContext } from "../types/environment.types";
 
 export class WalletProvider {
 
@@ -19,27 +19,43 @@ export class WalletProvider {
     return this.applicationContext.mainWallet;
   }
 
-  async getWalletBalance(blockTree: BlockTree, blockHash: string, address: string): Promise<BalanceDTO> {
-    let balance = await this.environmentProvider.get(blockTree, blockHash, `wallet:${address}:balance`);
+  async getWalletBalanceFromMainContext(blockTree: BlockTree, address: string): Promise<BalanceDTO> {
+    let balance = await this.environmentProvider.getFromMainContext(blockTree, `wallet:${address}:balance`);
     if (balance) {
       return new BalanceDTO(address, new BigNumber(balance));
     }
     return new BalanceDTO(address, new BigNumber(0));
   }
   
-  async getWalletInfo(blockTree: BlockTree, blockHash: string, address: string): Promise<WalletDTO> {
-    let info = await this.environmentProvider.get(blockTree, blockHash, `wallet:${address}:info`);
+  async getWalletInfoFromMainContext(blockTree: BlockTree, address: string): Promise<WalletDTO> {
+    let info = await this.environmentProvider.getFromMainContext(blockTree, `wallet:${address}:info`);
     if (info) {
       return new WalletDTO(JSON.parse(info));
     }
     return new WalletDTO();
   }
 
-  async setWalletBalance(blockTree: BlockTree, blockHash: string, balanceDTO: BalanceDTO): Promise<void> {
-    await this.environmentProvider.set(blockTree, blockHash, `wallet:${balanceDTO.address}:balance`, balanceDTO.balance.toString());
+  async getWalletBalance(envContext: EnvironmentContext, address: string): Promise<BalanceDTO> {
+    let balance = await this.environmentProvider.get(envContext, `wallet:${address}:balance`);
+    if (balance) {
+      return new BalanceDTO(address, new BigNumber(balance));
+    }
+    return new BalanceDTO(address, new BigNumber(0));
   }
   
-  async setWalletInfo(blockTree: BlockTree, blockHash: string, address: string, info: WalletDTO): Promise<void> {
-    await this.environmentProvider.set(blockTree, blockHash, `wallet:${address}:info`, JSON.stringify(info));
+  async getWalletInfo(envContext: EnvironmentContext, address: string): Promise<WalletDTO> {
+    let info = await this.environmentProvider.get(envContext, `wallet:${address}:info`);
+    if (info) {
+      return new WalletDTO(JSON.parse(info));
+    }
+    return new WalletDTO();
+  }
+
+  setWalletBalance(envContext: EnvironmentContext, balanceDTO: BalanceDTO): void {
+    this.environmentProvider.set(envContext, `wallet:${balanceDTO.address}:balance`, balanceDTO.balance.toString());
+  }
+  
+  setWalletInfo(envContext: EnvironmentContext, address: string, info: WalletDTO): void {
+    this.environmentProvider.set(envContext, `wallet:${address}:info`, JSON.stringify(info));
   }
 }
