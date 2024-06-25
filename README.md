@@ -11,11 +11,11 @@ Bywise is an enterprise-grade permissioned Distributed Ledger Technology (DLT), 
 ### System Requirements
 This system spec has been tested by many users and validators and found to be comfortable:
 
-Quad Core or larger AMD or Intel (amd64) CPU
-ARM CPUs like the Apple M1.
-16GB RAM
-200GB NVMe Storage
-10MBPS bidirectional internet connection
+- Quad Core or larger AMD x64, Intel x64 and ARM CPUs like the Apple M1.
+- 16GB RAM
+- 200GB NVMe Storage
+- 10MBPS bidirectional internet connection
+
 You can run Bywise on lower-spec hardware for each component, but you may find that it is not highly performant or prone to crashing.
 
 ### Installation
