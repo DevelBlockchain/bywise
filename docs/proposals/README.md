@@ -2,11 +2,11 @@
 
 ## Phase 1 - Scalling
 
-| Proposal                                                      | Champion                         | Status    |
-| ------------------------------------------------------------- | -------------------------------- | --------- |
-| Orchestration of slices - Linked issue[#26][issue26]            |                                  | Pending   |
-| Use WASMI with QuickJS - Linked issue[#32][issue32]              |                                  | Pending   |
-| EVM Compatibility                                             |                                  | Pending   |
+| Proposal                                                             | Champion                         | Status    |
+| -------------------------------------------------------------------- | -------------------------------- | --------- |
+| Orchestration of slices - Linked issue [#26][issue26]                |                                  | Pending   |
+| Use WASMI with QuickJS - Linked issue [#32][issue32], [#37][issue37] |                                  | Pending   |
+| EVM Compatibility                                                    |                                  | Pending   |
 
 ## Phase 0 - History / Validation
 
@@ -25,6 +25,7 @@
 
 Please see [Contributing to Bywise](https://github.com/DevelBlockchain/bywise/blob/main/docs/design/Contributing.md) for the most up-to-date information on contributing proposals to standard.
 
+[issue37]: https://github.com/DevelBlockchain/bywise/issues/37
 [issue32]: https://github.com/DevelBlockchain/bywise/issues/32
 [issue26]: https://github.com/DevelBlockchain/bywise/issues/26
 [P2P2013_041]: https://www.dpss.inesc-id.pt/~ler/docencia/rcs1314/papers/P2P2013_041.pdf
