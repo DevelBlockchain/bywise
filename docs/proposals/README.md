@@ -4,8 +4,8 @@
 
 | Proposal                                                      | Champion                         | Status    |
 | ------------------------------------------------------------- | -------------------------------- | --------- |
-| Orchestration of slices - [Related Issue][issue26]            |                                  | Pending   |
-| Use WASMI with QuickJS - [Linked issue][issue32]              |                                  | Pending   |
+| Orchestration of slices - Linked issue[#26][issue26]            |                                  | Pending   |
+| Use WASMI with QuickJS - Linked issue[#32][issue32]              |                                  | Pending   |
 | EVM Compatibility                                             |                                  | Pending   |
 
 ## Phase 0 - History / Validation
