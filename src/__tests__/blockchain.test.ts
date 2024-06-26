@@ -31,18 +31,18 @@ beforeAll(async () => {
         initialNodes: [],
         zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: wallet.seed,
-        startServices: ['api', 'core'],
+        startServices: ['api', 'core', 'network'],
     });
 
     web3 = new Web3({
         initialNodes: [`http://localhost:${port0}`]
     });
-    await web3.network.tryConnection();
-}, 30000);
+    await web3.network.connect();
+}, 2000);
 
 afterAll(async () => {
     await node0.stop();
-}, 1000)
+}, 2000)
 
 describe('simple transactions', () => {
 

@@ -41,9 +41,9 @@ beforeAll(async () => {
         isReset: true,
         myHost: `http://localhost:${port0}`,
         initialNodes: [],
-        zeroBlocks: [],
+        zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: node0Wallet.seed,
-        startServices: ['api', 'core'],
+        startServices: ['api'],
     });
 
     node1 = await Bywise.newBywiseInstance({
@@ -53,10 +53,10 @@ beforeAll(async () => {
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port1}`,
-        initialNodes: [`http://localhost:${port0}`, `http://localhost:${port2}`],
-        zeroBlocks: [],
+        initialNodes: [],
+        zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: node1Wallet.seed,
-        startServices: ['api', 'core'],
+        startServices: ['api'],
     });
 
     node2 = await Bywise.newBywiseInstance({
@@ -67,21 +67,19 @@ beforeAll(async () => {
         isReset: true,
         myHost: `http://localhost:${port2}`,
         initialNodes: [],
-        zeroBlocks: [],
+        zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: node2Wallet.seed,
-        startServices: ['api', 'core'],
+        startServices: ['api'],
     });
-}, 60000);
+}, 2000);
 
 beforeEach(async () => {
     await node0.core.stop();
     await node1.core.stop();
     await node2.core.stop();
-    await helper.sleep(200);
-
-    await node0.core.network.resetNetwork();
-    await node1.core.network.resetNetwork();
-    await node2.core.network.resetNetwork();
+    await node0.core.network.stop();
+    await node1.core.network.stop();
+    await node2.core.network.stop();
     await helper.sleep(200);
 
     await node0.applicationContext.database.drop();
@@ -91,24 +89,21 @@ beforeEach(async () => {
     await node0.core.blockProvider.setNewZeroBlock(b0);
     await node1.core.blockProvider.setNewZeroBlock(b0);
     await node2.core.blockProvider.setNewZeroBlock(b0);
+
+    await node0.core.network.start([]);
+    await node1.core.network.start([]);
+    await node2.core.network.start([]);
 }, 2000)
 
 afterAll(async () => {
     await node0.stop();
     await node1.stop();
     await node2.stop();
-}, 20000)
+}, 2000)
 
 const connectNodes = async () => {
-    await node0.core.network.start();
-    await node1.core.network.start();
-    await node2.core.network.start();
-    await helper.sleep(200);
-    await node0.core.network.web3.network.updateConnections([`http://localhost:${port1}`, `http://localhost:${port2}`]);
-    await node1.core.network.web3.network.updateConnections([`http://localhost:${port0}`, `http://localhost:${port2}`]);
-    await node2.core.network.web3.network.updateConnections([`http://localhost:${port0}`, `http://localhost:${port1}`]);
-    await helper.sleep(200);
-
+    await node0.core.network.web3.network.connect([`http://localhost:${port1}`, `http://localhost:${port2}`]);
+    await node1.core.network.web3.network.connect([`http://localhost:${port0}`, `http://localhost:${port2}`]);
     expect(node0.core.network.connectedNodesSize()).toEqual(2);
     expect(node1.core.network.connectedNodesSize()).toEqual(2);
     expect(node2.core.network.connectedNodesSize()).toEqual(2);
@@ -139,8 +134,8 @@ describe('propagation test', () => {
             .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
         expect(res.body.length).toEqual(1);
-    });
-
+    }, 2000);
+    
     test('test simple propagation', async () => {
         await connectNodes();
 
@@ -166,7 +161,7 @@ describe('propagation test', () => {
         expect(res.status).toEqual(200);
         expect(res.body.length).toBeGreaterThan(0);
     }, blockDelay * 5);
-
+    
     test('sync nodes', async () => {
         await node0.core.start();
         await helper.sleep(blockDelay * 6);
@@ -211,7 +206,7 @@ describe('propagation test', () => {
             }
         }
     }, blockDelay * 15);
-
+    
     test('multiple validators', async () => {
         await node0.core.start();
         await helper.sleep(blockDelay * 3); // start alone
@@ -263,25 +258,27 @@ describe('propagation test', () => {
         }
         expect(fromAddress.length).toBeGreaterThanOrEqual(2);
     }, blockDelay * 15);
-
+    
     test('blockchain convergence', async () => {
         let res;
         let blocksNode0: Block[] = []
         let blocksNode1: Block[] = []
         let blocksNode2: Block[] = []
 
-        await node0.core.start();
+        await node1.core.start();
         await node2.core.start();
+
         await helper.sleep(blockDelay * 6);
 
         expect(node0.core.network.connectedNodesSize()).toEqual(0);
+        expect(node1.core.network.connectedNodesSize()).toEqual(0);
         expect(node2.core.network.connectedNodesSize()).toEqual(0);
 
-        res = await request(node0.api.server)
+        res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain)
             .set('authorization', `Node ${keyJWT}`);
         expect(res.status).toEqual(200);
-        blocksNode0 = res.body.reverse();
+        blocksNode1 = res.body.reverse();
 
         res = await request(node2.api.server)
             .get('/api/v2/blocks/last/' + chain)
@@ -290,19 +287,16 @@ describe('propagation test', () => {
         blocksNode2 = res.body.reverse();
 
         // check if different chains
-        expect(blocksNode0.length).toBeGreaterThan(3);
+        expect(blocksNode1.length).toBeGreaterThan(3);
         expect(blocksNode2.length).toBeGreaterThan(3);
-        for (let i = 1; i < blocksNode0.length && i < blocksNode2.length; i++) {
-            const b0 = blocksNode0[i];
+        for (let i = 1; i < blocksNode1.length && i < blocksNode2.length; i++) {
+            const b1 = blocksNode1[i];
             const b2 = blocksNode2[i];
-            expect(b0.hash).not.toEqual(b2.hash);
+            expect(b1.hash).not.toEqual(b2.hash);
         }
 
-        await node1.core.start();
-        await node0.core.network.web3.network.updateConnections([`http://localhost:${port1}`, `http://localhost:${port2}`]);
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
+        await connectNodes();
+        await node0.core.start();
         await helper.sleep(blockDelay * 8);
 
         res = await request(node0.api.server)
@@ -323,21 +317,16 @@ describe('propagation test', () => {
         expect(res.status).toEqual(200);
         blocksNode2 = res.body.reverse();
 
-        //console.log('blocksNode0', blocksNode0.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode1', blocksNode1.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-        //console.log('blocksNode2', blocksNode2.map(tx => tx.height + ' ' + tx.hash.substring(0, 10)))
-
         // checks if the chains have converged
         expect(blocksNode0.length).toBeGreaterThanOrEqual(10);
+        expect(blocksNode1.length).toBeGreaterThanOrEqual(10);
         expect(blocksNode2.length).toBeGreaterThanOrEqual(10);
         for (let i = 0; i < 10; i++) {
             const b0 = blocksNode0[i];
+            const b1 = blocksNode1[i];
             const b2 = blocksNode2[i];
+            expect(b1.hash).toEqual(b2.hash);
             expect(b0.hash).toEqual(b2.hash);
-            if(i < blocksNode1.length) {
-                const b1 = blocksNode1[i];
-                expect(b0.hash).toEqual(b1.hash);
-            }
         }
-    }, blockDelay * 15);
+    }, blockDelay * 20);
 });

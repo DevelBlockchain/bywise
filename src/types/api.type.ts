@@ -1,15 +1,10 @@
-import { BywiseNode } from "@bywise/web3";
-import { BlocksProvider, ChainsProvider, SlicesProvider, TransactionsProvider } from "../services";
+import { BlocksProvider, SlicesProvider, TransactionsProvider } from "../services";
 import { WalletProvider } from "../services/wallet.service";
-import { BlockTree } from "./environment.types";
 import { ApplicationContext } from "./task.type";
 
 export class ApiContext {
     applicationContext;
-    knowNodes: BywiseNode[] = [];
     chains: string[];
-    blockTree: Map<string, BlockTree>;
-    chainsProvider;
     walletProvider;
     blockProvider;
     slicesProvider;
@@ -17,9 +12,7 @@ export class ApiContext {
 
     constructor(applicationContext: ApplicationContext) {
         this.applicationContext = applicationContext;
-        this.chains = [];
-        this.blockTree = new Map();
-        this.chainsProvider = new ChainsProvider(applicationContext);
+        this.chains = applicationContext.zeroBlocks.map(block => block.chain);
         this.walletProvider = new WalletProvider(applicationContext);
         this.blockProvider = new BlocksProvider(applicationContext);
         this.slicesProvider = new SlicesProvider(applicationContext);

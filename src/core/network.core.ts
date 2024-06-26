@@ -1,21 +1,19 @@
 import { Web3, BywiseNode } from '@bywise/web3';
 import { ApplicationContext, Task } from '../types/task.type';
-import { ChainsProvider, NodesProvider } from '../services';
+import { NodesProvider } from '../services';
 import helper from '../utils/helper';
-import { RoutingKeys } from '../datasource/message-queue';
+import { RequestKeys, RoutingKeys } from '../datasource/message-queue';
 
 export default class Network implements Task {
 
     public isRun: boolean = false;
     private nodeProvider: NodesProvider;
-    private chainsProvider: ChainsProvider;
     private applicationContext: ApplicationContext;
     public web3: Web3;
 
-    constructor(applicationContext: ApplicationContext, chainsProvider: ChainsProvider) {
+    constructor(applicationContext: ApplicationContext) {
         this.applicationContext = applicationContext;
-        this.chainsProvider = chainsProvider;
-        this.nodeProvider = new NodesProvider(applicationContext, chainsProvider);
+        this.nodeProvider = new NodesProvider(applicationContext);
 
         this.web3 = new Web3({
             initialNodes: this.applicationContext.initialNodes,
@@ -23,64 +21,55 @@ export default class Network implements Task {
             myHost: this.applicationContext.myHost,
             debug: false,
             createConnection: () => this.nodeProvider.createMyNode(),
-            getChains: this.chainsProvider.getChains
+            getChains: async () => this.applicationContext.zeroBlocks.map(block => block.chain)
         });
     }
 
     public mainLoop = async () => {
         while (this.isRun) {
-            await this.web3.network.updateConnections();
-            const knowNodes = this.web3.network.connectedNodes.map(n => ({
-                ...n,
-                token: undefined,
-                expire: undefined,
-            }));
-            this.applicationContext.logger.debug(`web3 - connections: ${knowNodes.length}`)
-            await this.applicationContext.mq.send(RoutingKeys.know_nodes, knowNodes);
-            for (let i = 0; i < 100 && this.isRun; i++) { // 10 seconds
-                await helper.sleep(100);
+            for (let i = 0; i < 1000 && this.isRun; i++) { // 60 seconds
+                await helper.sleep(60);
+            }
+            if (this.isRun) {
+                await this.web3.network.connect();
             }
         }
-    }
-
-    resetNetwork = async () => {
-        this.isRun = false;
-        await helper.sleep(100);
-        this.web3 = new Web3({
-            initialNodes: this.applicationContext.initialNodes,
-            maxConnectedNodes: this.applicationContext.nodeLimit,
-            myHost: this.applicationContext.myHost,
-            debug: false,
-            createConnection: () => this.nodeProvider.createMyNode(),
-            getChains: this.chainsProvider.getChains
-        });
-        await this.applicationContext.mq.send(RoutingKeys.know_nodes, []);
-        await helper.sleep(100);
     }
 
     connectedNodesSize = () => {
         return this.web3.network.connectedNodes.length;
     }
 
-    async start() {
-        if (!this.isRun) {
-            this.isRun = true;
-            this.applicationContext.mq.addMessageListener(RoutingKeys.started_api, async (message: any) => {
-                await this.web3.network.tryConnection();
-            });
-            this.applicationContext.mq.addMessageListener(RoutingKeys.new_node, async (message: any) => {
-                const node = new BywiseNode(message);
-                this.applicationContext.logger.verbose(`added new node`)
-                this.web3.network.addNode(node);
-            });
-            await this.web3.network.tryConnection();
-            this.applicationContext.logger.verbose(`start web3 - connections: ${this.web3.network.connectedNodes.length} -  initialNodes: ${this.applicationContext.initialNodes.join(", ")}`)
-            this.applicationContext.logger.info(`start web3 - host: ${this.applicationContext.myHost}`)
-            this.mainLoop();
+    isConnected = () => {
+        return this.web3.network.isConnected;
+    }
+
+    async start(initialNodes?: string[]) {
+        if (this.isRun) {
+            this.applicationContext.logger.error("NETWORK already started!");
+            return;
         }
+        this.isRun = true;
+        this.applicationContext.mq.addMessageListener(RoutingKeys.new_node, async (message: any) => {
+            const node = new BywiseNode(message);
+            this.applicationContext.logger.verbose(`web3 - added new node`)
+            this.web3.network.addNode(node);
+        });
+        this.applicationContext.mq.addRequestListener(RequestKeys.get_connected_nodes, async (data: { chain: string, address: string }) => {
+            return this.web3.network.connectedNodes.map(n => ({
+                ...n,
+                token: undefined,
+                expire: undefined,
+            }));
+        });
+        await this.web3.network.connect(initialNodes);
+        this.applicationContext.logger.verbose(`web3 - connections: ${this.web3.network.connectedNodes.length} -  initialNodes: ${this.applicationContext.initialNodes.join(", ")}`)
+        this.applicationContext.logger.info(`web3 - host: ${this.applicationContext.myHost}`)
+        this.mainLoop();
     };
 
     async stop() {
+        this.web3.network.disconnect();
         this.isRun = false;
     };
 }

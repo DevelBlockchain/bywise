@@ -89,7 +89,7 @@ export default class VoteBlocks {
         tx.hash = tx.toHash();
         tx.sign = [await mainWallet.signHash(tx.hash)];
 
-        await web3.network.tryConnection();
+        await web3.network.connect();
         try {
             await web3.transactions.sendTransactionSync(tx);
             this.coreContext.applicationContext.logger.verbose(`create poi in ${block.height} - hash: ${tx.hash}`);
