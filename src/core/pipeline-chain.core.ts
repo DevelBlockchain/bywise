@@ -190,7 +190,7 @@ export default class PipelineChain implements Task {
     private async consensusAlgorithm() {
         this.runWorkersCount++;
         try {
-            const task = new ConsensusAlgorithm(this.coreContext, this);
+            const task = new ConsensusAlgorithm(this.coreContext);
             while (this.isRun && task.isRun) {
                 await task.run();
 

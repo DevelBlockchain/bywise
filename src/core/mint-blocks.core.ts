@@ -25,21 +25,54 @@ export default class MintBlocks {
         const blockTime = this.coreContext.blockTime;
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
 
-        let myBlocks = await this.BlockRepository.findByChainAndHeight(this.coreContext.chain, currentBlock.height);
-        myBlocks = myBlocks.filter(info => info.block.from === mainWallet.address);
-
-        if (myBlocks.length === 0) {
-            await this.tryMintCurrentBlock(currentBlock);
+        const isMinner = await this.coreContext.configsProvider.isValidatorFromMainContext(this.coreContext.blockTree, currentBlock.height, mainWallet.address);
+        if (!isMinner) {
+            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
+            this.isRun = false;
+            return;
         }
-        if (now >= currentBlock.created + blockTime) {
+
+        let myBlocks;
+        let height = currentBlock.height - 1;
+        let isLastBlockMined = false;
+        let isCurrentBlockMined = false;
+        let isNextBlockMined = false;
+        if (height == -1) {
+            isLastBlockMined = true;
+            myBlocks = await this.BlockRepository.findByChainAndHeight(this.coreContext.chain, 0);
+        } else {
+            myBlocks = await this.BlockRepository.findByChainAndHeight(this.coreContext.chain, height);
+        }
+        for (let i = 0; i < myBlocks.length; i++) {
+            const block = myBlocks[i];
+            if (block.block.height == height) {
+                isLastBlockMined = true;
+            } else if (block.block.height == height + 1) {
+                isCurrentBlockMined = true;
+            } else if (block.block.height == height + 2) {
+                isNextBlockMined = true;
+            }
+        }
+
+        if (!isLastBlockMined) {
+            await this.tryMintLastBlock(currentBlock);
+        } else if (!isCurrentBlockMined) {
+            await this.tryMintCurrentBlock(currentBlock);
+        } else if (!isNextBlockMined && now >= currentBlock.created + blockTime) {
             await this.tryMintBlock(currentBlock);
         }
     }
 
+    async tryMintLastBlock(currentBlock: Block) {
+        if (currentBlock.lastHash === BlockTree.ZERO_HASH) throw new Error(`Error tryMintLastBlock`);
+        const lastBlock = await this.coreContext.blockProvider.getBlockInfo(currentBlock.lastHash);
+        if (lastBlock.block.lastHash === BlockTree.ZERO_HASH) throw new Error(`Error tryMintLastBlock`);
+        const lastLastBlock = await this.coreContext.blockProvider.getBlockInfo(currentBlock.lastHash);
+        await this.tryMintBlock(lastLastBlock.block);
+    }
+
     async tryMintCurrentBlock(currentBlock: Block) {
-        if (currentBlock.lastHash === BlockTree.ZERO_HASH) {
-            return;
-        }
+        if (currentBlock.lastHash === BlockTree.ZERO_HASH) throw new Error(`Error tryMintCurrentBlock`);
 
         const lastBlock = await this.coreContext.blockProvider.getBlockInfo(currentBlock.lastHash);
         await this.tryMintBlock(lastBlock.block);
@@ -50,12 +83,6 @@ export default class MintBlocks {
         const blockTime = this.coreContext.blockTime;
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
 
-        const isMinner = await this.coreContext.configsProvider.isValidatorFromMainContext(this.coreContext.blockTree, fromBlock.height, mainWallet.address);
-        if (!isMinner) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
-            this.isRun = false;
-            return;
-        }
         const minValue = await this.coreContext.configsProvider.getConfigByNameFromMainContext(this.coreContext.blockTree, fromBlock.height, 'min-bws-block');
         const balanceDTO = await this.coreContext.walletProvider.getWalletBalanceFromMainContext(this.coreContext.blockTree, mainWallet.address);
         if (balanceDTO.balance.isLessThan(new BigNumber(minValue.value))) {
@@ -135,6 +162,7 @@ export default class MintBlocks {
         blockInfo.isExecuted = false;
         await this.coreContext.blockProvider.updateBlock(blockInfo);
         this.coreContext.blockTree.addBlock(block);
+        await this.coreContext.blockProvider.executeCompleteBlockByHash(this.coreContext.blockTree, blockInfo.block.hash);
         return block;
     }
 }
