@@ -13,7 +13,6 @@ import helper from '../utils/helper';
 export default async function contractsController(app: express.Express, apiContext: ApiContext): Promise<void> {
     const router = express.Router();
     const TransactionRepository = apiContext.applicationContext.database.TransactionRepository;
-    //const EventsRepository = apiContext.applicationContext.database.EventsRepository;
 
     metadataDocument.addPath({
         path: "/api/v2/contracts/simulate",
@@ -178,17 +177,15 @@ export default async function contractsController(app: express.Express, apiConte
     router.get('/contracts/abi/:chain/:address', async (req: express.Request, res: express.Response) => {
         const chain = req.params.chain;
         const address = req.params.address;
-        const blockTree = apiContext.blockTree.get(chain);
-        if (blockTree) {
-            const bcc = await apiContext.applicationContext.mq.request(RequestKeys.get_contract, { chain, address: address });
-            if (bcc) {
-                const txHash = (JSON.parse(bcc)).txHash;
-                const btx = await TransactionRepository.findByHash(txHash);
-                if (!btx) return res.status(404).send({ error: "Transaction not found" });
-                return res.send(btx.output);
-            }
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        
+        const bcc = await apiContext.applicationContext.mq.request(RequestKeys.get_contract, { chain, address: address });
+        if (bcc) {
+            const txHash = (JSON.parse(bcc)).txHash;
+            const btx = await TransactionRepository.findByHash(txHash);
+            if (!btx) return res.status(404).send({ error: "Transaction not found" });
+            return res.send(btx.output);
         }
-        return res.status(404).send({ error: "Contract not found" });
     });
 
     metadataDocument.addPath({
@@ -218,11 +215,9 @@ export default async function contractsController(app: express.Express, apiConte
         const contractAddress = req.params.contractAddress;
         const eventName = req.params.eventName;
         const page = req.query.page ? parseInt(`${req.query.page}`) : 0;
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
         try {
-            const blockTree = apiContext.blockTree.get(chain);
-            if (!blockTree) return res.status(400).send({ error: `Node does not work with this chain` });
-
             if (req.query.key && req.query.value) {
                 const key = `${req.query.key}`;
                 const value = `${req.query.value}`;

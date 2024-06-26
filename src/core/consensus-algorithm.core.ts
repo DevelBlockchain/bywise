@@ -3,17 +3,14 @@ import { RoutingKeys } from "../datasource/message-queue";
 import { Blocks, Votes } from "../models";
 import { CoreContext } from "../types";
 import helper from "../utils/helper";
-import PipelineChain from "./pipeline-chain.core";
 
 export default class ConsensusAlgorithm {
     public isRun = true;
     private coreContext;
-    private pipelineChain;
     private BlockRepository;
 
-    constructor(coreContext: CoreContext, pipelineChain: PipelineChain) {
+    constructor(coreContext: CoreContext) {
         this.coreContext = coreContext;
-        this.pipelineChain = pipelineChain;
         this.BlockRepository = coreContext.applicationContext.database.BlockRepository;
     }
 
