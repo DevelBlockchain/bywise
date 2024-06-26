@@ -23,7 +23,7 @@ beforeAll(async () => {
         startServices: [],
     });
     environmentProvider = new EnvironmentProvider(bywise.applicationContext);
-}, 30000)
+}, 2000)
 
 beforeEach(async () => {
     await bywise.applicationContext.database.drop();
@@ -75,11 +75,11 @@ beforeEach(async () => {
     block_5.lastHash = 'block_4';
     block_5.height = 5;
     blockTree.setMinnedBlock(block_5);
-})
+}, 2000)
 
 afterAll(async () => {
     await bywise.stop();
-}, 30000)
+}, 2000)
 
 describe('local operations', () => {
 

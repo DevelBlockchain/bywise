@@ -182,7 +182,6 @@ class Database {
     public TransactionRepository;
     public SliceRepository;
     public BlockRepository;
-    public ServiceRepository;
     public VotesRepository;
     public ETHRepository;
 
@@ -201,7 +200,6 @@ class Database {
         this.TransactionRepository = new repositories.TransactionRepository(this);
         this.SliceRepository = new repositories.SliceRepository(this);
         this.BlockRepository = new repositories.BlockRepository(this);
-        this.ServiceRepository = new repositories.ServiceRepository(this);
         this.VotesRepository = new repositories.VotesRepository(this);
         this.ETHRepository = new repositories.ETHRepository(this);
     }

@@ -38,9 +38,7 @@ export default class MintSlices {
             return; // not is slice minner for this block
         }
 
-        const isConnected = await this.coreContext.applicationContext.mq.request(RequestKeys.test_connection, {
-            chain: this.coreContext.chain
-        })
+        const isConnected = this.coreContext.network.isConnected();
         if (!isConnected) {
             this.coreContext.applicationContext.logger.error(`mint slice - Node has disconnected!`)
             this.pipelineChain.stop().then(() => {

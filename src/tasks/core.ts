@@ -1,5 +1,5 @@
 import { ApplicationContext, Task, CoreContext } from '../types';
-import { BlocksProvider, ChainsProvider, SlicesProvider, TransactionsProvider } from '../services';
+import { BlocksProvider, SlicesProvider, TransactionsProvider } from '../services';
 import helper from '../utils/helper';
 import PipelineChain from '../core/pipeline-chain.core';
 import Network from '../core/network.core';
@@ -18,22 +18,18 @@ class Core implements Task {
     public blockProvider;
     public transactionsProvider;
     public slicesProvider;
-    private chainsProvider;
 
     constructor(applicationContext: ApplicationContext) {
         this.applicationContext = applicationContext;
-        this.chainsProvider = new ChainsProvider(applicationContext);
-        this.network = new Network(applicationContext, this.chainsProvider);
+        this.network = new Network(applicationContext);
         this.blockProvider = new BlocksProvider(applicationContext);
         this.transactionsProvider = new TransactionsProvider(applicationContext);
         this.slicesProvider = new SlicesProvider(applicationContext);
     }
 
     async runCore() {
-        const chains = await this.chainsProvider.getChains(true);
-
-        for (let i = 0; i < chains.length; i++) {
-            const chain = chains[i];
+        for (let i = 0; i < this.applicationContext.zeroBlocks.length; i++) {
+            const chain = this.applicationContext.zeroBlocks[i].chain;
             let runChain = this.runChains.get(chain);
             if (runChain === undefined) {
 
@@ -55,16 +51,20 @@ class Core implements Task {
     }
 
     private async keepRun() {
-        this.isRun = true;
         while (this.isRun) {
             await this.runCore();
-            for (let i = 0; i < 1000 && this.isRun; i++) {
+            for (let i = 0; i < 1000 && this.isRun; i++) { // 60 seconds
                 await helper.sleep(60);
             }
         }
     }
 
     async start() {
+        if(this.isRun) {
+            this.applicationContext.logger.error("CORE already started!");
+            return;
+        }
+        this.isRun = true;
         this.applicationContext.mq.addMessageListener(RoutingKeys.new_tx, async (message: any) => {
             if (this.network.web3.network.isConnected) {
                 await this.network.web3.transactions.sendTransaction(message);
@@ -115,13 +115,6 @@ class Core implements Task {
                     }
                 }
             }
-        });
-        this.applicationContext.mq.addRequestListener(RequestKeys.test_connection, async (message: any) => {
-            let isConnected = await this.network.web3.network.testConnections();
-            if (!isConnected) {
-                await this.network.web3.network.tryConnection();
-            }
-            return isConnected;
         });
 
         this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx }) => {
@@ -196,13 +189,11 @@ class Core implements Task {
                 throw new Error(`Node does not work with this chain`);
             }
         });
-        await this.network.start();
         this.keepRun();
     }
 
     async stop() {
         this.isRun = false;
-        await this.network.stop();
         for (let i = 0; i < this.runChainsList.length; i++) {
             await this.runChainsList[i].stop();
         }

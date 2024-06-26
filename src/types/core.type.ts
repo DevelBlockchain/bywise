@@ -1,5 +1,5 @@
 import Network from "../core/network.core";
-import { BlocksProvider, ChainsProvider, EnvironmentProvider, SlicesProvider, TransactionsProvider } from "../services";
+import { BlocksProvider, EnvironmentProvider, SlicesProvider, TransactionsProvider } from "../services";
 import { ConfigProvider } from "../services/configs.service";
 import { EventsProvider } from "../services/events.service";
 import { MinnerProvider } from "../services/minner.service";
@@ -12,7 +12,6 @@ export class CoreContext {
     network;
     blockTree;
     chain;
-    chainsProvider;
     blockProvider;
     slicesProvider;
     transactionsProvider;
@@ -29,7 +28,6 @@ export class CoreContext {
         this.network = network;
         this.blockTree = blockTree;
         this.chain = blockTree.chain;
-        this.chainsProvider = new ChainsProvider(applicationContext);
         this.blockProvider = new BlocksProvider(applicationContext);
         this.slicesProvider = new SlicesProvider(applicationContext);
         this.transactionsProvider = new TransactionsProvider(applicationContext);

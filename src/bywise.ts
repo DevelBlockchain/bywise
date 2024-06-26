@@ -21,6 +21,7 @@ export default class Bywise {
             port: bywiseStartNodeConfig.port,
             https: bywiseStartNodeConfig.https,
             nodeLimit,
+            zeroBlocks: [],
             keyJWT: bywiseStartNodeConfig.keyJWT,
             mainWallet: mainWallet,
             myHost: bywiseStartNodeConfig.myHost,
@@ -44,6 +45,8 @@ export default class Bywise {
             logger.info(`#### CONFIGURE CHAIN "${zeroBlock.block.chain}"`)
             await blockProvider.setNewZeroBlock(zeroBlock);
         }
+        const zeroBlocks = await database.BlockRepository.findZeroBlocks();
+        applicationContext.zeroBlocks = zeroBlocks.map(block => block.block);
 
         const api = new Api(applicationContext);
         const core = new Core(applicationContext);
@@ -77,8 +80,9 @@ export default class Bywise {
     stop = async () => {
         await this.api.stop();
         await this.core.stop();
+        await this.core.network.stop();
         await this.applicationContext.mq.stop();
-        await helper.sleep(200);
+        await helper.sleep(300);
         await this.applicationContext.database.stop();
     }
 }

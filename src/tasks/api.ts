@@ -38,29 +38,13 @@ class Api implements Task {
         this.app = express();
     }
 
-    private async addChain(chain: string) {
-        const blockTree = await this.apiCtx.blockProvider.getBlockTree(chain);
-        this.apiCtx.blockTree.set(chain, blockTree);
-        if (!this.apiCtx.chains.includes(chain)) {
-            this.apiCtx.chains.push(chain)
-        }
-    }
-
     async start() {
-        this.isRun = false;
-
-        this.applicationContext.mq.addMessageListener(RoutingKeys.know_nodes, async (message: any) => {
-            this.apiCtx.knowNodes = message;
-        });
-        this.applicationContext.mq.addMessageListener(RoutingKeys.selected_new_block, async (message: any) => {
-            await this.addChain(message);
-        });
-
-        const initialChains = await this.apiCtx.chainsProvider.getChains(true);
-        for (let i = 0; i < initialChains.length; i++) {
-            const chain = initialChains[i];
-            await this.addChain(chain);
+        if(this.isRun) {
+            this.applicationContext.logger.error("API already started!");
+            return;
         }
+        this.isRun = true;
+
         this.app.use(bodyParser.urlencoded({ extended: false }));
         this.app.use(bodyParser.json({ limit: '10mb' }));
         this.app.use(cors());
@@ -102,11 +86,11 @@ class Api implements Task {
         notFoundMiddleware(this.app);
 
         swaggerJson = metadataDocument.generateSwaggerJson();
-
+        let run = false;
         if (!this.applicationContext.https) {
             this.server = this.app.listen(this.applicationContext.port, () => {
                 this.applicationContext.logger.verbose('Start server on port ' + this.applicationContext.port);
-                this.isRun = true;
+                run = true;
             });
         } else {
             this.server = https.createServer({
@@ -116,10 +100,10 @@ class Api implements Task {
             }, this.app);
             this.server.listen(this.applicationContext.port, () => {
                 this.applicationContext.logger.verbose('Start server on port ' + this.applicationContext.port);
-                this.isRun = true;
+                run = true;
             });
         }
-        while (!this.isRun) {
+        while (!run) {
             await helper.sleep(10);
         }
         this.applicationContext.mq.send(RoutingKeys.started_api, '');
