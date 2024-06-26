@@ -2,7 +2,6 @@ import { BywiseNode, InfoNode } from '@bywise/web3/lib/types';
 import { ApplicationContext } from '../types/task.type';
 import helper from '../utils/helper';
 import AuthProvider from './auth.service';
-import { ChainsProvider } from './chains.service';
 import { WalletProvider } from './wallet.service';
 const pjson = require('./../../package.json');
 
@@ -13,11 +12,9 @@ export class NodesProvider {
   private authProvider;
   private walletProvider;
   private applicationContext;
-  private chainsProvider;
 
-  constructor(applicationContext: ApplicationContext, chainsProvider: ChainsProvider) {
+  constructor(applicationContext: ApplicationContext) {
     this.applicationContext = applicationContext;
-    this.chainsProvider = chainsProvider;
     this.authProvider = new AuthProvider(applicationContext);
     this.walletProvider = new WalletProvider(applicationContext);
   }
@@ -26,7 +23,7 @@ export class NodesProvider {
     let token = await this.authProvider.createNodeToken(EXPIRE);
     let account = await this.walletProvider.getMainWallet();
     let myNode = new BywiseNode({
-      chains: await this.chainsProvider.getChains(),
+      chains: this.applicationContext.zeroBlocks.map(block => block.chain),
       address: account.address,
       host: this.applicationContext.myHost,
       version: pjson.version,
@@ -43,7 +40,7 @@ export class NodesProvider {
       host: this.applicationContext.myHost,
       version: pjson.version,
       timestamp: helper.getNow(),
-      chains: await this.chainsProvider.getChains(),
+      chains: this.applicationContext.zeroBlocks.map(block => block.chain),
       explorers: [],
       nodes: connectedNodes,
     }

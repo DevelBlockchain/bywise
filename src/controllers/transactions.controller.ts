@@ -43,6 +43,7 @@ export default async function transactionsController(app: express.Express, apiCo
         if (!chain) {
             return res.status(400).send({ error: `missing chain` });
         }
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
         if (!value && !searchBy) {
             return res.send({ count: await TransactionRepository.countByChain(chain) });
         }
@@ -123,6 +124,8 @@ export default async function transactionsController(app: express.Express, apiCo
         const searchBy = req.query.searchBy as string;
         const value = req.query.value as string;
         let txs: Transaction[] = [];
+
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
         if (!value && !searchBy) {
             txs = await TransactionRepository.findByChain(chain, limit, offset, order);
@@ -213,8 +216,7 @@ export default async function transactionsController(app: express.Express, apiCo
     router.post('/transactions/fee', async (req: express.Request, res: express.Response) => {
         const tx = new Tx(req.body);
         try {
-            const blockTree = apiContext.blockTree.get(tx.chain)
-            if (!blockTree) return res.status(400).send({ error: `Node does not work with this chain` });
+            if (!apiContext.chains.includes(tx.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
             tx.fee = '0';
             const output = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
 
@@ -285,9 +287,7 @@ export default async function transactionsController(app: express.Express, apiCo
         const body: { token: string, chain: string, to: string[], amount: string[], type: string, foreignKeys: string[], data: any } = req.body;
         try {
             if (body.token !== process.env.TOKEN) return res.status(400).send({ error: `Forbidden - invalid token` });
-
-            const blockTree = apiContext.blockTree.get(body.chain)
-            if (!blockTree) return res.status(400).send({ error: `Node does not work with this chain` });
+            if (!apiContext.chains.includes(body.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
             const mainWallet = await apiContext.walletProvider.getMainWallet();
             const tx = new Tx();

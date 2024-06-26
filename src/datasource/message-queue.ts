@@ -3,7 +3,6 @@ import worker_threads from 'worker_threads';
 import { EventEmitter } from 'node:events';
 
 export enum RoutingKeys {
-    know_nodes = 'know_nodes',
     new_node = 'new_node',
     new_tx = 'new_tx',
     new_slice = 'new_slice',
@@ -17,7 +16,7 @@ export enum RoutingKeys {
 }
 
 export enum RequestKeys {
-    test_connection = 'test_connection',
+    get_connected_nodes = 'get_connected_nodes',
     get_contract = 'get_contract',
     get_info_wallet = 'get_info_wallet',
     get_confirmed_slices = 'get_confirmed_slices',

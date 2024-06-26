@@ -26,9 +26,9 @@ export default async function walletsController(app: express.Express, apiContext
         }]
     })
     router.get('/wallets/:address/:chain', async (req: express.Request, res: express.Response) => {
-        const blockTree = apiContext.blockTree.get(req.params.chain)
-        if (!blockTree) return res.status(400).send({ error: `Node does not work with this chain` });
-
+        const chain = req.params.chain;
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        
         const info = await apiContext.applicationContext.mq.request(RequestKeys.get_info_wallet, {chain: req.params.chain, address: req.params.address});
 
         return res.send(info);

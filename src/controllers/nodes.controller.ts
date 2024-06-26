@@ -4,12 +4,12 @@ import { Web3, BywiseNode } from '@bywise/web3';
 import { NodesProvider } from '../services';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
 import { ApiContext } from '../types';
-import { RoutingKeys } from '../datasource/message-queue';
+import { RequestKeys, RoutingKeys } from '../datasource/message-queue';
 
 export default async function nodesController(app: express.Express, apiContext: ApiContext): Promise<void> {
     const router = express.Router();
     
-    const nodeProvider = new NodesProvider(apiContext.applicationContext, apiContext.chainsProvider);
+    const nodeProvider = new NodesProvider(apiContext.applicationContext);
 
     metadataDocument.addPath({
         path: "/api/v2/nodes/info",
@@ -26,7 +26,8 @@ export default async function nodesController(app: express.Express, apiContext: 
         }]
     })
     router.get('/info', async (req: express.Request, res: express.Response) => {
-        return res.send(await nodeProvider.getInfoNode(apiContext.knowNodes));
+        const connectedNodes = await apiContext.applicationContext.mq.request(RequestKeys.get_connected_nodes);
+        return res.send(await nodeProvider.getInfoNode(connectedNodes));
     });
 
     metadataDocument.addPath({
@@ -44,7 +45,8 @@ export default async function nodesController(app: express.Express, apiContext: 
         }]
     })
     router.get('/try-token', async (req: express.Request, res: express.Response) => {
-        return res.send(await nodeProvider.getInfoNode(apiContext.knowNodes));
+        const connectedNodes = await apiContext.applicationContext.mq.request(RequestKeys.get_connected_nodes);
+        return res.send(await nodeProvider.getInfoNode(connectedNodes));
     });
 
     metadataDocument.addPath({

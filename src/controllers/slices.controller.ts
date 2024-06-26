@@ -39,9 +39,12 @@ export default async function slicesController(app: express.Express, apiContext:
             status = BlockchainStatus.TX_FAILED;
         }
 
-        let count = await SliceRepository.count(req.params.chain, status);
+        const chain = req.params.chain;
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        
+        let count = await SliceRepository.count(chain, status);
         if (status === BlockchainStatus.TX_MINED) {
-            const confimedSlices: Slices[] = await apiContext.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: req.params.chain });
+            const confimedSlices: Slices[] = await apiContext.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: chain });
             count += confimedSlices.length;
         }
         return res.send({ count });
@@ -89,9 +92,12 @@ export default async function slicesController(app: express.Express, apiContext:
         }
         if (limit > 200) return res.status(400).send({ error: "invalid limit" });
 
+        const chain = req.params.chain;
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+
         const slices: Slice[] = [];
         if (status === BlockchainStatus.TX_MINED) {
-            const confimedSlices: Slices[] = await apiContext.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: req.params.chain });
+            const confimedSlices: Slices[] = await apiContext.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: chain });
             confimedSlices.forEach(sliceInfo => slices.push(sliceInfo.slice));
         }
         const findSlices = await SliceRepository.find(req.params.chain, status, limit, offset, order);

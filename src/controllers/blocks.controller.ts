@@ -36,7 +36,9 @@ export default async function blocksController(app: express.Express, apiContext:
         } else if (req.query.status === 'failed') {
             status = BlockchainStatus.TX_FAILED;
         }
-        const count = await BlockRepository.countBlocksByStatus(status, req.params.chain);
+        const chain = req.params.chain;
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        const count = await BlockRepository.countBlocksByStatus(status, chain);
         return res.send({ count });
     });
 
@@ -82,7 +84,9 @@ export default async function blocksController(app: express.Express, apiContext:
         }
         if (limit > 200) return res.status(400).send({ error: "invalid limit" });
 
-        const blocks = await BlockRepository.findBlocksLastsByStatus(status, req.params.chain, limit, offset, order);
+        const chain = req.params.chain;
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        const blocks = await BlockRepository.findBlocksLastsByStatus(status, chain, limit, offset, order);
 
         return res.send(blocks.map(block => ({ ...(new Block(block.block)), status: block.status })));
     });
@@ -109,7 +113,10 @@ export default async function blocksController(app: express.Express, apiContext:
         }]
     })
     router.get('/blocks/height/:chain/:height', async (req: express.Request, res: express.Response) => {
-        const blocks = await BlockRepository.findByChainAndHeight(req.params.chain, parseInt(req.params.height));
+        const chain = req.params.chain;
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+
+        const blocks = await BlockRepository.findByChainAndHeight(chain, parseInt(req.params.height));
         for (let i = 0; i < blocks.length; i++) {
             const block = blocks[i];
             if(block.status === BlockchainStatus.TX_MINED) {
@@ -206,7 +213,9 @@ export default async function blocksController(app: express.Express, apiContext:
         }]
     })
     router.get('/blocks/pack/:chain/:height', async (req: express.Request, res: express.Response) => {
-        const blockPack = await apiContext.blockProvider.getBlockPack(req.params.chain, parseInt(req.params.height));
+        const chain = req.params.chain;
+        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        const blockPack = await apiContext.blockProvider.getBlockPack(chain, parseInt(req.params.height));
         if (blockPack) {
             res.send(blockPack);
         } else {

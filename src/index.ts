@@ -229,7 +229,7 @@ const main = async () => {
                 initialNodes: initialNodes,
                 zeroBlocks: [],
                 mainWalletSeed: wallet,
-                startServices: ['core'],
+                startServices: ['core', 'network'],
             });
             await newBywiseWorker(true, {
                 name: name,
@@ -254,7 +254,7 @@ const main = async () => {
                 initialNodes: initialNodes,
                 zeroBlocks: [],
                 mainWalletSeed: wallet,
-                startServices: ['core', 'api'],
+                startServices: ['core', 'api', 'network'],
             });
         }
     } catch (err: any) {
