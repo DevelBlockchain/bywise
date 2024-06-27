@@ -57,7 +57,7 @@ export default class VoteBlocks {
         tx.hash = tx.toHash();
         tx.sign = [await mainWallet.signHash(tx.hash)];
         await this.coreContext.transactionsProvider.saveNewTransaction(tx);
-        this.coreContext.applicationContext.logger.verbose(`create vote in ${currentBlock.height}`);
+        this.coreContext.applicationContext.logger.info(`create vote in ${currentBlock.height}`);
 
         await this.makePOI(currentBlock);
     }
