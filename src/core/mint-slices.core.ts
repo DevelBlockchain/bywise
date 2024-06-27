@@ -38,19 +38,6 @@ export default class MintSlices {
             return; // not is slice minner for this block
         }
 
-        const isConnected = this.coreContext.network.isConnected();
-        if (!isConnected) {
-            this.coreContext.applicationContext.logger.error(`mint slice - Node has disconnected!`)
-            this.pipelineChain.stop().then(() => {
-                this.pipelineChain.start();
-            });
-            return;
-        }
-
-        if (helper.getNow() >= currentMinnedBlock.created + this.coreContext.blockTime * 2) {
-            return; // too late
-        }
-
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
         let slices = await this.SliceRepository.findByChainAndBlockHeight(this.coreContext.chain, currentMinnedBlock.height + 1);
         slices = slices.filter(
@@ -76,6 +63,16 @@ export default class MintSlices {
             }
         }
         if (end) {
+            return; // slice already ended
+        }
+
+        const isConnected = this.coreContext.network.isConnected();
+        if (!isConnected) {
+            this.coreContext.applicationContext.logger.error(`mint slice - Node has disconnected!`);
+            return;
+        }
+        if (helper.getNow() >= currentMinnedBlock.created + this.coreContext.blockTime * 2) {
+            this.coreContext.applicationContext.logger.error(`mint slice - Too late to mint`);
             return;
         }
 

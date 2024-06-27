@@ -23,20 +23,20 @@ export default class VoteBlocks {
         if (now < nextVote) {
             return;
         }
-        if(this.blockHeight >= currentBlock.height) {
+        if (this.blockHeight >= currentBlock.height) {
             return;
         }
         this.blockHeight = currentBlock.height;
 
         const isMinner = await this.coreContext.configsProvider.isValidatorFromMainContext(this.coreContext.blockTree, currentBlock.height, mainWallet.address);
         if (!isMinner) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
-            this.isRun = false;
+            this.coreContext.applicationContext.logger.verbose(`not enabled to vote blocks on chain ${this.coreContext.chain}`);
             return;
         }
         const minValue = await this.coreContext.configsProvider.getConfigByNameFromMainContext(this.coreContext.blockTree, currentBlock.height, 'min-bws-block');
         const balanceDTO = await this.coreContext.walletProvider.getWalletBalanceFromMainContext(this.coreContext.blockTree, mainWallet.address);
         if (balanceDTO.balance.isLessThan(new BigNumber(minValue.value))) {
+            this.coreContext.applicationContext.logger.verbose(`not enabled to vote blocks on chain ${this.coreContext.chain} - low balance`);
             return;
         }
 
