@@ -21,7 +21,9 @@ export class CoreContext {
     walletProvider;
     eventsProvider;
 
-    blockTime: number = 60;
+    blockTime = 60;
+    isValidator = false;
+    hasMinimumBWSToMine = false;
 
     constructor(applicationContext: ApplicationContext, network: Network, blockTree: BlockTree) {
         this.applicationContext = applicationContext;

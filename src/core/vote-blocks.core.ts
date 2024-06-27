@@ -1,5 +1,4 @@
 import { Block, Tx, TxType, Web3 } from "@bywise/web3";
-import BigNumber from "bignumber.js";
 import { CoreContext } from "../types";
 import helper from "../utils/helper";
 
@@ -13,6 +12,9 @@ export default class VoteBlocks {
     }
 
     async run() {
+        if (!this.coreContext.isValidator || !this.coreContext.hasMinimumBWSToMine) {
+            return;
+        }
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
         const currentBlock = await this.coreContext.blockTree.currentMinnedBlock;
 
@@ -27,18 +29,6 @@ export default class VoteBlocks {
             return;
         }
         this.blockHeight = currentBlock.height;
-
-        const isMinner = await this.coreContext.configsProvider.isValidatorFromMainContext(this.coreContext.blockTree, currentBlock.height, mainWallet.address);
-        if (!isMinner) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to vote blocks on chain ${this.coreContext.chain}`);
-            return;
-        }
-        const minValue = await this.coreContext.configsProvider.getConfigByNameFromMainContext(this.coreContext.blockTree, currentBlock.height, 'min-bws-block');
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalanceFromMainContext(this.coreContext.blockTree, mainWallet.address);
-        if (balanceDTO.balance.isLessThan(new BigNumber(minValue.value))) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to vote blocks on chain ${this.coreContext.chain} - low balance`);
-            return;
-        }
 
         const tx = new Tx();
         tx.version = '2';
