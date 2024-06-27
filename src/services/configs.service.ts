@@ -102,49 +102,6 @@ export class ConfigProvider {
     return null;
   }
 
-  async getConfigByNameFromMainContext(blockTree: BlockTree, blockHeight: number, name: string): Promise<ConfigDTO> {
-    let cfg = new ConfigDTO({
-      chain: blockTree.chain,
-      name: name,
-      value: 'false',
-      type: 'boolean',
-    });
-    let configEnv = await this.environmentProvider.getFromMainContext(blockTree, `config-${name}`);
-    if (configEnv) {
-      let cfgMeta: ConfigMeta = JSON.parse(configEnv);
-      cfg.type = cfgMeta.type;
-      if (blockHeight - cfgMeta.lastUpdate > 60 || cfgMeta.lastUpdate === 0) {
-        cfg.setValue(cfgMeta.value);
-      } else {
-        cfg.setValue(cfgMeta.lastValue);
-      }
-    } else {
-      let defaultCfg = this.findByName(name);
-      if (defaultCfg === null) throw new Error(`config ${name} not found`);
-      cfg.type = defaultCfg.type;
-      cfg.setValue(defaultCfg.value);
-    }
-    return new ConfigDTO(cfg);
-  }
-
-  async isValidatorFromMainContext(blockTree: BlockTree, blockHeight: number, address: string): Promise<boolean> {
-    try {
-      const isValidatorAddress = await this.getConfigByNameFromMainContext(blockTree, blockHeight, `validator-${address}`);
-      return isValidatorAddress.toBoolean();
-    } catch (err) {
-      return false;
-    }
-  }
-
-  async isAdminFromMainContext(blockTree: BlockTree, blockHeight: number, address: string): Promise<boolean> {
-    try {
-      const isAdminAddress = await this.getConfigByNameFromMainContext(blockTree, blockHeight, `admin-address-${address}`);
-      return isAdminAddress.toBoolean();
-    } catch (err) {
-      return false;
-    }
-  }
-
   async isValidator(envContext: EnvironmentContext, address: string): Promise<boolean> {
     try {
       const isValidatorAddress = await this.getByName(envContext, `validator-${address}`);

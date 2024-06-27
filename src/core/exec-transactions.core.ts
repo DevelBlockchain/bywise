@@ -2,6 +2,7 @@ import { Tx } from "@bywise/web3";
 import { CoreContext, SimulateDTO } from "../types";
 import helper from "../utils/helper";
 import { CompiledContext } from "../types/environment.types";
+import BigNumber from "bignumber.js";
 
 const EVENT_PAGE_SIZE = 100;
 
@@ -49,6 +50,7 @@ export default class ExecuteTransactions {
         if (oldContext) {
             await this.coreContext.transactionsProvider.disposeContext(oldContext);
         }
+        await this.updateConfigs(ctx);
         this.busy = false;
     }
 
@@ -154,5 +156,26 @@ export default class ExecuteTransactions {
             total_events: Math.floor(size),
             events
         };
+    }
+
+    private async updateConfigs(currentContext: SimulateDTO) {
+        const mainWallet = await this.coreContext.walletProvider.getMainWallet();
+        const config = await this.coreContext.configsProvider.getByName(currentContext.envContext, 'blockTime');
+        const newBlockTime = parseInt(config.value);
+        const isValidator = await this.coreContext.configsProvider.isValidator(currentContext.envContext, mainWallet.address);
+        const minValue = await this.coreContext.configsProvider.getByName(currentContext.envContext, 'min-bws-block');
+        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.envContext, mainWallet.address);
+        const hasMinimumBWSToMine = !balanceDTO.balance.isLessThan(new BigNumber(minValue.value));
+
+        this.coreContext.blockTime = newBlockTime;
+        this.coreContext.isValidator = isValidator;
+        this.coreContext.hasMinimumBWSToMine = hasMinimumBWSToMine;
+
+        if (!this.coreContext.isValidator) {
+            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
+        }
+        if (!this.coreContext.hasMinimumBWSToMine) {
+            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain} - low balance`);
+        }
     }
 }

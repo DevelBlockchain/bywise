@@ -1,5 +1,4 @@
 import { Block } from "@bywise/web3";
-import { RoutingKeys } from "../datasource/message-queue";
 import { Blocks, Votes } from "../models";
 import { CoreContext } from "../types";
 import helper from "../utils/helper";
@@ -66,7 +65,7 @@ export default class ConsensusAlgorithm {
 
         if (currentBlock.hash !== bestBlock.block.hash) {
             this.coreContext.applicationContext.logger.info(`consensus - change current block ${bestBlock.block.height} - ${bestBlock.block.hash.substring(0, 10)}... by ${changeReason}`);
-            await this.selectNewMinedBlock(bestBlock);
+            await this.coreContext.blockProvider.selectMinedBlock(this.coreContext.blockTree, bestBlock.block.hash);
         } else {
             if (nextBlocks.length > 0) {
                 if (helper.getNow() < currentBlock.created + blockTime) {
@@ -80,7 +79,7 @@ export default class ConsensusAlgorithm {
                     }
                 }
                 this.coreContext.applicationContext.logger.info(`consensus - consolide block ${bestBlock.block.height} - ${bestBlock.block.lastHash.substring(0, 10)}... - votes: ${bestBlockByVotesMax} - options: ${currentBlocks.length} -> next block ${bestBlock.block.hash.substring(0, 10)}...`);
-                await this.selectNewMinedBlock(bestBlock);
+                await this.coreContext.blockProvider.selectMinedBlock(this.coreContext.blockTree, bestBlock.block.hash);
             }
         }
     }
@@ -99,12 +98,5 @@ export default class ConsensusAlgorithm {
             count += this.countChainVotes(lastHash, votes);
         }
         return count;
-    }
-
-    private async selectNewMinedBlock(bestBlock: Blocks) {
-        await this.coreContext.blockProvider.selectMinedBlock(this.coreContext.blockTree, bestBlock.block.hash);
-        const config = await this.coreContext.configsProvider.getConfigByNameFromMainContext(this.coreContext.blockTree, bestBlock.block.height, 'blockTime');
-        this.coreContext.blockTime = parseInt(config.value);
-        await this.coreContext.applicationContext.mq.send(RoutingKeys.selected_new_block, this.coreContext.chain);
     }
 }

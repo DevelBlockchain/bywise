@@ -158,7 +158,7 @@ export default class PipelineChain implements Task {
     private async mintBlocks() {
         this.runWorkersCount++;
         try {
-            const task = new MintBlocks(this.coreContext, this);
+            const task = new MintBlocks(this.coreContext);
             while (this.isRun && task.isRun) {
                 await task.run();
 

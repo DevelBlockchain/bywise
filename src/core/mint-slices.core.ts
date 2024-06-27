@@ -1,5 +1,4 @@
 import { Block, Slice, SliceData, Tx, TxType } from "@bywise/web3";
-import { RequestKeys } from "../datasource/message-queue";
 import { BlockchainStatus, CoreContext, SimulateDTO, TransactionOutputDTO } from "../types";
 import { BlockTree, CompiledContext } from "../types/environment.types";
 import helper from "../utils/helper";
@@ -31,24 +30,14 @@ export default class MintSlices {
     }
 
     async run() {
+        if (!this.coreContext.isValidator || !this.coreContext.hasMinimumBWSToMine) {
+            return;
+        }
         const currentMinnedBlock = this.coreContext.blockTree.currentMinnedBlock;
 
         let isMiner = await this.isSliceMinner(currentMinnedBlock);
         if (!isMiner) {
             return; // not is slice minner for this block
-        }
-
-        const isConnected = this.coreContext.network.isConnected();
-        if (!isConnected) {
-            this.coreContext.applicationContext.logger.error(`mint slice - Node has disconnected!`)
-            this.pipelineChain.stop().then(() => {
-                this.pipelineChain.start();
-            });
-            return;
-        }
-
-        if (helper.getNow() >= currentMinnedBlock.created + this.coreContext.blockTime * 2) {
-            return; // too late
         }
 
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
@@ -76,6 +65,16 @@ export default class MintSlices {
             }
         }
         if (end) {
+            return; // slice already ended
+        }
+
+        const isConnected = this.coreContext.network.isConnected();
+        if (!isConnected) {
+            this.coreContext.applicationContext.logger.error(`mint slice - Node has disconnected!`);
+            return;
+        }
+        if (helper.getNow() >= currentMinnedBlock.created + this.coreContext.blockTime * 2) {
+            this.coreContext.applicationContext.logger.error(`mint slice - Too late to mint`);
             return;
         }
 

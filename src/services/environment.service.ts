@@ -95,24 +95,6 @@ export class EnvironmentProvider {
         return env;
     }
 
-    async hasFromMainContext(blockTree: BlockTree, key: string): Promise<boolean> {
-        const env = await this.EnvironmentRepository.get(blockTree.chain, key, CompiledContext.MAIN_CONTEXT_HASH);
-        if (!env || env.value === null) {
-            return false;
-        } else {
-            return true;
-        }
-    }
-
-    async getFromMainContext(blockTree: BlockTree, key: string): Promise<string> {
-        const env = await this.EnvironmentRepository.get(blockTree.chain, key, CompiledContext.MAIN_CONTEXT_HASH);
-        if (env && env.value !== null) {
-            return env.value;
-        } else {
-            return '';
-        }
-    }
-
     async getList(envContext: EnvironmentContext, key: string, limit: number, offset: number): Promise<Environment[]> {
         let envs: Environment[];
         envs = await this.EnvironmentRepository.findByChainAndHashAndKey(envContext.blockTree.chain, envContext.fromContextHash, key, limit, offset);
@@ -242,7 +224,7 @@ export class EnvironmentProvider {
 
     private async consolideFromHash(blockTree: BlockTree, fromContextHash: string, toContextHash: string, compiledContext: CompiledContext) {
         if (toContextHash === BlockTree.ZERO_HASH) {
-            await this.clearMainContext(blockTree.chain, compiledContext);
+            await this.clearContext(blockTree.chain, compiledContext);
         } else if (fromContextHash !== toContextHash) {
             const lastHash = blockTree.getLastHash(toContextHash);
             await this.consolideFromHash(blockTree, fromContextHash, lastHash, compiledContext);
@@ -250,8 +232,8 @@ export class EnvironmentProvider {
         await this.mergeContext(blockTree.chain, toContextHash, compiledContext);
     }
 
-    public async clearMainContext(chain: string, compiledContext: CompiledContext) {
-        this.logger.warn(`EnvironmentProvider.clearMainContext`);
+    public async clearContext(chain: string, compiledContext: CompiledContext) {
+        this.logger.warn(`EnvironmentProvider.clearContext`);
         let delEnvs: Environment[] = [];
         do {
             delEnvs = await this.EnvironmentRepository.findByChainAndHash(chain, compiledContext, ENV_BATCH, 0);

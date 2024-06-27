@@ -1,5 +1,4 @@
 import { Block, Tx, TxType, Web3 } from "@bywise/web3";
-import BigNumber from "bignumber.js";
 import { CoreContext } from "../types";
 import helper from "../utils/helper";
 
@@ -13,6 +12,9 @@ export default class VoteBlocks {
     }
 
     async run() {
+        if (!this.coreContext.isValidator || !this.coreContext.hasMinimumBWSToMine) {
+            return;
+        }
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
         const currentBlock = await this.coreContext.blockTree.currentMinnedBlock;
 
@@ -23,22 +25,10 @@ export default class VoteBlocks {
         if (now < nextVote) {
             return;
         }
-        if(this.blockHeight >= currentBlock.height) {
+        if (this.blockHeight >= currentBlock.height) {
             return;
         }
         this.blockHeight = currentBlock.height;
-
-        const isMinner = await this.coreContext.configsProvider.isValidatorFromMainContext(this.coreContext.blockTree, currentBlock.height, mainWallet.address);
-        if (!isMinner) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
-            this.isRun = false;
-            return;
-        }
-        const minValue = await this.coreContext.configsProvider.getConfigByNameFromMainContext(this.coreContext.blockTree, currentBlock.height, 'min-bws-block');
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalanceFromMainContext(this.coreContext.blockTree, mainWallet.address);
-        if (balanceDTO.balance.isLessThan(new BigNumber(minValue.value))) {
-            return;
-        }
 
         const tx = new Tx();
         tx.version = '2';
@@ -57,7 +47,7 @@ export default class VoteBlocks {
         tx.hash = tx.toHash();
         tx.sign = [await mainWallet.signHash(tx.hash)];
         await this.coreContext.transactionsProvider.saveNewTransaction(tx);
-        this.coreContext.applicationContext.logger.verbose(`create vote in ${currentBlock.height}`);
+        this.coreContext.applicationContext.logger.info(`create vote in ${currentBlock.height}`);
 
         await this.makePOI(currentBlock);
     }

@@ -1,24 +1,23 @@
 import { Block, Wallet } from "@bywise/web3";
 import { Slices } from "../models";
-import BigNumber from "bignumber.js";
 import { CoreContext } from "../types";
 import helper from "../utils/helper";
 import { BlockTree } from "../types/environment.types";
-import PipelineChain from "./pipeline-chain.core";
 
 export default class MintBlocks {
     public isRun = true;
     private coreContext;
-    private pipelineChain;
     private BlockRepository;
 
-    constructor(coreContext: CoreContext, pipelineChain: PipelineChain) {
+    constructor(coreContext: CoreContext) {
         this.coreContext = coreContext;
-        this.pipelineChain = pipelineChain;
         this.BlockRepository = coreContext.applicationContext.database.BlockRepository;
     }
 
     async run() {
+        if (!this.coreContext.isValidator || !this.coreContext.hasMinimumBWSToMine) {
+            return;
+        }
         const now = helper.getNow()
         const currentBlock = this.coreContext.blockTree.currentMinnedBlock;
         const blockTime = this.coreContext.blockTime;
@@ -74,20 +73,6 @@ export default class MintBlocks {
         const blockTime = this.coreContext.blockTime;
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
 
-        const isMinner = await this.coreContext.configsProvider.isValidatorFromMainContext(this.coreContext.blockTree, fromBlock.height, mainWallet.address);
-        if (!isMinner) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
-            this.isRun = false;
-            return;
-        }
-
-        const minValue = await this.coreContext.configsProvider.getConfigByNameFromMainContext(this.coreContext.blockTree, fromBlock.height, 'min-bws-block');
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalanceFromMainContext(this.coreContext.blockTree, mainWallet.address);
-        if (balanceDTO.balance.isLessThan(new BigNumber(minValue.value))) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain} - low balance`);
-            return;
-        }
-
         let from = fromBlock.from;
         if (fromBlock.lastHash !== BlockTree.ZERO_HASH) {
             const lastLastBlock = await this.coreContext.blockProvider.getBlockInfo(fromBlock.lastHash);
@@ -103,13 +88,17 @@ export default class MintBlocks {
             if (!sliceInfo.isExecuted) {
                 break;
             }
+            slices.push(sliceInfo);
             if (sliceInfo.slice.end) {
                 end = true;
+                break;
             }
-            slices.push(sliceInfo);
         }
         if (!end && now < fromBlock.created + blockTime * 2) {
             return;
+        }
+        if(!end) {
+            this.coreContext.applicationContext.logger.warn(`mint-blocks - end slice not found - mint by time`);
         }
         await this.mintBlock(fromBlock, mainWallet, slices);
     }
@@ -117,10 +106,7 @@ export default class MintBlocks {
     private async mintBlock(fromBlock: Block, mainWallet: Wallet, bestSlices: Slices[]) {
         const isConnected = this.coreContext.network.isConnected();
         if (!isConnected) {
-            this.coreContext.applicationContext.logger.error(`mint-blocks - Node has disconnected!`)
-            this.pipelineChain.stop().then(() => {
-                this.pipelineChain.start();
-            });
+            this.coreContext.applicationContext.logger.error(`mint-blocks - Node has disconnected!`);
             return;
         }
 
@@ -150,8 +136,8 @@ export default class MintBlocks {
         const blockInfo = await this.coreContext.blockProvider.saveNewBlock(block);
         blockInfo.isComplete = true;
         blockInfo.isExecuted = false;
-        await this.coreContext.blockProvider.updateBlock(blockInfo);
         this.coreContext.blockTree.addBlock(block);
+        await this.coreContext.blockProvider.updateBlock(blockInfo);
         await this.coreContext.blockProvider.executeCompleteBlockByHash(this.coreContext.blockTree, blockInfo.block.hash);
         return block;
     }
