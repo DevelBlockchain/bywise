@@ -11,7 +11,6 @@ export enum RoutingKeys {
     find_tx = 'find_tx',
     find_slice = 'find_slice',
     find_block = 'find_block',
-    selected_new_block = 'selected_new_block',
     started_api = 'started_api',
 }
 

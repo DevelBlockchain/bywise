@@ -1,5 +1,4 @@
 import { Block, Slice, SliceData, Tx, TxType } from "@bywise/web3";
-import { RequestKeys } from "../datasource/message-queue";
 import { BlockchainStatus, CoreContext, SimulateDTO, TransactionOutputDTO } from "../types";
 import { BlockTree, CompiledContext } from "../types/environment.types";
 import helper from "../utils/helper";
@@ -31,6 +30,9 @@ export default class MintSlices {
     }
 
     async run() {
+        if (!this.coreContext.isValidator || !this.coreContext.hasMinimumBWSToMine) {
+            return;
+        }
         const currentMinnedBlock = this.coreContext.blockTree.currentMinnedBlock;
 
         let isMiner = await this.isSliceMinner(currentMinnedBlock);

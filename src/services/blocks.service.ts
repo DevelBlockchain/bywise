@@ -341,8 +341,6 @@ export class BlocksProvider {
 
     const blockTree = new BlockTree(blockPack.block.chain);
     await this.setNewBlockPack(blockTree, blockPack);
-    await this.mq.send(RoutingKeys.selected_new_block, blockPack.block.chain);
-
     return blockTree;
   }
 

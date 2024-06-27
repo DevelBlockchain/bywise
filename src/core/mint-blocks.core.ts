@@ -1,6 +1,5 @@
 import { Block, Wallet } from "@bywise/web3";
 import { Slices } from "../models";
-import BigNumber from "bignumber.js";
 import { CoreContext } from "../types";
 import helper from "../utils/helper";
 import { BlockTree } from "../types/environment.types";
@@ -16,6 +15,9 @@ export default class MintBlocks {
     }
 
     async run() {
+        if (!this.coreContext.isValidator || !this.coreContext.hasMinimumBWSToMine) {
+            return;
+        }
         const now = helper.getNow()
         const currentBlock = this.coreContext.blockTree.currentMinnedBlock;
         const blockTime = this.coreContext.blockTime;
@@ -70,19 +72,6 @@ export default class MintBlocks {
         const now = helper.getNow()
         const blockTime = this.coreContext.blockTime;
         const mainWallet = await this.coreContext.walletProvider.getMainWallet();
-
-        const isMinner = await this.coreContext.configsProvider.isValidatorFromMainContext(this.coreContext.blockTree, fromBlock.height, mainWallet.address);
-        if (!isMinner) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
-            return;
-        }
-
-        const minValue = await this.coreContext.configsProvider.getConfigByNameFromMainContext(this.coreContext.blockTree, fromBlock.height, 'min-bws-block');
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalanceFromMainContext(this.coreContext.blockTree, mainWallet.address);
-        if (balanceDTO.balance.isLessThan(new BigNumber(minValue.value))) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain} - low balance`);
-            return;
-        }
 
         let from = fromBlock.from;
         if (fromBlock.lastHash !== BlockTree.ZERO_HASH) {
