@@ -2,7 +2,7 @@ import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import fs from 'fs';
 import randomstring from 'randomstring';
-import { Block, Slice, Tx, TxType, Wallet, BlockPack } from '@bywise/web3';
+import { Block, Slice, Tx, TxType, Wallet, BlockPack, BywiseHelper } from '@bywise/web3';
 import { SimulateDTO, ZeroBlockConfig } from '../types';
 import { BlockTree, CompiledContext, EnvironmentContext } from '../types/environment.types';
 
@@ -189,6 +189,11 @@ const numberToString = (n: number | string) => {
     return str;
 }
 
+const stringToHash = (str: string) => {
+    let hex = Buffer.from(str.normalize('NFKD'), 'utf-8').toString('hex');
+    return BywiseHelper.makeHash(hex);
+}
+
 const getNow = () => Math.floor(Date.now() / 1000);
 
 const helper = {
@@ -200,6 +205,7 @@ const helper = {
     sleep,
     createLogger,
     numberToString,
+    stringToHash,
     getNow,
 }
 

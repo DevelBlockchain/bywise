@@ -91,7 +91,7 @@ export default async function contractsController(app: express.Express, apiConte
                 ctx.tx.fee = '0.12';
                 ctx.tx.type = TxType.TX_CONTRACT_EXE;
                 ctx.tx.created = Math.floor(Date.now() / 1000);
-                ctx.tx.hash = helper.getRandomHash();
+                ctx.tx.hash = ctx.tx.toHash();
 
                 await blockchainDebug.internalTransfer(body.from, ctx.tx.to[0], ctx.tx.amount[0]);
                 await blockchainDebug.payFee(body.from, ctx.tx.fee);
@@ -125,7 +125,7 @@ export default async function contractsController(app: express.Express, apiConte
                 ctx.tx.fee = '0.12';
                 ctx.tx.type = TxType.TX_CONTRACT;
                 ctx.tx.created = Math.floor(Date.now() / 1000);
-                ctx.tx.hash = helper.getRandomHash();
+                ctx.tx.hash = ctx.tx.toHash();
 
                 await blockchainDebug.internalTransfer(body.from, contractAddress, ctx.tx.amount[0]);
                 await blockchainDebug.payFee(body.from, ctx.tx.fee);

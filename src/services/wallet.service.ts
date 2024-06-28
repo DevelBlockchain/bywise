@@ -3,7 +3,7 @@ import { ApplicationContext } from "../types/task.type";
 import { Wallet } from '@bywise/web3';
 import { BalanceDTO, WalletDTO } from "../types";
 import { EnvironmentProvider } from "./environment.service";
-import { BlockTree, EnvironmentContext } from "../types/environment.types";
+import { EnvironmentContext } from "../types/environment.types";
 
 export class WalletProvider {
 
@@ -20,7 +20,7 @@ export class WalletProvider {
   }
 
   async getWalletBalance(envContext: EnvironmentContext, address: string): Promise<BalanceDTO> {
-    let balance = await this.environmentProvider.get(envContext, `wallet:${address}:balance`);
+    let balance = await this.environmentProvider.get(envContext, `${address}-WB`);
     if (balance) {
       return new BalanceDTO(address, new BigNumber(balance));
     }
@@ -28,7 +28,7 @@ export class WalletProvider {
   }
   
   async getWalletInfo(envContext: EnvironmentContext, address: string): Promise<WalletDTO> {
-    let info = await this.environmentProvider.get(envContext, `wallet:${address}:info`);
+    let info = await this.environmentProvider.get(envContext, `${address}-WI`);
     if (info) {
       return new WalletDTO(JSON.parse(info));
     }
@@ -36,10 +36,10 @@ export class WalletProvider {
   }
 
   setWalletBalance(envContext: EnvironmentContext, balanceDTO: BalanceDTO): void {
-    this.environmentProvider.set(envContext, `wallet:${balanceDTO.address}:balance`, balanceDTO.balance.toString());
+    this.environmentProvider.set(envContext, `${balanceDTO.address}-WB`, balanceDTO.balance.toString());
   }
   
   setWalletInfo(envContext: EnvironmentContext, address: string, info: WalletDTO): void {
-    this.environmentProvider.set(envContext, `wallet:${address}:info`, JSON.stringify(info));
+    this.environmentProvider.set(envContext, `${address}-WI`, JSON.stringify(info));
   }
 }

@@ -5,9 +5,8 @@ import BlockchainInterface, { GetContract, TransactionMessage } from './Blockcha
 import { SimulateDTO } from '../types';
 import helper from '../utils/helper';
 
-const seedrandom = require('seedrandom');
 const PRESET = [
-    "Math.random = () => parseFloat(blockchain.getRandom('float'));",
+    "Math.random = () => 0;",
     "console = {log:blockchain.log};",
     "class EditDate extends Date { static now = () => parseInt(blockchain.getTxCreated());constructor() { super(EditDate.now()) }};",
     "Date = EditDate;",
@@ -127,8 +126,7 @@ export class BywiseRuntimeInstance {
             value: value,
             ctx,
             bywiseRuntime: this,
-            getContract,
-            random: seedrandom(`${ctx.sliceFrom}:${ctx.nonce}:${ctx.tx?.hash}`)
+            getContract
         }
         let abi: any;
         try {
@@ -150,8 +148,7 @@ export class BywiseRuntimeInstance {
             value: value,
             ctx,
             bywiseRuntime: this,
-            getContract,
-            random: seedrandom(`${ctx.sliceFrom}:${ctx.nonce}:${ctx.tx?.hash}`)
+            getContract
         }
         this.calls = bcc.calls.map(c => c);
         try {
@@ -170,8 +167,7 @@ export class BywiseRuntimeInstance {
             value: value,
             ctx,
             bywiseRuntime: this,
-            getContract,
-            random: seedrandom(`${ctx.sliceFrom}:${ctx.nonce}:${ctx.tx?.hash}`)
+            getContract
         }
         try {
             const result = await this.exec(tx, code, true);

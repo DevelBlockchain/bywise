@@ -8,6 +8,7 @@ import BywiseRuntime from './BywiseRuntime';
 import { ETHAction, ETHProxyData } from '../models';
 import { BywiseHelper } from '@bywise/web3';
 import { EventsProvider } from '../services/events.service';
+import helper from '../utils/helper';
 
 export default class BlockchainBywise implements BlockchainInterface {
 
@@ -27,16 +28,16 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     getUUID = async (tx: TransactionMessage) => {
-        const charset = '0123456789abcdef';
-        let uuid = '';
-        for (let i = 0; i < 32; i++) {
-            uuid += charset[Math.floor(tx.random() * charset.length)];
-        }
+        let eventIntexString = await this.environmentProvider.get(tx.ctx.envContext, `${tx.contractAddress}-CI`);
+        let index = BigInt(eventIntexString ? eventIntexString : '0');
+        index++;
+        const uuid = helper.numberToString(index.toString());
+        this.environmentProvider.set(tx.ctx.envContext, `${tx.contractAddress}-CI`, index.toString());
         return uuid;
     }
 
-    isUUID = async (uuid: string) => {
-        return /^[a-f0-9]{32}$/.test(uuid);
+    isUUID = (uuid: string) => {
+        return /^[0-9]{20}$/.test(uuid);
     }
 
     getTxSender = async (tx: TransactionMessage): Promise<string> => {
@@ -75,21 +76,22 @@ export default class BlockchainBywise implements BlockchainInterface {
 
     emitEvent = async (tx: TransactionMessage, eventName: string, data: string): Promise<string> => {
         if (!tx.ctx.tx) throw new Error('BVM: event hash not found');
+        if (eventName.length == 0) throw new Error(`BVM: invalid event name - "${eventName}"`);
         const eventEntries: TransactionEventEntry[] = [];
         const entries = Object.entries(JSON.parse(data));
         for (let j = 0; j < entries.length; j++) {
             const [entryKey, entryValue] = entries[j];
-            if (!/^[a-zA-Z0-9_]{1,64}$/.test(entryKey)) throw new Error(`BVM: invalid event key - "${entryKey}"`);
+            if (entryKey.length == 0) throw new Error(`BVM: invalid event key - "${entryKey}"`);
             if (Array.isArray(entryValue)) {
                 for (let i = 0; i < entryValue.length; i++) {
-                    const value = entryValue[i];
-                    if (typeof value !== 'string') throw new Error(`BVM: invalid event typeof - "${typeof entryValue}"`);
-                    if (!/^[a-zA-Z0-9_\.]{1,64}$/.test(value)) throw new Error(`BVM: invalid event value - "${entryValue}"`);
+                    let value = entryValue[i];
+                    if (typeof value !== 'string') throw new Error(`BVM: invalid event typeof - "${typeof value}"`);
+                    if (value.length == 0) throw new Error(`BVM: invalid event value - "${value}"`);
                     eventEntries.push({ key: entryKey, value: value });
                 }
             } else {
                 if (typeof entryValue !== 'string') throw new Error(`BVM: invalid event typeof - "${typeof entryValue}"`);
-                if (!/^[a-zA-Z0-9_\.]{1,64}$/.test(entryValue)) throw new Error(`BVM: invalid event value - "${entryValue}"`);
+                if (entryValue.length == 0) throw new Error(`BVM: invalid event value - "${entryValue}"`);
                 eventEntries.push({ key: entryKey, value: entryValue });
             }
         }
@@ -99,7 +101,6 @@ export default class BlockchainBywise implements BlockchainInterface {
             entries: eventEntries,
             hash: tx.ctx.tx.hash
         }
-        await this.eventsProvider.saveEvents(tx.ctx.envContext, event);
         tx.ctx.output.events.push(event);
         return '';
     }
@@ -113,10 +114,10 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     balanceTransfer = async (tx: TransactionMessage, recipient: string, amount: string): Promise<string> => {
-        if (typeof amount !== 'string') throw new Error('BVM: invalid typeof amount')
-        if (typeof recipient !== 'string') throw new Error('BVM: invalid typeof recipient')
+        if (typeof amount !== 'string') throw new Error('BVM: invalid typeof amount');
+        if (typeof recipient !== 'string') throw new Error('BVM: invalid typeof recipient');
 
-        if (!BywiseHelper.isValidAmount(amount)) throw new Error('BVM: invalid amount')
+        if (!BywiseHelper.isValidAmount(amount)) throw new Error('BVM: invalid amount');
         let amoutBN = new BigNumber(amount);
 
         let balanceAccount = await this.walletProvider.getWalletBalance(tx.ctx.envContext, tx.contractAddress);
@@ -132,31 +133,31 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     balanceOf = async (tx: TransactionMessage, address: string): Promise<string> => {
-        if (typeof address !== 'string') throw new Error('BVM: invalid typeof address')
+        if (typeof address !== 'string') throw new Error('BVM: invalid typeof address');
 
         const balanceDTO = await this.walletProvider.getWalletBalance(tx.ctx.envContext, address);
         return balanceDTO.balance.toString();
     }
 
     valueSet = async (tx: TransactionMessage, value: string, uuid?: string): Promise<string> => {
-        if (typeof value !== 'string') throw new Error('BVM: invalid typeof value')
+        if (typeof value !== 'string') throw new Error('BVM: invalid typeof value');
 
-        if (value.length > BlockchainBywise.MAX_VALUE_LENGTH) throw new Error('BVM: value too large')
+        if (value.length > BlockchainBywise.MAX_VALUE_LENGTH) throw new Error('BVM: value too large');
         if (uuid) {
-            if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
+            if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
         } else {
-            uuid = await await this.getUUID(tx);
+            uuid = await this.getUUID(tx);
         }
-        const key = `V-${tx.contractAddress}-${uuid}`
+        const key = `${tx.contractAddress}-V-${uuid}`
         this.environmentProvider.set(tx.ctx.envContext, key, value);
         return uuid;
     }
 
     valueGet = async (tx: TransactionMessage, uuid: string): Promise<string> => {
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
 
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
-        const key = `V-${tx.contractAddress}-${uuid}`
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
+        const key = `${tx.contractAddress}-V-${uuid}`
         if (await this.environmentProvider.has(tx.ctx.envContext, key)) {
             return await this.environmentProvider.get(tx.ctx.envContext, key);
         } else {
@@ -165,24 +166,24 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     mapNew = async (tx: TransactionMessage, defaultValue: string): Promise<string> => {
-        if (typeof defaultValue !== 'string') throw new Error('BVM: invalid typeof defaultValue')
+        if (typeof defaultValue !== 'string') throw new Error('BVM: invalid typeof defaultValue');
 
         const uuid = await this.getUUID(tx);
-        const mapKey = `M-${tx.contractAddress}-${uuid}-default`
+        const mapKey = `${tx.contractAddress}-M-${uuid}-default`
         this.environmentProvider.set(tx.ctx.envContext, mapKey, defaultValue);
         return uuid;
     }
 
     mapSet = async (tx: TransactionMessage, key: string, value: string, uuid: string): Promise<string> => {
-        if (typeof key !== 'string') throw new Error('BVM: invalid typeof key')
-        if (typeof value !== 'string') throw new Error('BVM: invalid typeof value')
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
-        if (value.length > BlockchainBywise.MAX_VALUE_LENGTH) throw new Error('BVM: value too large')
-        if (key.length > BlockchainBywise.MAX_KEY_LENGTH) throw new Error('BVM: key too large')
+        if (typeof key !== 'string') throw new Error('BVM: invalid typeof key');
+        if (typeof value !== 'string') throw new Error('BVM: invalid typeof value');
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
+        if (value.length > BlockchainBywise.MAX_VALUE_LENGTH) throw new Error('BVM: value too large');
+        if (key.length == 0) throw new Error('BVM: invalid map.key');
 
-        const mapKey = `M-${tx.contractAddress}-${uuid}-default`;
-        const searchKey = `M-${tx.contractAddress}-${uuid}-value-${key.replace(/-/gm, '_')}`;
+        const mapKey = `${tx.contractAddress}-M-${uuid}-default`;
+        const searchKey = `${tx.contractAddress}-M-${uuid}-value-${helper.stringToHash(key)}`;
         if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
         this.environmentProvider.set(tx.ctx.envContext, searchKey, value);
@@ -190,13 +191,13 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     mapGet = async (tx: TransactionMessage, key: string, uuid: string): Promise<string> => {
-        if (typeof key !== 'string') throw new Error('BVM: invalid typeof key')
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
-        if (key.length > BlockchainBywise.MAX_KEY_LENGTH) throw new Error('BVM: key too large')
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
+        if (typeof key !== 'string') throw new Error('BVM: invalid typeof key');
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
+        if (key.length == 0) throw new Error('BVM: invalid map.key');
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        const mapKey = `M-${tx.contractAddress}-${uuid}-default`;
-        const searchKey = `M-${tx.contractAddress}-${uuid}-value-${key.replace(/-/gm, '_')}`;
+        const mapKey = `${tx.contractAddress}-M-${uuid}-default`;
+        const searchKey = `${tx.contractAddress}-M-${uuid}-value-${helper.stringToHash(key)}`;
         if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
         if (await this.environmentProvider.has(tx.ctx.envContext, searchKey)) {
@@ -207,13 +208,13 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     mapHas = async (tx: TransactionMessage, key: string, uuid: string): Promise<string> => {
-        if (typeof key !== 'string') throw new Error('BVM: invalid typeof key')
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
-        if (key.length > BlockchainBywise.MAX_KEY_LENGTH) throw new Error('BVM: key too large')
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
+        if (typeof key !== 'string') throw new Error('BVM: invalid typeof key');
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
+        if (key.length == 0) throw new Error('BVM: invalid map.key');
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        const mapKey = `M-${tx.contractAddress}-${uuid}-default`;
-        const searchKey = `M-${tx.contractAddress}-${uuid}-value-${key.replace(/-/gm, '_')}`;
+        const mapKey = `${tx.contractAddress}-M-${uuid}-default`;
+        const searchKey = `${tx.contractAddress}-M-${uuid}-value-${helper.stringToHash(key)}`;
 
         if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
@@ -225,13 +226,13 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     mapDel = async (tx: TransactionMessage, key: string, uuid: string): Promise<string> => {
-        if (typeof key !== 'string') throw new Error('BVM: invalid typeof key')
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
-        if (key.length > BlockchainBywise.MAX_KEY_LENGTH) throw new Error('BVM: key too large')
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
+        if (typeof key !== 'string') throw new Error('BVM: invalid typeof key');
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
+        if (key.length == 0) throw new Error('BVM: invalid map.key');
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        const mapKey = `M-${tx.contractAddress}-${uuid}-default`;
-        const searchKey = `M-${tx.contractAddress}-${uuid}-value-${key.replace(/-/gm, '_')}`;
+        const mapKey = `${tx.contractAddress}-M-${uuid}-default`;
+        const searchKey = `${tx.contractAddress}-M-${uuid}-value-${helper.stringToHash(key)}`;
 
         if (!await this.environmentProvider.has(tx.ctx.envContext, mapKey)) throw new Error('BVM: invalid map uuid')
 
@@ -243,77 +244,77 @@ export default class BlockchainBywise implements BlockchainInterface {
 
     listNew = async (tx: TransactionMessage): Promise<string> => {
         const uuid = await this.getUUID(tx);
-        this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, '0');
+        this.environmentProvider.set(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-size`, '0');
         return uuid;
     }
 
     listSize = async (tx: TransactionMessage, uuid: string): Promise<string> => {
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
 
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
-        if (!await this.environmentProvider.has(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`)) throw new Error('BVM: list not found');
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
+        if (!await this.environmentProvider.has(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-size`)) throw new Error('BVM: list not found');
 
-        return await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`);
+        return await this.environmentProvider.get(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-size`);
     }
 
     listGet = async (tx: TransactionMessage, index: string, uuid: string): Promise<string> => {
-        if (typeof index !== 'string') throw new Error('BVM: invalid typeof index')
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
-        if (index.length > BlockchainBywise.MAX_KEY_LENGTH) throw new Error('BVM: index too large')
-        if (!/^[0-9]+$/.test(index)) throw new Error('BVM: index need be integer number')
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
+        if (typeof index !== 'string') throw new Error('BVM: invalid typeof index');
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
+        if (index.length > BlockchainBywise.MAX_KEY_LENGTH) throw new Error('BVM: index too large');
+        if (!/^[0-9]+$/.test(index)) throw new Error('BVM: index need be integer number');
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
         let indexBN = new BigNumber(index);
-        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`));
+        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-size`));
         if (indexBN.isGreaterThanOrEqualTo(size)) throw new Error('BVM: index out of array');
 
-        const key = `L-${tx.contractAddress}-${uuid}-value-${indexBN.toFixed(0)}`
+        const key = `${tx.contractAddress}-L-${uuid}-value-${indexBN.toFixed(0)}`
         return await this.environmentProvider.get(tx.ctx.envContext, key);
     }
 
     listSet = async (tx: TransactionMessage, index: string, value: string, uuid: string): Promise<string> => {
-        if (typeof index !== 'string') throw new Error('BVM: invalid typeof index')
-        if (typeof value !== 'string') throw new Error('BVM: invalid typeof value')
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
-        if (value.length > BlockchainBywise.MAX_VALUE_LENGTH) throw new Error('BVM: value too large')
-        if (index.length > BlockchainBywise.MAX_KEY_LENGTH) throw new Error('BVM: index too large')
-        if (!/^[0-9]+$/.test(index)) throw new Error('BVM: index need be integer number')
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
+        if (typeof index !== 'string') throw new Error('BVM: invalid typeof index');
+        if (typeof value !== 'string') throw new Error('BVM: invalid typeof value');
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
+        if (value.length > BlockchainBywise.MAX_VALUE_LENGTH) throw new Error('BVM: value too large');
+        if (index.length > BlockchainBywise.MAX_KEY_LENGTH) throw new Error('BVM: index too large');
+        if (!/^[0-9]+$/.test(index)) throw new Error('BVM: index need be integer number');
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
         let indexBN = new BigNumber(index);
-        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`));
+        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-size`));
         if (indexBN.isGreaterThanOrEqualTo(size)) throw new Error('BVM: index out of array');
 
-        const key = `L-${tx.contractAddress}-${uuid}-value-${indexBN.toFixed(0)}`;
+        const key = `${tx.contractAddress}-L-${uuid}-value-${indexBN.toFixed(0)}`;
         this.environmentProvider.set(tx.ctx.envContext, key, value);
         return '';
     }
 
     listPush = async (tx: TransactionMessage, value: string, uuid: string): Promise<string> => {
-        if (typeof value !== 'string') throw new Error('BVM: invalid typeof value')
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
-        if (value.length > BlockchainBywise.MAX_VALUE_LENGTH) throw new Error('BVM: value too large')
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
+        if (typeof value !== 'string') throw new Error('BVM: invalid typeof value');
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
+        if (value.length > BlockchainBywise.MAX_VALUE_LENGTH) throw new Error('BVM: value too large');
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`));
+        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-size`));
         let newSize = size.plus(1).toFixed(0);
 
-        this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${size.toFixed(0)}`, value);
-        this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, newSize);
+        this.environmentProvider.set(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-value-${size.toFixed(0)}`, value);
+        this.environmentProvider.set(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-size`, newSize);
         return '';
     }
 
     listPop = async (tx: TransactionMessage, uuid: string): Promise<string> => {
-        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid')
-        if (!await this.isUUID(uuid)) throw new Error('BVM: invalid uuid')
+        if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
+        if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`));
-        if (size.isEqualTo(0)) throw new Error('BVM: array is empty')
+        let size = new BigNumber(await this.environmentProvider.get(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-size`));
+        if (size.isEqualTo(0)) throw new Error('BVM: array is empty');
         let newSize = size.minus(1).toFixed(0);
 
-        const returnValue = await this.environmentProvider.get(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${newSize}`);
-        this.environmentProvider.delete(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-value-${newSize}`);
-        this.environmentProvider.set(tx.ctx.envContext, `L-${tx.contractAddress}-${uuid}-size`, newSize);
+        const returnValue = await this.environmentProvider.get(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-value-${newSize}`);
+        this.environmentProvider.delete(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-value-${newSize}`);
+        this.environmentProvider.set(tx.ctx.envContext, `${tx.contractAddress}-L-${uuid}-size`, newSize);
         return returnValue;
     }
 
@@ -361,11 +362,6 @@ export default class BlockchainBywise implements BlockchainInterface {
         }
     }
 
-    getRandom = async (tx: TransactionMessage, type: string): Promise<string> => {
-        if (typeof type !== 'string') throw new Error('BVM: invalid typeof type')
-        return `${tx.random()}`;
-    }
-
     exposeMethods = () => {
         const methods: BlockchainAction[] = [];
         methods.push({ action: this.log, name: 'log' });
@@ -396,7 +392,6 @@ export default class BlockchainBywise implements BlockchainInterface {
         methods.push({ action: this.newProxyAction, name: 'newProxyAction' });
         methods.push({ action: this.costProxyAction, name: 'costProxyAction' });
         methods.push({ action: this.readProxyAction, name: 'readProxyAction' });
-        methods.push({ action: this.getRandom, name: 'getRandom' });
         return methods;
     }
 }

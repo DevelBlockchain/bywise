@@ -7,7 +7,6 @@ export type TransactionMessage = {
     contractAddress: string;
     sender: string;
     value: string;
-    random: any;
     ctx: SimulateDTO;
     bywiseRuntime: BywiseRuntimeInstance;
     getContract: GetContract
@@ -69,8 +68,6 @@ export default interface BlockchainInterface {
     listPush(tx: TransactionMessage, value: string, uuid: string): Promise<string>;
 
     listPop(tx: TransactionMessage, uuid: string): Promise<string>;
-
-    getRandom(tx: TransactionMessage, type: string): Promise<string>;
 
     newProxyAction(tx: TransactionMessage, proxyChain: string, proxyAction: string, proxyData: string): Promise<string>;
 
