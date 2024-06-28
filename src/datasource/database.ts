@@ -34,10 +34,8 @@ export type FindTransactionsRequest = {
 
 class DatabaseWorker {
     public db: Level;
-    private path: string;
 
     constructor(path: string, mq: MessageQueue) {
-        this.path = path;
         if (!fs.existsSync('data')) {
             fs.mkdirSync('data')
         }
@@ -75,22 +73,22 @@ class DatabaseWorker {
     async saveMany(arr: SaveRequest[]): Promise<void> {
         await this.db.batch(arr.map(item => ({
             type: item.delete ? 'del' : 'put',
-            key: item.key,
+            key: item.key.normalize('NFKD'),
             value: item.data,
         })));
     }
 
     async save(sr: SaveRequest): Promise<void> {
         if (sr.delete) {
-            await this.db.del(sr.key);
+            await this.db.del(sr.key.normalize('NFKD'));
         } else {
-            await this.db.put(sr.key, sr.data);
+            await this.db.put(sr.key.normalize('NFKD'), sr.data);
         }
     }
 
     async has(key: string): Promise<boolean> {
         try {
-            await this.db.get(key);
+            await this.db.get(key.normalize('NFKD'));
             return true;
         } catch (err) {
         }
@@ -100,21 +98,21 @@ class DatabaseWorker {
     async find(fr: FindRequest): Promise<any[]> {
         const values = [];
         if (fr.gt) {
-            const vs = await this.db.values({ gt: `${fr.key}-${fr.gt}`, lt: `${fr.key}.`, limit: fr.offset + fr.limit, reverse: fr.reverse }).all();
+            const vs = await this.db.values({ gt: `${fr.key}-${fr.gt}`, lt: `${fr.key}.`.normalize('NFKD'), limit: fr.offset + fr.limit, reverse: fr.reverse }).all();
             for (let i = 0; i < vs.length; i++) {
                 if (i >= fr.offset) {
                     values.push(vs[i]);
                 }
             }
         } else if (fr.lt) {
-            const vs = await this.db.values({ gt: `${fr.key}-`, lt: `${fr.key}-${fr.lt}`, limit: fr.offset + fr.limit, reverse: fr.reverse }).all();
+            const vs = await this.db.values({ gt: `${fr.key}-`, lt: `${fr.key}-${fr.lt}`.normalize('NFKD'), limit: fr.offset + fr.limit, reverse: fr.reverse }).all();
             for (let i = 0; i < vs.length; i++) {
                 if (i >= fr.offset) {
                     values.push(vs[i]);
                 }
             }
         } else {
-            const vs = await this.db.values({ gt: `${fr.key}-`, lt: `${fr.key}.`, limit: fr.offset + fr.limit, reverse: fr.reverse }).all();
+            const vs = await this.db.values({ gt: `${fr.key}-`, lt: `${fr.key}.`.normalize('NFKD'), limit: fr.offset + fr.limit, reverse: fr.reverse }).all();
             for (let i = 0; i < vs.length; i++) {
                 if (i >= fr.offset) {
                     values.push(vs[i]);
@@ -125,12 +123,12 @@ class DatabaseWorker {
     }
 
     async count(key: string): Promise<number> {
-        return (await (await this.db.iterator({ gte: `${key}-`, lt: `${key}.`, values: false })).all()).length
+        return (await (await this.db.iterator({ gte: `${key}-`, lt: `${key}.`.normalize('NFKD'), values: false })).all()).length
     }
 
     async get(key: string): Promise<any | null> {
         try {
-            const data = await this.db.get(key);
+            const data = await this.db.get(key.normalize('NFKD'));
             return data;
         } catch (err) {
         }
@@ -138,19 +136,19 @@ class DatabaseWorker {
     }
 
     async getMany(keys: string[]): Promise<any[]> {
-        const data = await this.db.getMany(keys);
+        const data = await this.db.getMany(keys.map(key => key.normalize('NFKD')));
         return data;
     }
 
     async del(keys: string[]): Promise<void> {
         await this.db.batch(keys.map(key => ({
             type: 'del',
-            key: key,
+            key: key.normalize('NFKD'),
         })));
     }
 
     async delMany(key: string): Promise<void> {
-        await this.db.clear({ gte: `${key}-`, lt: `${key}.` });
+        await this.db.clear({ gte: `${key}-`, lt: `${key}.`.normalize('NFKD') });
     }
 
     async drop() {
