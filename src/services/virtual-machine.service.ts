@@ -108,8 +108,6 @@ export class VirtualMachineProvider {
           contractAmount = contractAmount.plus(new BigNumber(tx.amount[i]));
         }
       }
-      if (!contractAmount.isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
-
       const bcc = await BywiseRuntime.execContract(this.blockchainBywise, getContract, ctx, contractAddress, tx.from[0], contractAmount.toString(), code);
 
       this.environmentProvider.set(ctx.envContext, contractAddress, JSON.stringify(bcc));
@@ -129,7 +127,9 @@ export class VirtualMachineProvider {
         if (BywiseHelper.isContractAddress(to)) {
           const contract = await getContract(to, tx.data[i].method, tx.data[i].inputs);
 
-          if (!contract.payable && !(new BigNumber(tx.amount[i])).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
+          if(ctx.feeCostType > 0) {
+            if (!contract.payable && !(new BigNumber(tx.amount[i])).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
+          }
           ctx.output.output = await BywiseRuntime.execInContract(this.blockchainBywise, getContract, ctx, to, contract.bcc, tx.from[0], tx.amount[i], contract.code);
         }
       }

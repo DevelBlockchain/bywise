@@ -54,36 +54,23 @@ export class EnvironmentProvider {
     }
 
     private async getFromContextEnv(envContext: EnvironmentContext, key: string): Promise<Environment> {
-        let env: Environment | null = null;
-        let getEnv = envContext.setStageKeys.get(key);
-        if (getEnv !== undefined) {
-            env = getEnv;
+        let env = envContext.setStageKeys.get(key);
+        if (!env) {
+            env = envContext.setMainKeys.get(key);
         }
-        if (env == null) {
-            getEnv = envContext.setMainKeys.get(key);
-            if (getEnv !== undefined) {
-                env = getEnv;
+        if (!env) {
+            env = envContext.getStageKeys.get(key);
+        }
+        if (!env) {
+            env = envContext.getMainKeys.get(key);
+        }
+        if (!env) {
+            const from_context_env = await this.EnvironmentRepository.get(envContext.blockTree.chain, key, envContext.fromContextHash);
+            if (from_context_env) {
+                env = from_context_env;
             }
         }
-        if (env == null) {
-            getEnv = envContext.getStageKeys.get(key);
-            if (getEnv !== undefined) {
-                env = getEnv;
-            }
-        }
-        if (env == null) {
-            getEnv = envContext.getMainKeys.get(key);
-            if (getEnv !== undefined) {
-                env = getEnv;
-            }
-        }
-        if (env == null) {
-            const main_context_env = await this.EnvironmentRepository.get(envContext.blockTree.chain, key, envContext.fromContextHash);
-            if (main_context_env) {
-                env = main_context_env;
-            }
-        }
-        if (env == null) {
+        if (!env) {
             env = {
                 chain: envContext.blockTree.chain,
                 key: key,
@@ -148,6 +135,20 @@ export class EnvironmentProvider {
     deleteCommit(envContext: EnvironmentContext) {
         envContext.setStageKeys.clear();
         envContext.getStageKeys.clear();
+    }
+
+    changes(envContext: EnvironmentContext) {
+        let get = [];
+        let set = [];
+        for (let [key, env] of envContext.getStageKeys) {
+            if (!key.startsWith('config-')) {
+                get.push(key);
+            }
+        }
+        for (let [key, env] of envContext.setStageKeys) {
+            set.push([key, env.value]);
+        }
+        return { get, set };
     }
 
     commit(envContext: EnvironmentContext) {

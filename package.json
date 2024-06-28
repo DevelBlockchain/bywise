@@ -34,7 +34,6 @@
     "pidusage": "^3.0.2",
     "quickjs-emscripten": "^0.29.2",
     "randomstring": "^1.2.2",
-    "seedrandom": "^3.0.5",
     "web3": "^4.10.0",
     "winston": "^3.13.0",
     "winston-daily-rotate-file": "^5.0.0"

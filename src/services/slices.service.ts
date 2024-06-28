@@ -90,12 +90,12 @@ export class SlicesProvider {
         const output = await this.transactionsProvider.simulateTransaction(txInfo.tx, sliceInfo.slice, ctx);
         sliceInfo.outputs.push(output);
         if (output.error) {
-          this.logger.error(output.error)
+          this.logger.error(`Invalid transaction - tx.hash: ${txInfo.tx.hash} - error: "${output.error}"`)
           error = true;
         }
       }
       if (error) {
-        this.logger.error(`Slice has invalid transactions - hash: ${sliceInfo.slice.hash}`)
+        this.logger.error(`Slice has invalid transactions - slice.hash: ${sliceInfo.slice.hash}`)
         sliceInfo.status = BlockchainStatus.TX_FAILED;
       } else {
         sliceInfo.isExecuted = true;

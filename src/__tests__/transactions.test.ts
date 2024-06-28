@@ -7,6 +7,7 @@ import helper from '../utils/helper';
 import { ChainConfig } from '../types';
 import { ConfigProvider } from '../services/configs.service';
 import { CompiledContext } from '../types/environment.types';
+import { BywiseContractContext } from '../vm/BywiseRuntime';
 
 var bywise: Bywise;
 var transactionsProvider: TransactionsProvider;
@@ -394,7 +395,7 @@ describe('contracts', () => {
         expect(output.output).toEqual("SimpleToken");
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 
     test('contract call other contracs', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
@@ -497,7 +498,7 @@ describe('contracts', () => {
         expect(output.output).toEqual("Banana");
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 
     test('contract events', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
@@ -561,7 +562,7 @@ describe('contracts', () => {
         }]);
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 
     test('cost - hardwork', async () => {
         const contractAddress = BywiseHelper.getBWSAddressContract();
@@ -614,7 +615,7 @@ describe('contracts', () => {
         expect(output.cost).toEqual(201);
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 
     test('cost - multiple calls', async () => {
         const contractAddress = BywiseHelper.getBWSAddressContract();
@@ -682,7 +683,7 @@ describe('contracts', () => {
         expect(output.cost).toEqual(80);
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 
     test('cost - call other contracs', async () => {
         const contractAddress = BywiseHelper.getBWSAddressContract();
@@ -784,7 +785,7 @@ describe('contracts', () => {
         expect(output.cost).toEqual(850);
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 
     test('cost - gas limit', async () => {
         const contractAddress = BywiseHelper.getBWSAddressContract();
@@ -849,7 +850,7 @@ describe('contracts', () => {
         expect(output.cost).toEqual(3);
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 
     test('set fee by cost', async () => {
         const contractAddress = BywiseHelper.getBWSAddressContract();
@@ -938,7 +939,122 @@ describe('contracts', () => {
         expect(balance.balance.toString()).toEqual('99.7');
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
+    
+    test('change state', async () => {
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+        const blockTree = await blocksProvider.getBlockTree(chain);
+        const currentMinnedBlock = blockTree.currentMinnedBlock;
+        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
+        const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
+        ctx.checkWalletBalance = true;
+
+        const stealthAddress = wallet.getStealthAddress(0, 0);
+
+        let tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_COMMAND,
+            {
+                name: "setBalance",
+                input: [
+                    wallet.address,
+                    "100"
+                ]
+            }
+        );
+        tx.isValid();
+        await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(ctx.output.error).toEqual(undefined);
+        expect(environmentProvider.changes(ctx.envContext)).toEqual({
+            get: [
+                `${wallet.address}-WB`,
+            ],
+            set: [
+                [`${wallet.address}-WB`, '100']
+            ]
+        });
+        environmentProvider.commit(ctx.envContext);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '10',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCodeV2 }
+        );
+        tx.isValid();
+        await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(ctx.output.error).toEqual(undefined);
+        expect(environmentProvider.changes(ctx.envContext)).toEqual({
+            get: [
+                `${contractAddress}`,
+                `${contractAddress}-CI`,
+                `${contractAddress}-M-00000000000000000002-default`,
+                `${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(wallet.address)}`,
+                `${contractAddress}-V-00000000000000000001`,
+                `${wallet.address}-WB`,
+                `${contractAddress}-WB`,
+            ],
+            set: [
+                [`${contractAddress}-CI`, '3'],
+                [`${contractAddress}-V-00000000000000000001`, '"5000000000000000000000"'],
+                [`${contractAddress}-M-00000000000000000002-default`, '"0"'],
+                [`${contractAddress}-M-00000000000000000003-default`, '""'],
+                [`${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(wallet.address)}`, '"5000000000000000000000"'],
+                [`${contractAddress}`, JSON.stringify(new BywiseContractContext(tx.hash, ctx.output.output.abi, ERCCodeV2, [
+                    '00000000000000000001',
+                    '00000000000000000002',
+                    '00000000000000000003',
+                    wallet.address,
+                    '"0"',
+                    '',
+                    '"0"',
+                    '00000000000000000001'
+                ]))],
+                [`${wallet.address}-WB`, '90'],
+                [`${contractAddress}-WB`, '10'],
+            ]
+        });
+        environmentProvider.commit(ctx.envContext);
+
+        tx = await transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "transfer", inputs: [stealthAddress, '1000'] }]
+        );
+        tx.isValid();
+        await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
+        expect(ctx.output.error).toEqual(undefined);
+        expect(environmentProvider.changes(ctx.envContext)).toEqual({
+            get: [
+                `${contractAddress}`,
+                `${contractAddress}-M-00000000000000000002-default`,
+                `${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(wallet.address)}`,
+                `${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(stealthAddress)}`,
+                `${wallet.address}-WB`,
+                `${contractAddress}-WB`,
+            ],
+            set: [
+                [`${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(wallet.address)}`, '"4999999999999999999000"'],
+                [`${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(stealthAddress)}`, '"1000"'],
+                [`${wallet.address}-WB`, '90'],
+                [`${contractAddress}-WB`, '10'],
+            ]
+        });
+        environmentProvider.commit(ctx.envContext);
+
+        await transactionsProvider.disposeContext(ctx);
+    }, 3000);
 });
 
 describe('stress testing', () => {
@@ -972,7 +1088,7 @@ describe('stress testing', () => {
         expect(uptime).toBeLessThan(1);
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 
     test('contract transactions', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
@@ -1059,7 +1175,7 @@ describe('stress testing', () => {
         expect(output.output).toEqual("100000000000000000000");
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 
     test('contract transactions - BigInt', async () => {
         const blockTree = await blocksProvider.getBlockTree(chain);
@@ -1146,5 +1262,5 @@ describe('stress testing', () => {
         expect(uptime).toBeLessThan(3);
 
         await transactionsProvider.disposeContext(ctx);
-    }, 30000);
+    }, 3000);
 });

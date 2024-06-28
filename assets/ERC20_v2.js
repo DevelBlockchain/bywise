@@ -101,6 +101,12 @@ class ERC20 {
         let toBalance = BigInt(this._balances.get(to));
         toBalance += amount;
         this._balances.set(to, toBalance.toString())
+
+        BywiseUtils.emit("transfer", {
+            from: from,
+            to: to,
+            amount: amount.toString(),
+        });
     }
 
     _mint(recipient, amount) { // @private
