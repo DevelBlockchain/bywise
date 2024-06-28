@@ -2,6 +2,7 @@ name: 🚀 Test And Build
 
 on:
   push:
+    branches: [ main, devel ]
 
 jobs:
   test-and-build:
