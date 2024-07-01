@@ -137,42 +137,44 @@ export class CommandDTO {
   }
 }
 
-export type WalletInfoDTO = {
-  photo: string;
-  name: string;
-  url: string;
-  bio: string;
-  publicKey: string;
-}
-
 export type TxBlockchainInfoDTO = {
   tx: any;
   slice?: SliceModelDTO;
   block?: BlockModelDTO;
 }
 
-export class BalanceDTO {
-  address: string;
-  balance: BigNumber;
 
-  constructor(address: string, balance: BigNumber) {
-    this.address = address;
-    this.balance = balance;
-  }
+export type ABIParameters = {
+  name: string;
+  type: string[];
 }
 
-export class WalletDTO {
-  name?: string
-  photo?: string
-  url?: string
-  bio?: string
-  publicKey?: string
+export type ABIMethod = {
+  name: string;
+  view: boolean;
+  payable: boolean;
+  parameters: ABIParameters[];
+  returns: string[];
+}
 
-  constructor(data?: Partial<WalletDTO>) {
-    this.name = data?.name;
-    this.photo = data?.photo;
-    this.url = data?.url;
-    this.bio = data?.bio;
-    this.publicKey = data?.publicKey;
-  }
+export type WalletInfoDTO = {
+  address: string;
+  name?: string;
+  photo?: string;
+  url?: string;
+  bio?: string;
+  publicKey?: string;
+}
+
+export type WalletBalanceDTO = {
+  address: string;
+  balance: BigNumber;
+}
+
+export type WalletCodeDTO = {
+  address: string;
+  status: string;
+  abi: ABIMethod[];
+  code: string;
+  calls: string[];
 }

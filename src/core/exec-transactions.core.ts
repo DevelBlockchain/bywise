@@ -80,14 +80,15 @@ export default class ExecuteTransactions {
             throw new Error('currentContext not found')
         }
 
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.envContext, address);
-        const infoDTO = await this.coreContext.walletProvider.getWalletInfo(currentContext.envContext, address);
+        const walletCodeDTO = await this.coreContext.walletProvider.getWalletCode(currentContext.envContext, address);
+        const walletInfoDTO = await this.coreContext.walletProvider.getWalletInfo(currentContext.envContext, address);
+        const walletBalanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.envContext, address);
 
         this.busy = false;
         return {
-            ...balanceDTO,
-            ...infoDTO,
-            balance: balanceDTO.balance.toString(),
+            ...walletCodeDTO,
+            ...walletInfoDTO,
+            balance: walletBalanceDTO.balance.toString(),
         };
     }
 
@@ -164,8 +165,8 @@ export default class ExecuteTransactions {
         const newBlockTime = parseInt(config.value);
         const isValidator = await this.coreContext.configsProvider.isValidator(currentContext.envContext, mainWallet.address);
         const minValue = await this.coreContext.configsProvider.getByName(currentContext.envContext, 'min-bws-block');
-        const balanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.envContext, mainWallet.address);
-        const hasMinimumBWSToMine = !balanceDTO.balance.isLessThan(new BigNumber(minValue.value));
+        const walletDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.envContext, mainWallet.address);
+        const hasMinimumBWSToMine = !walletDTO.balance.isLessThan(new BigNumber(minValue.value));
 
         this.coreContext.blockTime = newBlockTime;
         this.coreContext.isValidator = isValidator;

@@ -1,12 +1,11 @@
 import BigNumber from "bignumber.js";
-import { CommandDTO, SimulateDTO, TransactionOutputDTO } from '../types/transactions.type';
+import { CommandDTO, SimulateDTO, TransactionOutputDTO, WalletBalanceDTO, WalletCodeDTO } from '../types/transactions.type';
 import { TxType, BywiseHelper, Tx, SliceData } from '@bywise/web3';
 import { ConfigProvider } from "./configs.service";
 import { ApplicationContext } from "../types/task.type";
 import { WalletProvider } from "./wallet.service";
-import BywiseRuntime, { BywiseContractContext } from "../vm/BywiseRuntime";
+import BywiseRuntime from "../vm/BywiseRuntime";
 import BlockchainBywise from "../vm/BlockchainBywise";
-import { EnvironmentProvider } from "./environment.service";
 import { GetContract } from "../vm/BlockchainInterface";
 import { ConfigDTO } from "../types";
 import { Votes } from "../models";
@@ -14,7 +13,6 @@ import { Votes } from "../models";
 export class VirtualMachineProvider {
 
   private configsProvider;
-  private environmentProvider;
   private walletProvider;
   private applicationContext;
   private blockchainBywise;
@@ -22,7 +20,6 @@ export class VirtualMachineProvider {
   constructor(applicationContext: ApplicationContext) {
     this.applicationContext = applicationContext;
     this.configsProvider = new ConfigProvider(applicationContext);
-    this.environmentProvider = new EnvironmentProvider(applicationContext);
     this.walletProvider = new WalletProvider(applicationContext);
     this.blockchainBywise = new BlockchainBywise(applicationContext);
   }
@@ -61,18 +58,17 @@ export class VirtualMachineProvider {
       totalAmount = totalAmount.plus(new BigNumber(tx.amount[i]));
     }
 
-    const getContract: GetContract = async (address: string, method: string, inputs: string[]): Promise<{ bcc: BywiseContractContext, code: string, view: boolean, payable: boolean }> => {
+    const getContract: GetContract = async (address: string, method: string, inputs: string[]): Promise<{ wc: WalletCodeDTO, code: string, view: boolean, payable: boolean }> => {
       if (!BywiseHelper.isValidAddress(address)) throw new Error(`Invalid address`);
       if (inputs === undefined) throw new Error(`inputs array not found`);
       if (!Array.isArray(inputs)) throw new Error(`Inputs need be an array`);
-      const bccString = await this.environmentProvider.get(ctx.envContext, address);
-      if (!bccString) throw new Error(`Contract not found`);
-      const bcc: BywiseContractContext = JSON.parse(bccString);
+      const walletCodeDTO = await this.walletProvider.getWalletCode(ctx.envContext, address);
+      if (!walletCodeDTO) throw new Error(`Contract not found`);
       let foundMethod = false;
       let view = false;
       let payable = false;
-      for (let i = 0; i < bcc.abi.length; i++) {
-        const abiMethod = bcc.abi[i];
+      for (let i = 0; i < walletCodeDTO.abi.length; i++) {
+        const abiMethod = walletCodeDTO.abi[i];
         if (abiMethod.name === method) {
           foundMethod = true;
           view = abiMethod.view;
@@ -84,7 +80,7 @@ export class VirtualMachineProvider {
       return {
         payable,
         view,
-        bcc,
+        wc: walletCodeDTO,
         code: `globalThis.contract.${method}(${inputs.map(i => `"${i}"`).join(',')});`
       }
     }
@@ -99,8 +95,8 @@ export class VirtualMachineProvider {
       if (!BywiseHelper.isValidAddress(contractAddress)) throw new Error(`invalid address`);
       if (!BywiseHelper.decodeBWSAddress(contractAddress).isContract) throw new Error(`invalid address - not is contract`);
 
-      const oldContract = await this.environmentProvider.get(ctx.envContext, contractAddress);
-      if (oldContract) throw new Error(`Cant update contract`);
+      let walletCodeDTO = await this.walletProvider.getWalletCode(ctx.envContext, contractAddress);
+      if (walletCodeDTO) throw new Error(`Cant update contract`);
 
       let contractAmount = new BigNumber(0);
       for (let i = 0; i < tx.to.length; i++) {
@@ -108,14 +104,14 @@ export class VirtualMachineProvider {
           contractAmount = contractAmount.plus(new BigNumber(tx.amount[i]));
         }
       }
-      const bcc = await BywiseRuntime.execContract(this.blockchainBywise, getContract, ctx, contractAddress, tx.from[0], contractAmount.toString(), code);
+      const wc = await BywiseRuntime.execContract(this.blockchainBywise, getContract, ctx, contractAddress, tx.from[0], contractAmount.toString(), code);
 
-      this.environmentProvider.set(ctx.envContext, contractAddress, JSON.stringify(bcc));
+      await this.walletProvider.setWalletCode(ctx.envContext, wc);
       ctx.output.output = {
         contractAddress: contractAddress,
-        abi: bcc.abi
+        abi: wc.abi
       }
-      if(ctx.feeCostType == 0) {
+      if (ctx.feeCostType == 0) {
         ctx.output.cost = 0;
       }
     } else if (tx.type === TxType.TX_CONTRACT_EXE) {
@@ -127,14 +123,14 @@ export class VirtualMachineProvider {
         if (BywiseHelper.isContractAddress(to)) {
           const contract = await getContract(to, tx.data[i].method, tx.data[i].inputs);
 
-          if(ctx.feeCostType > 0) {
+          if (ctx.feeCostType > 0) {
             if (!contract.payable && !(new BigNumber(tx.amount[i])).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
           }
-          ctx.output.output = await BywiseRuntime.execInContract(this.blockchainBywise, getContract, ctx, to, contract.bcc, tx.from[0], tx.amount[i], contract.code);
+          ctx.output.output = await BywiseRuntime.execInContract(this.blockchainBywise, getContract, ctx, to, contract.wc, tx.from[0], tx.amount[i], contract.code);
         }
       }
 
-      if(ctx.feeCostType == 0) {
+      if (ctx.feeCostType == 0) {
         ctx.output.cost = 0;
       }
     } else if (tx.type === TxType.TX_COMMAND) {
@@ -162,17 +158,22 @@ export class VirtualMachineProvider {
       const amount = new BigNumber(tx.amount[i]);
       debit = debit.plus(amount);
     }
-
     for (let i = 0; i < tx.to.length; i++) {
       const to = tx.to[i];
+      const amount = new BigNumber(tx.amount[i]);
+      if (amount.isGreaterThan(new BigNumber(0))) {
+        const walletDTO = await this.walletProvider.getWalletBalance(ctx.envContext, to);
+        walletDTO.balance = walletDTO.balance.plus(new BigNumber(amount));
+        await this.walletProvider.setWalletBalance(ctx.envContext, walletDTO);
+      }
       if (BywiseHelper.isContractAddress(to)) {
         const amount = ctx.output.payableContracts.get(to);
         if (amount !== undefined) {
           const amountBN = new BigNumber(amount);
 
-          const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, to);
+          const walletDTO = await this.walletProvider.getWalletBalance(ctx.envContext, to);
 
-          if (balanceDTO.balance.minus(amountBN).isLessThan(new BigNumber(0))) {
+          if (walletDTO.balance.minus(amountBN).isLessThan(new BigNumber(0))) {
             throw new Error(`Contract with insufficient funds`);
           }
 
@@ -181,9 +182,9 @@ export class VirtualMachineProvider {
           }
 
           debit = debit.minus(amountBN);
-          balanceDTO.balance = balanceDTO.balance.minus(amountBN);
+          walletDTO.balance = walletDTO.balance.minus(amountBN);
 
-          this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+          await this.walletProvider.setWalletBalance(ctx.envContext, walletDTO);
         }
       }
     }
@@ -194,27 +195,20 @@ export class VirtualMachineProvider {
         throw new Error(`Invalid from address`);
       }
 
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, from);
-
-      if (balanceDTO.balance.minus(debit).isLessThan(new BigNumber(0))) {
-        debit = debit.minus(balanceDTO.balance);
-        balanceDTO.balance = (new BigNumber(0));
-      } else {
-        balanceDTO.balance = balanceDTO.balance.minus(debit);
-        debit = new BigNumber(0);
+      if (debit.isGreaterThan(new BigNumber(0))) {
+        const walletDTO = await this.walletProvider.getWalletBalance(ctx.envContext, from);
+        if (walletDTO.balance.minus(debit).isLessThan(new BigNumber(0))) {
+          debit = debit.minus(walletDTO.balance);
+          walletDTO.balance = (new BigNumber(0));
+        } else {
+          walletDTO.balance = walletDTO.balance.minus(debit);
+          debit = new BigNumber(0);
+        }
+        await this.walletProvider.setWalletBalance(ctx.envContext, walletDTO);
       }
-      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
     }
     if (ctx.checkWalletBalance === true && !debit.isEqualTo(new BigNumber(0))) {
       throw new Error('insufficient funds');
-    }
-    for (let i = 0; i < tx.to.length; i++) {
-      const to = tx.to[i];
-      const amount = new BigNumber(tx.amount[i]);
-
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, to);
-      balanceDTO.balance = balanceDTO.balance.plus(new BigNumber(amount));
-      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
     }
 
     ctx.output.fee = tx.fee;
@@ -288,12 +282,12 @@ export class VirtualMachineProvider {
       //const hash = cmd.input[1];
 
       const address = ctx.tx.from[0];
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, address);
-      balanceDTO.balance = balanceDTO.balance.minus(new BigNumber("0.1"));
-      if (balanceDTO.balance.isLessThan(new BigNumber(0))) {
-        balanceDTO.balance = new BigNumber(0);
+      const walletDTO = await this.walletProvider.getWalletBalance(ctx.envContext, address);
+      walletDTO.balance = walletDTO.balance.minus(new BigNumber("0.1"));
+      if (walletDTO.balance.isLessThan(new BigNumber(0))) {
+        walletDTO.balance = new BigNumber(0);
       }
-      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      await this.walletProvider.setWalletBalance(ctx.envContext, walletDTO);
     } else {
       throw new Error("Method not implemented.");
     }
@@ -360,9 +354,11 @@ export class VirtualMachineProvider {
       const amount = cmd.input[1];
       if (!BywiseHelper.isValidAddress(address)) throw new Error(`invalid address ${address}`);
       if (!BywiseHelper.isValidAmount(amount)) throw new Error(`invalid amount ${amount}`);
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, address);
-      balanceDTO.balance = new BigNumber(amount);
-      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      const walletDTO: WalletBalanceDTO = {
+        balance: new BigNumber(amount),
+        address: address,
+      }
+      await this.walletProvider.setWalletBalance(ctx.envContext, walletDTO);
 
     } else if (cmd.name == 'addBalance') {
       if (cmd.input.length !== 2) throw new Error(`addBalance expected 2 inputs`);
@@ -370,9 +366,9 @@ export class VirtualMachineProvider {
       const amount = cmd.input[1];
       if (!BywiseHelper.isValidAddress(address)) throw new Error(`invalid address ${address}`);
       if (!BywiseHelper.isValidAmount(amount)) throw new Error(`invalid amount ${amount}`);
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, address);
-      balanceDTO.balance = balanceDTO.balance.plus(new BigNumber(amount));
-      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      const walletDTO = await this.walletProvider.getWalletBalance(ctx.envContext, address);
+      walletDTO.balance = walletDTO.balance.plus(new BigNumber(amount));
+      await this.walletProvider.setWalletBalance(ctx.envContext, walletDTO);
 
     } else if (cmd.name == 'subBalance') {
       if (cmd.input.length !== 2) throw new Error(`subBalance expected 2 inputs`);
@@ -380,12 +376,12 @@ export class VirtualMachineProvider {
       const amount = cmd.input[1];
       if (!BywiseHelper.isValidAddress(address)) throw new Error(`invalid address ${address}`);
       if (!BywiseHelper.isValidAmount(amount)) throw new Error(`invalid amount ${amount}`);
-      const balanceDTO = await this.walletProvider.getWalletBalance(ctx.envContext, address);
-      balanceDTO.balance = balanceDTO.balance.minus(new BigNumber(amount));
-      if (balanceDTO.balance.isLessThan(new BigNumber(0))) {
-        balanceDTO.balance = new BigNumber(0);
+      const walletDTO = await this.walletProvider.getWalletBalance(ctx.envContext, address);
+      walletDTO.balance = walletDTO.balance.minus(new BigNumber(amount));
+      if (walletDTO.balance.isLessThan(new BigNumber(0))) {
+        walletDTO.balance = new BigNumber(0);
       }
-      this.walletProvider.setWalletBalance(ctx.envContext, balanceDTO);
+      await this.walletProvider.setWalletBalance(ctx.envContext, walletDTO);
 
     } else {
       throw new Error("Method not implemented.");
@@ -401,13 +397,13 @@ export class VirtualMachineProvider {
       const value = cmd.input[1];
       if (value.length > 1024 * 1000) throw new Error("Value info too long");
 
-      let info = await this.walletProvider.getWalletInfo(ctx.envContext, ctx.tx.from[0]);
-      if (name === 'name') info.name = value;
-      if (name === 'url') info.url = value;
-      if (name === 'bio') info.bio = value;
-      if (name === 'photo') info.photo = value;
-      if (name === 'publicKey') info.publicKey = value;
-      this.walletProvider.setWalletInfo(ctx.envContext, ctx.tx.from[0], info);
+      let walletDTO = await this.walletProvider.getWalletInfo(ctx.envContext, ctx.tx.from[0]);
+      if (name === 'name') walletDTO.name = value;
+      if (name === 'url') walletDTO.url = value;
+      if (name === 'bio') walletDTO.bio = value;
+      if (name === 'photo') walletDTO.photo = value;
+      if (name === 'publicKey') walletDTO.publicKey = value;
+      await this.walletProvider.setWalletInfo(ctx.envContext, walletDTO);
       return;
     }
     throw new Error("Method not implemented.");

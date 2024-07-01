@@ -2,12 +2,12 @@ import express from 'express';
 import BigNumber from "bignumber.js";
 import metadataDocument from '../metadata/metadataDocument';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { ApiContext } from '../types';
+import { ApiContext, WalletCodeDTO } from '../types';
 import { RequestKeys } from '../datasource/message-queue';
 import BlockchainDebug from '../vm/BlockchainDebug';
 import { GetContract } from '../vm/BlockchainInterface';
 import { BywiseHelper, Tx, TxType } from '@bywise/web3';
-import BywiseRuntime, { BywiseContractContext } from '../vm/BywiseRuntime';
+import BywiseRuntime from '../vm/BywiseRuntime';
 import helper from '../utils/helper';
 
 export default async function contractsController(app: express.Express, apiContext: ApiContext): Promise<void> {
@@ -46,17 +46,17 @@ export default async function contractsController(app: express.Express, apiConte
             const blockchainDebug = new BlockchainDebug(apiContext.applicationContext);
             blockchainDebug.loadData(runtimeContext);
 
-            const getContract: GetContract = async (address: string, method: string, inputs: string[]): Promise<{ bcc: BywiseContractContext, code: string, view: boolean, payable: boolean }> => {
+            const getContract: GetContract = async (address: string, method: string, inputs: string[]): Promise<{ wc: WalletCodeDTO, code: string, view: boolean, payable: boolean }> => {
                 if (!BywiseHelper.isValidAddress(address)) throw new Error(`Invalid address`);
                 if (inputs === undefined) throw new Error(`inputs array not found`);
                 if (!Array.isArray(inputs)) throw new Error(`Inputs need be an array`);
-                const bcc: BywiseContractContext = runtimeContext.contractAddress[address];
-                if (!bcc) throw new Error(`Contract not found`);
+                const wc: WalletCodeDTO = runtimeContext.contractAddress[address];
+                if (!wc) throw new Error(`Contract not found`);
                 let foundMethod = false;
                 let view = false;
                 let payable = false;
-                for (let i = 0; i < bcc.abi.length; i++) {
-                    const abiMethod = bcc.abi[i];
+                for (let i = 0; i < wc.abi.length; i++) {
+                    const abiMethod = wc.abi[i];
                     if (abiMethod.name === method) {
                         foundMethod = true;
                         view = abiMethod.view;
@@ -68,7 +68,7 @@ export default async function contractsController(app: express.Express, apiConte
                 return {
                     payable,
                     view,
-                    bcc,
+                    wc,
                     code: `globalThis.contract.${method}(${inputs.map(i => `"${i}"`).join(',')});`
                 }
             }
@@ -100,7 +100,7 @@ export default async function contractsController(app: express.Express, apiConte
 
                 if (!contract.payable && !(new BigNumber(sendAmount)).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
 
-                const output = await BywiseRuntime.execInContract(blockchainDebug, getContract, ctx, req.body.contractAddress, contract.bcc, req.body.from, sendAmount, contract.code);
+                const output = await BywiseRuntime.execInContract(blockchainDebug, getContract, ctx, req.body.contractAddress, contract.wc, req.body.from, sendAmount, contract.code);
 
                 runtimeContext.data = blockchainDebug.export();
 

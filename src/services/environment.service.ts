@@ -112,7 +112,7 @@ export class EnvironmentProvider {
         return '';
     }
 
-    set(envContext: EnvironmentContext, key: string, value: string): void {
+    async set(envContext: EnvironmentContext, key: string, value: string): Promise<void> {
         const newEnv: Environment = {
             chain: envContext.blockTree.chain,
             key: key,

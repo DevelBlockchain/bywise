@@ -2,7 +2,7 @@ import { QuickJSAsyncWASMModule, QuickJSAsyncRuntime, QuickJSAsyncContext, Quick
 import fs from 'fs';
 import path from 'path';
 import BlockchainInterface, { GetContract, TransactionMessage } from './BlockchainInterface';
-import { SimulateDTO } from '../types';
+import { SimulateDTO, WalletCodeDTO } from '../types';
 import helper from '../utils/helper';
 
 const PRESET = [
@@ -19,34 +19,6 @@ const imports = [
     { module: "bywise-utils.js", binary: FILE_BYWISE_UTILS },
     { module: "bywise-utils", binary: FILE_BYWISE_UTILS_V2 }
 ]
-
-
-export type ABIParameters = {
-    name: string;
-    type: string[];
-}
-
-export type ABIMethod = {
-    name: string;
-    view: boolean;
-    payable: boolean;
-    parameters: ABIParameters[];
-    returns: string[];
-}
-
-export class BywiseContractContext {
-    txHash: string;
-    abi: ABIMethod[];
-    code: string;
-    calls: string[];
-
-    constructor(txHash: string, abi: ABIMethod[], code: string, calls: string[]) {
-        this.txHash = txHash;
-        this.abi = abi;
-        this.code = code;
-        this.calls = calls;
-    }
-}
 
 export class BywiseRuntimeInstance {
     public bywiseVirtualMachineStack = 0;
@@ -81,7 +53,7 @@ export class BywiseRuntimeInstance {
         const blockchainHandle = this.ctx.newObject();
         this.blockchain.exposeMethods().forEach(method => {
             const func = this.ctx.newAsyncifiedFunction(method.name, async (...parans) => {
-                this.interruptCycles+=7;
+                this.interruptCycles += 7;
                 if (!this.tx) throw new Error('transaction message not found');
                 if (this.write) {
                     const decodedParans = parans.map(this.ctx.getString);
@@ -119,7 +91,7 @@ export class BywiseRuntimeInstance {
         this.runtime.dispose();
     }
 
-    execContract = async (getContract: GetContract, ctx: SimulateDTO, contractAddress: string, sender: string, value: string, code: string) => {
+    execContract = async (getContract: GetContract, ctx: SimulateDTO, contractAddress: string, sender: string, value: string, code: string):Promise<WalletCodeDTO> => {
         const tx: TransactionMessage = {
             contractAddress,
             sender: sender,
@@ -138,10 +110,10 @@ export class BywiseRuntimeInstance {
         }
         const calls = this.calls.map(c => c);
 
-        return new BywiseContractContext(ctx.tx ? ctx.tx.hash : '', abi, code, calls);
+        return {address: contractAddress, status: 'locked', abi, code, calls};
     }
 
-    startContract = async (getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string) => {
+    startContract = async (getContract: GetContract, ctx: SimulateDTO, contractAddress: string, wc: WalletCodeDTO, sender: string, value: string) => {
         const tx: TransactionMessage = {
             contractAddress,
             sender: sender,
@@ -150,17 +122,17 @@ export class BywiseRuntimeInstance {
             bywiseRuntime: this,
             getContract
         }
-        this.calls = bcc.calls.map(c => c);
+        this.calls = wc.calls.map(c => c);
         try {
             await this.exec(tx, PRESET, false);
-            await this.exec(tx, bcc.code, false);
+            await this.exec(tx, wc.code, false);
             await this.exec(tx, "globalThis.abi;", false);
         } catch (err) {
             throw err;
         }
     }
 
-    execStartedContract = async (getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string, code: string) => {
+    execStartedContract = async (getContract: GetContract, ctx: SimulateDTO, contractAddress: string, wc: WalletCodeDTO, sender: string, value: string, code: string) => {
         const tx: TransactionMessage = {
             contractAddress,
             sender: sender,
@@ -237,18 +209,18 @@ export default class BywiseRuntime {
         }
     }
 
-    static execInContract = async (blockchain: BlockchainInterface, getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string, code: string) => {
+    static execInContract = async (blockchain: BlockchainInterface, getContract: GetContract, ctx: SimulateDTO, contractAddress: string, wc: WalletCodeDTO, sender: string, value: string, code: string) => {
         const runtimeModule = await BywiseRuntime.getModule(true);
         let br: BywiseRuntimeInstance | undefined = ctx.envContext.executedContracts.get(contractAddress);
         if (!br) {
             br = new BywiseRuntimeInstance(runtimeModule.module, blockchain);
-            await br.startContract(getContract, ctx, contractAddress, bcc, sender, value);
+            await br.startContract(getContract, ctx, contractAddress, wc, sender, value);
             ctx.envContext.executedContracts.set(contractAddress, br);
         }
         try {
             br.bywiseVirtualMachineStack = 0;
             br.interruptCycles = 1;
-            let result = await br.execStartedContract(getContract, ctx, contractAddress, bcc, sender, value, code);
+            let result = await br.execStartedContract(getContract, ctx, contractAddress, wc, sender, value, code);
             ctx.output.cost += br.interruptCycles;
             runtimeModule.busy = false;
             return result;
@@ -259,7 +231,7 @@ export default class BywiseRuntime {
         }
     }
 
-    static execInContractSubContext = async (brSubcontext: BywiseRuntimeInstance, getContract: GetContract, ctx: SimulateDTO, contractAddress: string, bcc: BywiseContractContext, sender: string, value: string, code: string) => {
+    static execInContractSubContext = async (brSubcontext: BywiseRuntimeInstance, getContract: GetContract, ctx: SimulateDTO, contractAddress: string, wc: WalletCodeDTO, sender: string, value: string, code: string) => {
         const bywiseVirtualMachineStack = brSubcontext.bywiseVirtualMachineStack + 1;
         if (bywiseVirtualMachineStack > 5) {
             throw new Error(`BVM: call many contracts`);
@@ -269,13 +241,13 @@ export default class BywiseRuntime {
         let br: BywiseRuntimeInstance | undefined = ctx.envContext.executedContracts.get(subContextKey);
         if (!br) {
             br = new BywiseRuntimeInstance(runtimeModule.module, brSubcontext.blockchain);
-            await br.startContract(getContract, ctx, contractAddress, bcc, sender, value);
+            await br.startContract(getContract, ctx, contractAddress, wc, sender, value);
             ctx.envContext.executedContracts.set(subContextKey, br);
         }
         try {
             br.bywiseVirtualMachineStack = bywiseVirtualMachineStack;
             br.interruptCycles = brSubcontext.interruptCycles;
-            let result = await br.execStartedContract(getContract, ctx, contractAddress, bcc, sender, value, code);
+            let result = await br.execStartedContract(getContract, ctx, contractAddress, wc, sender, value, code);
             brSubcontext.interruptCycles = br.interruptCycles + 14;
             runtimeModule.busy = false;
             return result;

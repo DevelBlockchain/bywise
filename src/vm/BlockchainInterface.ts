@@ -1,7 +1,7 @@
-import { SimulateDTO } from "../types";
-import { BywiseContractContext, BywiseRuntimeInstance } from "./BywiseRuntime";
+import { SimulateDTO, WalletCodeDTO } from "../types";
+import { BywiseRuntimeInstance } from "./BywiseRuntime";
 
-export type GetContract = (address: string, method: string, parans: string[]) => Promise<{ bcc: BywiseContractContext, code: string, view: boolean, payable: boolean }>
+export type GetContract = (address: string, method: string, parans: string[]) => Promise<{ wc: WalletCodeDTO, code: string, view: boolean, payable: boolean }>
 
 export type TransactionMessage = {
     contractAddress: string;

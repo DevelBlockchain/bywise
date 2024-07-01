@@ -63,13 +63,13 @@ export default class BlockchainDebug implements BlockchainInterface {
         let eventIntexString = await this.memory.get(`${tx.contractAddress}-CI`);
         let index = BigInt(eventIntexString ? eventIntexString : '0');
         index++;
-        let uuid = helper.numberToString(index.toString());
+        let uuid = index.toString();
         this.memory.set(`${tx.contractAddress}-CI`, index.toString());
         return uuid;
     }
 
     isUUID = (uuid: string) => {
-        return /^[0-9]{20}$/.test(uuid);
+        return /^[0-9]{1,20}$/.test(uuid);
     }
 
     getTxCreated = async (tx: TransactionMessage): Promise<string> => {
@@ -181,7 +181,7 @@ export default class BlockchainDebug implements BlockchainInterface {
         const contract = await tx.getContract(contractAddress, method, inputs);
 
         await this.internalTransfer(tx.contractAddress, contractAddress, amount);
-        const output = await BywiseRuntime.execInContractSubContext(tx.bywiseRuntime, tx.getContract, tx.ctx, contractAddress, contract.bcc, tx.contractAddress, amount, contract.code)
+        const output = await BywiseRuntime.execInContractSubContext(tx.bywiseRuntime, tx.getContract, tx.ctx, contractAddress, contract.wc, tx.contractAddress, amount, contract.code)
         return `${output}`;
     }
 
@@ -225,7 +225,7 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (typeof defaultValue !== 'string') throw new Error('BVM: invalid typeof defaultValue');
 
         const uuid = await this.getUUID(tx);
-        const key = `${tx.contractAddress}-M-${uuid}`
+        const key = `${tx.contractAddress}-MD-${uuid}`
         this.memory.set(key, defaultValue);
 
         return uuid;
@@ -239,10 +239,10 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (value.length > BlockchainDebug.MAX_VALUE_LENGTH) throw new Error('BVM: value too large');
         if (key.length == 0) throw new Error('BVM: invalid map.key');
 
-        const mapKey = `${tx.contractAddress}-M-${uuid}`;
+        const mapKey = `${tx.contractAddress}-MD-${uuid}`;
         if (!this.memory.has(mapKey)) throw new Error('BVM: invalid map uuid');
 
-        this.memory.set(`${tx.contractAddress}-M-${uuid}-${helper.stringToHash(key)}`, value);
+        this.memory.set(`${tx.contractAddress}-MV-${uuid}-${helper.stringToHash(key)}`, value);
 
         return '';
     }
@@ -253,10 +253,10 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (key.length == 0) throw new Error('BVM: invalid map.key');
         if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        const mapKey = `${tx.contractAddress}-M-${uuid}`;
+        const mapKey = `${tx.contractAddress}-MD-${uuid}`;
         if (!this.memory.has(mapKey)) throw new Error('BVM: invalid map uuid');
 
-        const searchKey = `${tx.contractAddress}-M-${uuid}-${helper.stringToHash(key)}`;
+        const searchKey = `${tx.contractAddress}-MV-${uuid}-${helper.stringToHash(key)}`;
 
         if (this.memory.has(searchKey)) {
             return this.memory.get(searchKey);
@@ -271,7 +271,7 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (key.length == 0) throw new Error('BVM: invalid map.key');
         if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        const searchKey = `${tx.contractAddress}-M-${uuid}-${helper.stringToHash(key)}`;
+        const searchKey = `${tx.contractAddress}-MV-${uuid}-${helper.stringToHash(key)}`;
 
         if (this.memory.has(searchKey)) {
             return '1';
@@ -286,17 +286,16 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (key.length == 0) throw new Error('BVM: invalid map.key');
         if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        const searchKey = `${tx.contractAddress}-M-${uuid}-${helper.stringToHash(key)}`;
+        const searchKey = `${tx.contractAddress}-MV-${uuid}-${helper.stringToHash(key)}`;
         if (this.memory.has(searchKey)) {
             this.memory.delete(searchKey);
         }
-
         return '';
     }
 
     listNew = async (tx: TransactionMessage): Promise<string> => {
         const uuid = await this.getUUID(tx);
-        this.memory.set(`${tx.contractAddress}-L-${uuid}`, '0');
+        this.memory.set(`${tx.contractAddress}-LS-${uuid}`, '0');
 
         return uuid;
     }
@@ -305,10 +304,9 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
 
         if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
-        if (!this.memory.has(`${tx.contractAddress}-L-${uuid}`)) throw new Error('BVM: list not found');
+        if (!this.memory.has(`${tx.contractAddress}-LS-${uuid}`)) throw new Error('BVM: list not found');
 
-
-        return this.memory.get(`${tx.contractAddress}-L-${uuid}`);
+        return this.memory.get(`${tx.contractAddress}-LS-${uuid}`);
     }
 
     listGet = async (tx: TransactionMessage, index: string, uuid: string): Promise<string> => {
@@ -319,10 +317,10 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
         let indexBN = new BigNumber(index);
-        let size = new BigNumber(this.memory.get(`${tx.contractAddress}-L-${uuid}`));
+        let size = new BigNumber(this.memory.get(`${tx.contractAddress}-LS-${uuid}`));
         if (indexBN.isGreaterThanOrEqualTo(size)) throw new Error('BVM: index out of array');
 
-        const key = `${tx.contractAddress}-L-${uuid}-${indexBN.toFixed(0)}`
+        const key = `${tx.contractAddress}-LV-${uuid}-${indexBN.toFixed(0)}`
 
         return this.memory.get(key);
     }
@@ -337,10 +335,10 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
         let indexBN = new BigNumber(index);
-        let size = new BigNumber(this.memory.get(`${tx.contractAddress}-L-${uuid}`));
+        let size = new BigNumber(this.memory.get(`${tx.contractAddress}-LS-${uuid}`));
         if (indexBN.isGreaterThanOrEqualTo(size)) throw new Error('BVM: index out of array');
 
-        const key = `${tx.contractAddress}-L-${uuid}-${indexBN.toFixed(0)}`;
+        const key = `${tx.contractAddress}-LV-${uuid}-${indexBN.toFixed(0)}`;
         this.memory.set(key, value);
 
         return '';
@@ -352,11 +350,11 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (value.length > BlockchainDebug.MAX_VALUE_LENGTH) throw new Error('BVM: value too large');
         if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        let size = new BigNumber(this.memory.get(`${tx.contractAddress}-L-${uuid}`));
+        let size = new BigNumber(this.memory.get(`${tx.contractAddress}-LS-${uuid}`));
         let newSize = size.plus(1).toFixed(0);
 
-        this.memory.set(`${tx.contractAddress}-L-${uuid}-${size.toFixed(0)}`, value);
-        this.memory.set(`${tx.contractAddress}-L-${uuid}`, newSize);
+        this.memory.set(`${tx.contractAddress}-LV-${uuid}-${size.toFixed(0)}`, value);
+        this.memory.set(`${tx.contractAddress}-LS-${uuid}`, newSize);
 
         return '';
     }
@@ -365,13 +363,13 @@ export default class BlockchainDebug implements BlockchainInterface {
         if (typeof uuid !== 'string') throw new Error('BVM: invalid typeof uuid');
         if (!this.isUUID(uuid)) throw new Error('BVM: invalid uuid');
 
-        let size = new BigNumber(this.memory.get(`${tx.contractAddress}-L-${uuid}`));
+        let size = new BigNumber(this.memory.get(`${tx.contractAddress}-LS-${uuid}`));
         if (size.isEqualTo(0)) throw new Error('BVM: array is empty')
         let newSize = size.minus(1).toFixed(0);
 
-        const returnValue = this.memory.get(`${tx.contractAddress}-L-${uuid}-${newSize}`);
-        this.memory.delete(`${tx.contractAddress}-L-${uuid}-${newSize}`);
-        this.memory.set(`${tx.contractAddress}-L-${uuid}`, newSize);
+        const returnValue = this.memory.get(`${tx.contractAddress}-LV-${uuid}-${newSize}`);
+        this.memory.delete(`${tx.contractAddress}-LV-${uuid}-${newSize}`);
+        this.memory.set(`${tx.contractAddress}-LS-${uuid}`, newSize);
 
         return returnValue;
     }

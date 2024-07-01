@@ -7,7 +7,6 @@ import helper from '../utils/helper';
 import { ChainConfig } from '../types';
 import { ConfigProvider } from '../services/configs.service';
 import { CompiledContext } from '../types/environment.types';
-import { BywiseContractContext } from '../vm/BywiseRuntime';
 
 var bywise: Bywise;
 var transactionsProvider: TransactionsProvider;
@@ -110,8 +109,8 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
-        expect(balance.balance.toString()).toEqual('100');
+        let walletDTO = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
+        expect(walletDTO.balance.toString()).toEqual('100');
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);
@@ -143,8 +142,8 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
-        expect(balance.balance.toString()).toEqual('60');
+        let walletDTO = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
+        expect(walletDTO.balance.toString()).toEqual('60');
 
         await transactionsProvider.disposeContext(ctx);
     }), 30000;
@@ -191,8 +190,8 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
-        expect(balance.balance.toString()).toEqual('75');
+        let walletDTO = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
+        expect(walletDTO.balance.toString()).toEqual('75');
 
         await transactionsProvider.disposeContext(ctx);
     }, 30000);
@@ -203,8 +202,8 @@ describe('basic tests', () => {
         const currentMinnedBlock = blockTree.currentMinnedBlock;
         await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
         const ctx = transactionsProvider.createContext(blockTree, CompiledContext.MAIN_CONTEXT_HASH, currentMinnedBlock.height + 1);
-        let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
-        expect(balance.balance.toString()).toEqual('0');
+        let walletDTO = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
+        expect(walletDTO.balance.toString()).toEqual('0');
 
         let tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -225,8 +224,8 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
-        expect(balance.balance.toString()).toEqual('100');
+        walletDTO = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
+        expect(walletDTO.balance.toString()).toEqual('100');
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -240,11 +239,11 @@ describe('basic tests', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
 
-        balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
-        expect(balance.balance.toString()).toEqual('30');
+        walletDTO = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
+        expect(walletDTO.balance.toString()).toEqual('30');
 
-        balance = await walletProvider.getWalletBalance(ctx.envContext, wallet2.address);
-        expect(balance.balance.toString()).toEqual('70');
+        walletDTO = await walletProvider.getWalletBalance(ctx.envContext, wallet2.address);
+        expect(walletDTO.balance.toString()).toEqual('70');
 
         tx = await transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -935,12 +934,12 @@ describe('contracts', () => {
         expect(output.fee).toEqual("1");
         expect(output.feeUsed).toEqual("0.3");
 
-        let balance = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
-        expect(balance.balance.toString()).toEqual('99.7');
+        let walletDTO = await walletProvider.getWalletBalance(ctx.envContext, wallet.address);
+        expect(walletDTO.balance.toString()).toEqual('99.7');
 
         await transactionsProvider.disposeContext(ctx);
     }, 3000);
-    
+
     test('change state', async () => {
         const contractAddress = BywiseHelper.getBWSAddressContract();
         const blockTree = await blocksProvider.getBlockTree(chain);
@@ -970,9 +969,7 @@ describe('contracts', () => {
         await transactionsProvider.simulateTransaction(tx, { from: wallet.address }, ctx);
         expect(ctx.output.error).toEqual(undefined);
         expect(environmentProvider.changes(ctx.envContext)).toEqual({
-            get: [
-                `${wallet.address}-WB`,
-            ],
+            get: [],
             set: [
                 [`${wallet.address}-WB`, '100']
             ]
@@ -993,32 +990,37 @@ describe('contracts', () => {
         expect(ctx.output.error).toEqual(undefined);
         expect(environmentProvider.changes(ctx.envContext)).toEqual({
             get: [
-                `${contractAddress}`,
+                `${contractAddress}-WC`,
                 `${contractAddress}-CI`,
-                `${contractAddress}-M-00000000000000000002-default`,
-                `${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(wallet.address)}`,
-                `${contractAddress}-V-00000000000000000001`,
-                `${wallet.address}-WB`,
+                `${contractAddress}-MD-2`,
+                `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
+                `${contractAddress}-V-1`,
                 `${contractAddress}-WB`,
+                `${wallet.address}-WB`,
             ],
             set: [
                 [`${contractAddress}-CI`, '3'],
-                [`${contractAddress}-V-00000000000000000001`, '"5000000000000000000000"'],
-                [`${contractAddress}-M-00000000000000000002-default`, '"0"'],
-                [`${contractAddress}-M-00000000000000000003-default`, '""'],
-                [`${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(wallet.address)}`, '"5000000000000000000000"'],
-                [`${contractAddress}`, JSON.stringify(new BywiseContractContext(tx.hash, ctx.output.output.abi, ERCCodeV2, [
-                    '00000000000000000001',
-                    '00000000000000000002',
-                    '00000000000000000003',
-                    wallet.address,
-                    '"0"',
-                    '',
-                    '"0"',
-                    '00000000000000000001'
-                ]))],
-                [`${wallet.address}-WB`, '90'],
+                [`${contractAddress}-V-1`, '"5000000000000000000000"'],
+                [`${contractAddress}-MD-2`, '"0"'],
+                [`${contractAddress}-MD-3`, '""'],
+                [`${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`, '"5000000000000000000000"'],
+                [`${contractAddress}-WC`, JSON.stringify({
+                    status: 'locked',
+                    abi: ctx.output.output.abi,
+                    code: ERCCodeV2,
+                    calls: [
+                        '1',
+                        '2',
+                        '3',
+                        wallet.address,
+                        '"0"',
+                        '',
+                        '"0"',
+                        '1'
+                    ],
+                })],
                 [`${contractAddress}-WB`, '10'],
+                [`${wallet.address}-WB`, '90'],
             ]
         });
         environmentProvider.commit(ctx.envContext);
@@ -1037,18 +1039,14 @@ describe('contracts', () => {
         expect(ctx.output.error).toEqual(undefined);
         expect(environmentProvider.changes(ctx.envContext)).toEqual({
             get: [
-                `${contractAddress}`,
-                `${contractAddress}-M-00000000000000000002-default`,
-                `${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(wallet.address)}`,
-                `${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(stealthAddress)}`,
-                `${wallet.address}-WB`,
-                `${contractAddress}-WB`,
+                `${contractAddress}-WC`,
+                `${contractAddress}-MD-2`,
+                `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
+                `${contractAddress}-MV-2-${helper.stringToHash(stealthAddress)}`
             ],
             set: [
-                [`${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(wallet.address)}`, '"4999999999999999999000"'],
-                [`${contractAddress}-M-00000000000000000002-value-${helper.stringToHash(stealthAddress)}`, '"1000"'],
-                [`${wallet.address}-WB`, '90'],
-                [`${contractAddress}-WB`, '10'],
+                [`${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`, '"4999999999999999999000"'],
+                [`${contractAddress}-MV-2-${helper.stringToHash(stealthAddress)}`, '"1000"']
             ]
         });
         environmentProvider.commit(ctx.envContext);
