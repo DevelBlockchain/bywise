@@ -181,7 +181,6 @@ class Database {
     public SliceRepository;
     public BlockRepository;
     public VotesRepository;
-    public ETHRepository;
 
     private constructor(path: string, mq: MessageQueue, logger: Logger) {
         this.mq = mq;
@@ -199,7 +198,6 @@ class Database {
         this.SliceRepository = new repositories.SliceRepository(this);
         this.BlockRepository = new repositories.BlockRepository(this);
         this.VotesRepository = new repositories.VotesRepository(this);
-        this.ETHRepository = new repositories.ETHRepository(this);
     }
 
     async saveMany(arr: SaveRequest[]): Promise<void> {

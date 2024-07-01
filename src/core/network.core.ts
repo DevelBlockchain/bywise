@@ -1,5 +1,5 @@
 import { Web3, BywiseNode } from '@bywise/web3';
-import { ApplicationContext, Task } from '../types/task.type';
+import { ApplicationContext, Task } from '../types';
 import { NodesProvider } from '../services';
 import helper from '../utils/helper';
 import { RequestKeys, RoutingKeys } from '../datasource/message-queue';

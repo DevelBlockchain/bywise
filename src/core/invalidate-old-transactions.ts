@@ -1,13 +1,14 @@
-import { BlockchainStatus, CoreContext, TransactionOutputDTO } from "../types";
+import { CoreProvider } from "../services";
+import { BlockchainStatus, TransactionOutputDTO } from "../types";
 import helper from "../utils/helper";
 
 export default class InvalideteOldTransactions {
     public isRun = true;
-    private coreContext;
+    private coreProvider;
     private lastUpdate = 0;
 
-    constructor(coreContext: CoreContext) {
-        this.coreContext = coreContext;
+    constructor(coreProvider: CoreProvider) {
+        this.coreProvider = coreProvider;
     }
 
     async run() {
@@ -17,14 +18,14 @@ export default class InvalideteOldTransactions {
         }
         this.lastUpdate = now;
 
-        const oldTxs = await this.coreContext.applicationContext.database.TransactionRepository.findByChainAndStatus(this.coreContext.chain, BlockchainStatus.TX_MEMPOOL);
+        const oldTxs = await this.coreProvider.applicationContext.database.TransactionRepository.findByChainAndStatus(this.coreProvider.chain, BlockchainStatus.TX_MEMPOOL);
         for (let i = 0; i < oldTxs.length; i++) {
             const tx = oldTxs[i];
             if (tx.tx.created < now - 240) {
                 tx.status = BlockchainStatus.TX_FAILED;
                 tx.output = new TransactionOutputDTO();
                 tx.output.error = 'TIMEOUT';
-                await this.coreContext.transactionsProvider.updateTransaction(tx);
+                await this.coreProvider.transactionsProvider.updateTransaction(tx);
             }
         }
     }

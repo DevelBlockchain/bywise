@@ -1,12 +1,10 @@
 import BigNumber from "bignumber.js";
 import { Block, BywiseHelper, Slice, Tx, BlockPack } from '@bywise/web3';
-import { ApplicationContext } from '../types/task.type';
-import { BlockchainStatus } from '../types';
-import { MinnerProvider } from './minner.service';
-import { BlockTree, CompiledContext } from '../types/environment.types';
-import { EnvironmentProvider } from "./environment.service";
 import { RoutingKeys } from "../datasource/message-queue";
 import { Blocks } from "../models";
+import { ApplicationContext, BlockchainStatus, BlockTree, CompiledContext } from '../types';
+import { MinnerProvider } from './minner.service';
+import { EnvironmentProvider } from "./environment.service";
 import { SlicesProvider } from "./slices.service";
 import { TransactionsProvider } from "./transactions.service";
 
@@ -26,7 +24,7 @@ export class BlocksProvider {
     this.applicationContext = applicationContext;
     this.mq = applicationContext.mq;
     this.environmentProvider = new EnvironmentProvider(applicationContext);
-    this.minnerProvider = new MinnerProvider(applicationContext);
+    this.minnerProvider = new MinnerProvider();
     this.slicesProvider = new SlicesProvider(applicationContext);
     this.transactionsProvider = new TransactionsProvider(applicationContext);
     this.BlockRepository = applicationContext.database.BlockRepository;
@@ -118,7 +116,7 @@ export class BlocksProvider {
         await this.mq.send(RoutingKeys.find_block, blockInfo.block.lastHash);
       }
     } else {
-      if(!lastBlockInfo.isComplete) {
+      if (!lastBlockInfo.isComplete) {
         isComplete = false;
       }
     }
@@ -232,7 +230,7 @@ export class BlocksProvider {
           for (let j = 0; j < blockInfo.block.slices.length; j++) {
             const sliceHash = blockInfo.block.slices[j];
             const sliceInfo = await this.slicesProvider.getSliceInfo(sliceHash);
-  
+
             await this.environmentProvider.mergeContext(blockTree.chain, sliceInfo.slice.hash, blockInfo.block.hash);
           }
           if (!lastBlockInfo) {
@@ -286,7 +284,7 @@ export class BlocksProvider {
     }
 
     let lastMinnedBlock = blockTree.minnedBlockList.get(blockInfo.block.height);
-    if(lastMinnedBlock) {
+    if (lastMinnedBlock) {
       const lastMinnedBlockInfo = await this.getBlockInfo(lastMinnedBlock.hash);
       await this.selectUndoMiningBlock(lastMinnedBlockInfo);
     }
@@ -397,7 +395,7 @@ export class BlocksProvider {
       for (let i = 0; i < blocks.length; i++) {
         const blockInfo = blocks[i];
 
-        if(blockInfo.isComplete) {
+        if (blockInfo.isComplete) {
           blockTree.addBlock(blockInfo.block);
           if (blockInfo.status === BlockchainStatus.TX_MINED) {
             blockTree.setMinnedBlock(blockInfo.block);

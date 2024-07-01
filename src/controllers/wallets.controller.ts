@@ -2,9 +2,9 @@ import express from 'express';
 import { RequestKeys } from '../datasource/message-queue';
 import metadataDocument from '../metadata/metadataDocument';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { ApiContext } from '../types';
+import { ApiService } from '../services';
 
-export default async function walletsController(app: express.Express, apiContext: ApiContext): Promise<void> {
+export default async function walletsController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
 
     metadataDocument.addPath({
@@ -27,9 +27,9 @@ export default async function walletsController(app: express.Express, apiContext
     })
     router.get('/wallets/:address/:chain', async (req: express.Request, res: express.Response) => {
         const chain = req.params.chain;
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
         
-        const info = await apiContext.applicationContext.mq.request(RequestKeys.get_info_wallet, {chain: req.params.chain, address: req.params.address});
+        const info = await apiProvider.applicationContext.mq.request(RequestKeys.get_info_wallet, {chain: req.params.chain, address: req.params.address});
 
         return res.send(info);
     });

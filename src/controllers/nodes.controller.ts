@@ -1,15 +1,14 @@
 import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
 import { Web3, BywiseNode } from '@bywise/web3';
-import { NodesProvider } from '../services';
+import { ApiService, NodesProvider } from '../services';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { ApiContext } from '../types';
 import { RequestKeys, RoutingKeys } from '../datasource/message-queue';
 
-export default async function nodesController(app: express.Express, apiContext: ApiContext): Promise<void> {
+export default async function nodesController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
     
-    const nodeProvider = new NodesProvider(apiContext.applicationContext);
+    const nodeProvider = new NodesProvider(apiProvider.applicationContext);
 
     metadataDocument.addPath({
         path: "/api/v2/nodes/info",
@@ -26,7 +25,7 @@ export default async function nodesController(app: express.Express, apiContext: 
         }]
     })
     router.get('/info', async (req: express.Request, res: express.Response) => {
-        const connectedNodes = await apiContext.applicationContext.mq.request(RequestKeys.get_connected_nodes);
+        const connectedNodes = await apiProvider.applicationContext.mq.request(RequestKeys.get_connected_nodes);
         return res.send(await nodeProvider.getInfoNode(connectedNodes));
     });
 
@@ -45,7 +44,7 @@ export default async function nodesController(app: express.Express, apiContext: 
         }]
     })
     router.get('/try-token', async (req: express.Request, res: express.Response) => {
-        const connectedNodes = await apiContext.applicationContext.mq.request(RequestKeys.get_connected_nodes);
+        const connectedNodes = await apiProvider.applicationContext.mq.request(RequestKeys.get_connected_nodes);
         return res.send(await nodeProvider.getInfoNode(connectedNodes));
     });
 
@@ -73,7 +72,7 @@ export default async function nodesController(app: express.Express, apiContext: 
             if (remoteInfo.error) {
                 return res.status(400).send({ error: `could not connect to node - ${remoteInfo.error}` });
             }
-            apiContext.applicationContext.mq.send(RoutingKeys.new_node, node);
+            apiProvider.applicationContext.mq.send(RoutingKeys.new_node, node);
         }
         return res.send(await nodeProvider.createMyNode());
     });

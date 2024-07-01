@@ -29,7 +29,7 @@ beforeAll(async () => {
         mainWalletSeed: wallet.seed,
         startServices: [],
     });
-    minnerProvider = new MinnerProvider(bywise.applicationContext);
+    minnerProvider = new MinnerProvider();
     slicesProvider = new SlicesProvider(bywise.applicationContext);
     blocksProvider = new BlocksProvider(bywise.applicationContext);
 }, 30000)

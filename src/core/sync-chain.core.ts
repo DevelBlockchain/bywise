@@ -1,22 +1,22 @@
-import { CoreContext } from "../types";
+import { CoreProvider } from "../services";
 
 export default class SyncChain {
     public isRun = true;
-    private coreContext;
+    private coreProvider;
 
-    constructor(coreContext: CoreContext) {
-        this.coreContext = coreContext;
+    constructor(coreProvider: CoreProvider) {
+        this.coreProvider = coreProvider;
     }
 
     async run() {
-        if (this.coreContext.network.web3.network.isConnected) {
-            const currentBlock = this.coreContext.blockTree.currentMinnedBlock;
+        if (this.coreProvider.network.web3.network.isConnected) {
+            const currentBlock = this.coreProvider.blockTree.currentMinnedBlock;
       
-            const nextBlock = await this.coreContext.network.web3.blocks.getBlockPackByHeight(currentBlock.chain, currentBlock.height + 1);
+            const nextBlock = await this.coreProvider.network.web3.blocks.getBlockPackByHeight(currentBlock.chain, currentBlock.height + 1);
             if (nextBlock) {
-                await this.coreContext.blockProvider.setNewBlockPack(this.coreContext.blockTree, nextBlock);
+                await this.coreProvider.blockProvider.setNewBlockPack(this.coreProvider.blockTree, nextBlock);
             } else {
-                await this.coreContext.blockProvider.selectMinedBlock(this.coreContext.blockTree, currentBlock.hash);
+                await this.coreProvider.blockProvider.selectMinedBlock(this.coreProvider.blockTree, currentBlock.hash);
                 this.isRun = false;
             }
         }

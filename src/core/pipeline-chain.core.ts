@@ -1,7 +1,7 @@
-import { CoreContext, Task } from "../types";
+import { CoreProvider } from "../services";
+import { Task } from "../types";
 import helper from "../utils/helper";
 import ConsensusAlgorithm from "./consensus-algorithm.core";
-import ETHProxySync from "./eth-proxy-sync.core";
 import ExecuteBlocks from "./exec-blocks.core";
 import ExecuteSlices from "./exec-slices.core";
 import ExecuteTransactions from "./exec-transactions.core";
@@ -17,27 +17,27 @@ const DEFAULT_DELAY = 50;
 export default class PipelineChain implements Task {
     public isRun = false;
     private runWorkersCount = 0;
-    public coreContext;
+    public coreProvider;
     public executeTransactionsTask;
 
-    constructor(coreContext: CoreContext) {
-        this.coreContext = coreContext;
-        this.executeTransactionsTask = new ExecuteTransactions(this.coreContext);
+    constructor(coreProvider: CoreProvider) {
+        this.coreProvider = coreProvider;
+        this.executeTransactionsTask = new ExecuteTransactions(this.coreProvider);
     }
 
     private async runSyncChain() {
         this.runWorkersCount++;
         try {
-            const task = new SyncChain(this.coreContext);
-            this.coreContext.applicationContext.logger.verbose(`start sync chain ${this.coreContext.chain}`);
+            const task = new SyncChain(this.coreProvider);
+            this.coreProvider.applicationContext.logger.verbose(`start sync chain ${this.coreProvider.chain}`);
             while (this.isRun && task.isRun) {
                 await task.run();
 
                 await helper.sleep(10);
             }
-            this.coreContext.applicationContext.logger.verbose(`sync chain ${this.coreContext.chain} done`);
+            this.coreProvider.applicationContext.logger.verbose(`sync chain ${this.coreProvider.chain} done`);
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.runSyncChain chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.runSyncChain chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -46,14 +46,14 @@ export default class PipelineChain implements Task {
     private async keepSync() {
         this.runWorkersCount++;
         try {
-            const task = new KeepSync(this.coreContext);
+            const task = new KeepSync(this.coreProvider);
             while (this.isRun && task.isRun) {
                 await task.run();
 
                 await helper.sleep(DEFAULT_DELAY);
             }
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.keepSync chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.keepSync chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -62,30 +62,14 @@ export default class PipelineChain implements Task {
     private async invalidateTransactions() {
         this.runWorkersCount++;
         try {
-            const task = new InvalideteOldTransactions(this.coreContext);
+            const task = new InvalideteOldTransactions(this.coreProvider);
             while (this.isRun && task.isRun) {
                 await task.run();
 
                 await helper.sleep(DEFAULT_DELAY);
             }
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.invalidateTransactions chain ${this.coreContext.chain} - ${err.message}`, err);
-            this.stop();
-        }
-        this.runWorkersCount--;
-    }
-
-    private async ethProxy() {
-        this.runWorkersCount++;
-        try {
-            const task = new ETHProxySync(this.coreContext);
-            while (this.isRun && task.isRun) {
-                await task.run();
-
-                await helper.sleep(DEFAULT_DELAY);
-            }
-        } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.ethProxy chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.invalidateTransactions chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -94,14 +78,14 @@ export default class PipelineChain implements Task {
     private async executeBlocks() {
         this.runWorkersCount++;
         try {
-            const task = new ExecuteBlocks(this.coreContext);
+            const task = new ExecuteBlocks(this.coreProvider);
             while (this.isRun && task.isRun) {
                 await task.run();
 
                 await helper.sleep(DEFAULT_DELAY);
             }
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.executeBlocks chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.executeBlocks chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -116,7 +100,7 @@ export default class PipelineChain implements Task {
                 await helper.sleep(DEFAULT_DELAY);
             }
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.executeBlocks chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.executeBlocks chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -125,7 +109,7 @@ export default class PipelineChain implements Task {
     private async mintSlices() {
         this.runWorkersCount++;
         try {
-            const mintSlices = new MintSlices(this.coreContext, this);
+            const mintSlices = new MintSlices(this.coreProvider, this);
             await mintSlices.start();
             while (this.isRun && mintSlices.isRun) {
                 await mintSlices.run();
@@ -133,7 +117,7 @@ export default class PipelineChain implements Task {
                 await helper.sleep(DEFAULT_DELAY);
             }
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.mintSlices chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.mintSlices chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -142,14 +126,14 @@ export default class PipelineChain implements Task {
     private async executeSlices() {
         this.runWorkersCount++;
         try {
-            const executeSlices = new ExecuteSlices(this.coreContext);
+            const executeSlices = new ExecuteSlices(this.coreProvider);
             while (this.isRun && executeSlices.isRun) {
                 await executeSlices.run();
 
                 await helper.sleep(DEFAULT_DELAY);
             }
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.mintSlices chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.mintSlices chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -158,14 +142,14 @@ export default class PipelineChain implements Task {
     private async mintBlocks() {
         this.runWorkersCount++;
         try {
-            const task = new MintBlocks(this.coreContext);
+            const task = new MintBlocks(this.coreProvider);
             while (this.isRun && task.isRun) {
                 await task.run();
 
                 await helper.sleep(DEFAULT_DELAY);
             }
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.mintBlocks chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.mintBlocks chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -174,14 +158,14 @@ export default class PipelineChain implements Task {
     private async voteBlocks() {
         this.runWorkersCount++;
         try {
-            const task = new VoteBlocks(this.coreContext);
+            const task = new VoteBlocks(this.coreProvider);
             while (this.isRun && task.isRun) {
                 await task.run();
 
                 await helper.sleep(DEFAULT_DELAY);
             }
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.voteBlocks chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.voteBlocks chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -190,14 +174,14 @@ export default class PipelineChain implements Task {
     private async consensusAlgorithm() {
         this.runWorkersCount++;
         try {
-            const task = new ConsensusAlgorithm(this.coreContext);
+            const task = new ConsensusAlgorithm(this.coreProvider);
             while (this.isRun && task.isRun) {
                 await task.run();
 
                 await helper.sleep(DEFAULT_DELAY);
             }
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`error core.consensusAlgorithm chain ${this.coreContext.chain} - ${err.message}`, err);
+            this.coreProvider.applicationContext.logger.error(`error core.consensusAlgorithm chain ${this.coreProvider.chain} - ${err.message}`, err);
             this.stop();
         }
         this.runWorkersCount--;
@@ -217,14 +201,13 @@ export default class PipelineChain implements Task {
         this.voteBlocks();
         this.consensusAlgorithm();
         this.invalidateTransactions();
-        this.ethProxy();
 
         this.runWorkersCount--;
     }
 
     async start() {
         this.isRun = true;
-        this.coreContext.applicationContext.logger.verbose(`watch ${this.coreContext.chain} chain`)
+        this.coreProvider.applicationContext.logger.verbose(`watch ${this.coreProvider.chain} chain`)
         await this.runPipeline();
     }
 

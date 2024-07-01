@@ -1,24 +1,24 @@
 import { Block, Tx, TxType, Web3 } from "@bywise/web3";
-import { CoreContext } from "../types";
+import { CoreProvider } from "../services";
 import helper from "../utils/helper";
 
 export default class VoteBlocks {
     public isRun = true;
-    private coreContext;
+    private coreProvider;
     private blockHeight = -1;
 
-    constructor(coreContext: CoreContext) {
-        this.coreContext = coreContext;
+    constructor(coreProvider: CoreProvider) {
+        this.coreProvider = coreProvider;
     }
 
     async run() {
-        if (!this.coreContext.isValidator || !this.coreContext.hasMinimumBWSToMine) {
+        if (!this.coreProvider.isValidator || !this.coreProvider.hasMinimumBWSToMine) {
             return;
         }
-        const mainWallet = await this.coreContext.walletProvider.getMainWallet();
-        const currentBlock = await this.coreContext.blockTree.currentMinnedBlock;
+        const mainWallet = await this.coreProvider.walletProvider.getMainWallet();
+        const currentBlock = await this.coreProvider.blockTree.currentMinnedBlock;
 
-        const blockTime = this.coreContext.blockTime;
+        const blockTime = this.coreProvider.blockTime;
         const now = helper.getNow();
         const nextVote = currentBlock.created + blockTime / 2;
 
@@ -32,7 +32,7 @@ export default class VoteBlocks {
 
         const tx = new Tx();
         tx.version = '2';
-        tx.chain = this.coreContext.chain;
+        tx.chain = this.coreProvider.chain;
         tx.from = [mainWallet.address];
         tx.to = [mainWallet.address];
         tx.amount = ['0'];
@@ -46,8 +46,8 @@ export default class VoteBlocks {
         tx.created = Math.floor(Date.now() / 1000);
         tx.hash = tx.toHash();
         tx.sign = [await mainWallet.signHash(tx.hash)];
-        await this.coreContext.transactionsProvider.saveNewTransaction(tx);
-        this.coreContext.applicationContext.logger.info(`create vote in ${currentBlock.height}`);
+        await this.coreProvider.transactionsProvider.saveNewTransaction(tx);
+        this.coreProvider.applicationContext.logger.info(`create vote in ${currentBlock.height}`);
 
         await this.makePOI(currentBlock);
     }
@@ -56,7 +56,7 @@ export default class VoteBlocks {
         if (block.chain === 'mainnet' || block.chain === 'testnet' || block.chain === 'local') {
             return;
         }
-        const mainWallet = await this.coreContext.walletProvider.getMainWallet();
+        const mainWallet = await this.coreProvider.walletProvider.getMainWallet();
 
         const web3 = new Web3({
             initialNodes: ['https://node1.bywise.org'],
@@ -82,9 +82,9 @@ export default class VoteBlocks {
         await web3.network.connect();
         try {
             await web3.transactions.sendTransactionSync(tx);
-            this.coreContext.applicationContext.logger.verbose(`create poi in ${block.height} - hash: ${tx.hash}`);
+            this.coreProvider.applicationContext.logger.verbose(`create poi in ${block.height} - hash: ${tx.hash}`);
         } catch (err: any) {
-            this.coreContext.applicationContext.logger.error(`cant create poi in ${block.height} - error: ${err.message}`);
+            this.coreProvider.applicationContext.logger.error(`cant create poi in ${block.height} - error: ${err.message}`);
         }
     }
 }

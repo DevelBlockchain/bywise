@@ -2,11 +2,12 @@ import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
 import { Block, Slice } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { ApiContext, BlockchainStatus } from '../types';
+import { BlockchainStatus } from '../types';
+import { ApiService } from '../services';
 
-export default async function blocksController(app: express.Express, apiContext: ApiContext): Promise<void> {
+export default async function blocksController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
-    const BlockRepository = apiContext.applicationContext.database.BlockRepository;
+    const BlockRepository = apiProvider.applicationContext.database.BlockRepository;
 
     metadataDocument.addPath({
         path: "/api/v2/blocks/count/{chain}",
@@ -37,7 +38,7 @@ export default async function blocksController(app: express.Express, apiContext:
             status = BlockchainStatus.TX_FAILED;
         }
         const chain = req.params.chain;
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
         const count = await BlockRepository.countBlocksByStatus(status, chain);
         return res.send({ count });
     });
@@ -85,7 +86,7 @@ export default async function blocksController(app: express.Express, apiContext:
         if (limit > 200) return res.status(400).send({ error: "invalid limit" });
 
         const chain = req.params.chain;
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
         const blocks = await BlockRepository.findBlocksLastsByStatus(status, chain, limit, offset, order);
 
         return res.send(blocks.map(block => ({ ...(new Block(block.block)), status: block.status })));
@@ -114,7 +115,7 @@ export default async function blocksController(app: express.Express, apiContext:
     })
     router.get('/blocks/height/:chain/:height', async (req: express.Request, res: express.Response) => {
         const chain = req.params.chain;
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
         const blocks = await BlockRepository.findByChainAndHeight(chain, parseInt(req.params.height));
         for (let i = 0; i < blocks.length; i++) {
@@ -172,7 +173,7 @@ export default async function blocksController(app: express.Express, apiContext:
     router.get('/blocks/slices/:hash', async (req: express.Request, res: express.Response) => {
         const block = await BlockRepository.findByHash(req.params.hash);
         if (!block) return res.status(404).send({ error: "Block not found" });
-        const bslices = await apiContext.slicesProvider.getSlices(block.block.slices);
+        const bslices = await apiProvider.slicesProvider.getSlices(block.block.slices);
         const slices: Slice[] = [];
         for (let i = 0; i < bslices.length; i++) {
             const bslice = bslices[i];
@@ -214,8 +215,8 @@ export default async function blocksController(app: express.Express, apiContext:
     })
     router.get('/blocks/pack/:chain/:height', async (req: express.Request, res: express.Response) => {
         const chain = req.params.chain;
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-        const blockPack = await apiContext.blockProvider.getBlockPack(chain, parseInt(req.params.height));
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        const blockPack = await apiProvider.blockProvider.getBlockPack(chain, parseInt(req.params.height));
         if (blockPack) {
             res.send(blockPack);
         } else {
@@ -243,10 +244,10 @@ export default async function blocksController(app: express.Express, apiContext:
     router.post('/blocks', async (req: express.Request, res: express.Response) => {
         const block = new Block(req.body);
         try {
-            if (!apiContext.chains.includes(block.chain)) {
+            if (!apiProvider.chains.includes(block.chain)) {
                 return res.status(400).send({ error: `Node does not work with this chain` });
             }
-            await apiContext.blockProvider.saveNewBlock(block);
+            await apiProvider.blockProvider.saveNewBlock(block);
             return res.send({ message: 'OK' });
         } catch (err: any) {
             return res.status(400).send({ error: err.message });

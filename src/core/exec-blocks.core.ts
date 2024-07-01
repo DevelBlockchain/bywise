@@ -1,14 +1,14 @@
-import { CoreContext } from "../types";
+import { CoreProvider } from "../services";
 
 export default class ExecuteBlocks {
     public isRun = true;
-    private coreContext;
+    private coreProvider;
 
-    constructor(coreContext: CoreContext) {
-        this.coreContext = coreContext;
+    constructor(coreProvider: CoreProvider) {
+        this.coreProvider = coreProvider;
     }
 
     async run() {
-        await this.coreContext.blockProvider.executeCompleteBlocks(this.coreContext.blockTree);
+        await this.coreProvider.blockProvider.executeCompleteBlocks(this.coreProvider.blockTree);
     }
 }

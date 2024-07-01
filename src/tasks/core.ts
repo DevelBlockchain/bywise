@@ -1,12 +1,12 @@
-import { ApplicationContext, Task, CoreContext } from '../types';
+import { ApplicationContext, BlockTree, Task } from '../types';
 import { BlocksProvider, SlicesProvider, TransactionsProvider } from '../services';
 import helper from '../utils/helper';
 import PipelineChain from '../core/pipeline-chain.core';
 import Network from '../core/network.core';
 import { Block, Slice, Tx } from '@bywise/web3';
 import { RequestKeys, RoutingKeys } from '../datasource/message-queue';
-import { BlockTree } from '../types/environment.types';
 import { Slices } from '../models';
+import { CoreProvider } from '../services/core.service';
 
 class Core implements Task {
 
@@ -35,8 +35,8 @@ class Core implements Task {
 
                 const blockTree = await this.blockProvider.getBlockTree(chain);
 
-                const coreContext = new CoreContext(this.applicationContext, this.network, blockTree);
-                runChain = new PipelineChain(coreContext);
+                const coreProvider = new CoreProvider(this.applicationContext, this.network, blockTree);
+                runChain = new PipelineChain(coreProvider);
 
                 await runChain.start();
 
@@ -162,18 +162,18 @@ class Core implements Task {
         this.applicationContext.mq.addRequestListener(RequestKeys.get_confirmed_slices, async (data: { chain: string }) => {
             const pipelineChain = this.runChains.get(data.chain);
             if (pipelineChain) {
-                const currentBlock = pipelineChain.coreContext.blockTree.currentMinnedBlock;
+                const currentBlock = pipelineChain.coreProvider.blockTree.currentMinnedBlock;
                 let from = currentBlock.from;
                 if (currentBlock.lastHash !== BlockTree.ZERO_HASH) {
-                    const lastLastBlock = await pipelineChain.coreContext.blockProvider.getBlockInfo(currentBlock.lastHash);
+                    const lastLastBlock = await pipelineChain.coreProvider.blockProvider.getBlockInfo(currentBlock.lastHash);
                     from = lastLastBlock.block.from;
                 }
-                const bestSlices = await pipelineChain.coreContext.blockTree.getBestSlice(from, currentBlock.height + 1);
+                const bestSlices = await pipelineChain.coreProvider.blockTree.getBestSlice(from, currentBlock.height + 1);
                 const slices: Slices[] = [];
                 let end = false;
                 for (let i = 0; i < bestSlices.length; i++) {
                     const slice = bestSlices[i];
-                    const sliceInfo = await pipelineChain.coreContext.slicesProvider.getSliceInfo(slice.hash);
+                    const sliceInfo = await pipelineChain.coreProvider.slicesProvider.getSliceInfo(slice.hash);
                     if (!sliceInfo.isExecuted) {
                         break;
                     }

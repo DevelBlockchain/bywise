@@ -1,21 +1,21 @@
 import { Block } from "@bywise/web3";
 import { Blocks, Votes } from "../models";
-import { CoreContext } from "../types";
 import helper from "../utils/helper";
+import { CoreProvider } from "../services";
 
 export default class ConsensusAlgorithm {
     public isRun = true;
-    private coreContext;
+    private coreProvider;
     private BlockRepository;
 
-    constructor(coreContext: CoreContext) {
-        this.coreContext = coreContext;
-        this.BlockRepository = coreContext.applicationContext.database.BlockRepository;
+    constructor(coreProvider: CoreProvider) {
+        this.coreProvider = coreProvider;
+        this.BlockRepository = coreProvider.applicationContext.database.BlockRepository;
     }
 
     async run() {
-        const blockTime = this.coreContext.blockTime;
-        const currentBlock = this.coreContext.blockTree.currentMinnedBlock;
+        const blockTime = this.coreProvider.blockTime;
+        const currentBlock = this.coreProvider.blockTree.currentMinnedBlock;
 
         await this.selectNewBlock(blockTime, currentBlock);
     }
@@ -37,7 +37,7 @@ export default class ConsensusAlgorithm {
         let bestBlock: Blocks | null = null;
         for (let i = 0; i < currentBlocks.length; i++) {
             const blockInfo = currentBlocks[i];
-            if (bestBlock === null || this.coreContext.minnerProvider.compareDistance(bestBlock.distance, blockInfo.distance) === 'b') {
+            if (bestBlock === null || this.coreProvider.minnerProvider.compareDistance(bestBlock.distance, blockInfo.distance) === 'b') {
                 bestBlock = blockInfo;
             }
         }
@@ -47,7 +47,7 @@ export default class ConsensusAlgorithm {
         if (oldHeight < 0) {
             oldHeight = 0;
         }
-        const lastVotes = await this.coreContext.applicationContext.database.VotesRepository.findByChainAndGreaterHeight(currentBlock.chain, oldHeight);
+        const lastVotes = await this.coreProvider.applicationContext.database.VotesRepository.findByChainAndGreaterHeight(currentBlock.chain, oldHeight);
         let bestBlockByVotesMax = this.countChainVotes(bestBlock.block.hash, lastVotes);
         for (let i = 0; i < currentBlocks.length; i++) {
             const blockInfo = currentBlocks[i];
@@ -56,7 +56,7 @@ export default class ConsensusAlgorithm {
                 bestBlock = blockInfo;
                 bestBlockByVotesMax = votes;
                 changeReason = 'votes';
-            } else if (votes === bestBlockByVotesMax && this.coreContext.minnerProvider.compareDistance(bestBlock.distance, blockInfo.distance) === 'b') {
+            } else if (votes === bestBlockByVotesMax && this.coreProvider.minnerProvider.compareDistance(bestBlock.distance, blockInfo.distance) === 'b') {
                 bestBlock = blockInfo;
                 bestBlockByVotesMax = votes;
                 changeReason = 'votes';
@@ -64,8 +64,8 @@ export default class ConsensusAlgorithm {
         }
 
         if (currentBlock.hash !== bestBlock.block.hash) {
-            this.coreContext.applicationContext.logger.info(`consensus - change current block ${bestBlock.block.height} - ${bestBlock.block.hash.substring(0, 10)}... by ${changeReason}`);
-            await this.coreContext.blockProvider.selectMinedBlock(this.coreContext.blockTree, bestBlock.block.hash);
+            this.coreProvider.applicationContext.logger.info(`consensus - change current block ${bestBlock.block.height} - ${bestBlock.block.hash.substring(0, 10)}... by ${changeReason}`);
+            await this.coreProvider.blockProvider.selectMinedBlock(this.coreProvider.blockTree, bestBlock.block.hash);
         } else {
             if (nextBlocks.length > 0) {
                 if (helper.getNow() < currentBlock.created + blockTime) {
@@ -78,8 +78,8 @@ export default class ConsensusAlgorithm {
                         bestBlock = blockInfo;
                     }
                 }
-                this.coreContext.applicationContext.logger.info(`consensus - consolide block ${bestBlock.block.height} - ${bestBlock.block.lastHash.substring(0, 10)}... - votes: ${bestBlockByVotesMax} - options: ${currentBlocks.length} -> next block ${bestBlock.block.hash.substring(0, 10)}...`);
-                await this.coreContext.blockProvider.selectMinedBlock(this.coreContext.blockTree, bestBlock.block.hash);
+                this.coreProvider.applicationContext.logger.info(`consensus - consolide block ${bestBlock.block.height} - ${bestBlock.block.lastHash.substring(0, 10)}... - votes: ${bestBlockByVotesMax} - options: ${currentBlocks.length} -> next block ${bestBlock.block.hash.substring(0, 10)}...`);
+                await this.coreProvider.blockProvider.selectMinedBlock(this.coreProvider.blockTree, bestBlock.block.hash);
             }
         }
     }

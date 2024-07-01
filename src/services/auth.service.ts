@@ -1,8 +1,7 @@
 import jwt from 'jsonwebtoken';
-import { TokenInfo } from "../types";
-import { ApplicationContext } from '../types/task.type';
+import { ApplicationContext, TokenInfo } from "../types";
 
-export default class AuthProvider {
+export class AuthProvider {
 
     private JWT: string;
 

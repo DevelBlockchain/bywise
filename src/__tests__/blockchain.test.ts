@@ -3,7 +3,7 @@ import helper from '../utils/helper';
 import { TxType, BlockPack, Wallet, Web3, BywiseHelper, Tx } from '@bywise/web3';
 import { ChainConfig } from '../types';
 import Bywise from '../bywise';
-import { ConfigProvider } from '../services/configs.service';
+import { ConfigProvider } from '../services';
 
 var node0: Bywise;
 var b0: BlockPack;

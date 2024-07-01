@@ -2,13 +2,14 @@ import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
 import { Tx } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { ApiContext, BlockchainStatus, TransactionOutputDTO, TransactionsDTO } from '../types';
+import { BlockchainStatus, TransactionOutputDTO, TransactionsDTO } from '../types';
 import { Transaction } from '../models';
 import { RequestKeys } from '../datasource/message-queue';
+import { ApiService } from '../services';
 
-export default async function transactionsController(app: express.Express, apiContext: ApiContext): Promise<void> {
+export default async function transactionsController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
-    const TransactionRepository = apiContext.applicationContext.database.TransactionRepository;
+    const TransactionRepository = apiProvider.applicationContext.database.TransactionRepository;
 
     metadataDocument.addPath({
         path: "/api/v2/transactions/count",
@@ -43,7 +44,7 @@ export default async function transactionsController(app: express.Express, apiCo
         if (!chain) {
             return res.status(400).send({ error: `missing chain` });
         }
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
         if (!value && !searchBy) {
             return res.send({ count: await TransactionRepository.countByChain(chain) });
         }
@@ -125,7 +126,7 @@ export default async function transactionsController(app: express.Express, apiCo
         const value = req.query.value as string;
         let txs: Transaction[] = [];
 
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
         if (!value && !searchBy) {
             txs = await TransactionRepository.findByChain(chain, limit, offset, order);
@@ -216,9 +217,9 @@ export default async function transactionsController(app: express.Express, apiCo
     router.post('/transactions/fee', async (req: express.Request, res: express.Response) => {
         const tx = new Tx(req.body);
         try {
-            if (!apiContext.chains.includes(tx.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+            if (!apiProvider.chains.includes(tx.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
             tx.fee = '0';
-            const output = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
+            const output = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
 
             return res.send(output);
         } catch (err: any) {
@@ -246,11 +247,11 @@ export default async function transactionsController(app: express.Express, apiCo
     router.post('/transactions', async (req: express.Request, res: express.Response) => {
         const tx = new Tx(req.body);
         try {
-            if (!apiContext.chains.includes(tx.chain)) {
+            if (!apiProvider.chains.includes(tx.chain)) {
                 return res.status(400).send({ error: `Node does not work with this chain` });
             }
 
-            const btx = await apiContext.transactionsProvider.saveNewTransaction(tx);
+            const btx = await apiProvider.transactionsProvider.saveNewTransaction(tx);
             return res.send(new TransactionsDTO(btx));
         } catch (err: any) {
             return res.status(400).send({ error: err.message });
@@ -287,9 +288,9 @@ export default async function transactionsController(app: express.Express, apiCo
         const body: { token: string, chain: string, to: string[], amount: string[], type: string, foreignKeys: string[], data: any } = req.body;
         try {
             if (body.token !== process.env.TOKEN) return res.status(400).send({ error: `Forbidden - invalid token` });
-            if (!apiContext.chains.includes(body.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+            if (!apiProvider.chains.includes(body.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
-            const mainWallet = await apiContext.walletProvider.getMainWallet();
+            const mainWallet = await apiProvider.walletProvider.getMainWallet();
             const tx = new Tx();
             tx.version = '2';
             tx.chain = body.chain;
@@ -302,7 +303,7 @@ export default async function transactionsController(app: express.Express, apiCo
             tx.foreignKeys = body.foreignKeys;
             tx.created = Math.floor(Date.now() / 1000);
 
-            let output: TransactionOutputDTO = await apiContext.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
+            let output: TransactionOutputDTO = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
 
             tx.fee = output.feeUsed;
             tx.hash = tx.toHash();
@@ -312,7 +313,7 @@ export default async function transactionsController(app: express.Express, apiCo
                 throw new Error(output.error);
             }
 
-            const txInfo = await apiContext.transactionsProvider.saveNewTransaction(tx);
+            const txInfo = await apiProvider.transactionsProvider.saveNewTransaction(tx);
 
             return res.send({ ...txInfo.tx, status: txInfo.status, output });
         } catch (err: any) {

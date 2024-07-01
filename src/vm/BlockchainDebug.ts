@@ -1,7 +1,5 @@
 import { BywiseHelper } from '@bywise/web3';
 import BigNumber from 'bignumber.js';
-import { ETHProxyData } from '../models';
-import { ETHProvider } from '../services/eth.service';
 import { ApplicationContext, TransactionEvent, TransactionEventEntry } from '../types';
 import BlockchainInterface, { BlockchainAction, TransactionMessage } from './BlockchainInterface';
 import BywiseRuntime from './BywiseRuntime';
@@ -38,10 +36,8 @@ export default class BlockchainDebug implements BlockchainInterface {
 
     balances = new Memory();
     memory = new Memory();
-    ethProvider;
 
     constructor(applicationContext: ApplicationContext, backup?: any) {
-        this.ethProvider = new ETHProvider(applicationContext);
         this.loadData(backup);
     }
 
@@ -375,22 +371,15 @@ export default class BlockchainDebug implements BlockchainInterface {
     }
 
     newProxyAction = async (tx: TransactionMessage, proxyChain: string, proxyAction: string, proxyData: string): Promise<string> => {
-        const proxyParans: ETHProxyData = JSON.parse(proxyData);
-        tx.ctx.output.cost += await this.ethProvider.costAction(proxyChain, proxyAction, proxyParans);
-        // do nothing
-        return '';
+        throw new Error(`BVM: not implemented`);
     }
 
     costProxyAction = async (tx: TransactionMessage, proxyChain: string, proxyAction: string, proxyData: string): Promise<string> => {
-        const proxyParans: ETHProxyData = JSON.parse(proxyData);
-        const cost = await this.ethProvider.costAction(proxyChain, proxyAction, proxyParans);
-        return `${cost}`;
+        throw new Error(`BVM: not implemented`);
     }
 
     readProxyAction = async (tx: TransactionMessage, proxyChain: string, proxyAction: string, proxyData: string): Promise<string> => {
-        const proxyParans: ETHProxyData = JSON.parse(proxyData);
-        const returnStr = await this.ethProvider.readAction(proxyChain, proxyAction, proxyParans);
-        return returnStr;
+        throw new Error(`BVM: not implemented`);
     }
 
     exposeMethods = () => {

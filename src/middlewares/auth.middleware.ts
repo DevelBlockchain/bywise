@@ -1,6 +1,6 @@
 import { Express, Request, Response, NextFunction } from 'express';
-import AuthProvider from '../services/auth.service';
-import { ApplicationContext } from '../types/task.type';
+import { AuthProvider } from '../services';
+import { ApplicationContext } from '../types';
 
 export default function authMiddleware(app: Express, applicationContext: ApplicationContext): void {
     const authProvider = new AuthProvider(applicationContext);

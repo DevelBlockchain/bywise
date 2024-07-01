@@ -1,9 +1,7 @@
-import { BlockchainStatus } from '../types/transactions.type';
 import { Slice } from '@bywise/web3';
-import { ApplicationContext } from '../types/task.type';
+import { ApplicationContext, BlockTree, BlockchainStatus, CompiledContext } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
 import { Slices } from '../models';
-import { BlockTree, CompiledContext } from '../types/environment.types';
 import { TransactionsProvider } from './transactions.service';
 import { EnvironmentProvider } from './environment.service';
 

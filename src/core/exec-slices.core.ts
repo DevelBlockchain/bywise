@@ -1,17 +1,18 @@
-import { BlockchainStatus, CoreContext } from "../types";
+import { CoreProvider } from "../services";
+import { BlockchainStatus } from "../types";
 
 export default class ExecuteSlices {
     public isRun = true;
-    private coreContext;
+    private coreProvider;
     private SliceRepository;
 
-    constructor(coreContext: CoreContext) {
-        this.coreContext = coreContext;
-        this.SliceRepository = coreContext.applicationContext.database.SliceRepository;
+    constructor(coreProvider: CoreProvider) {
+        this.coreProvider = coreProvider;
+        this.SliceRepository = coreProvider.applicationContext.database.SliceRepository;
     }
 
     async run() {
-        let slices = await this.SliceRepository.findByChainAndStatus(this.coreContext.chain, BlockchainStatus.TX_MEMPOOL);
+        let slices = await this.SliceRepository.findByChainAndStatus(this.coreProvider.chain, BlockchainStatus.TX_MEMPOOL);
         slices = slices.filter(info => info.isComplete === true && info.isExecuted === false);
         if (slices.length == 0) {
             return;
@@ -22,33 +23,33 @@ export default class ExecuteSlices {
         for (let i = 0; i < slices.length; i++) {
             const sliceInfo = slices[i];
 
-            const sliceList = this.coreContext.blockTree.getSliceList(sliceInfo.slice.hash);
+            const sliceList = this.coreProvider.blockTree.getSliceList(sliceInfo.slice.hash);
             let lastContextHashIsExecuted = true;
             if(sliceList.length == 0) {
                 lastContextHashIsExecuted = false; // last slices not found
             }
             for (let j = 0; j < sliceList.length - 1; j++) {
-                const lastSliceInfo = await this.coreContext.slicesProvider.getSliceInfo(sliceList[j].hash);
+                const lastSliceInfo = await this.coreProvider.slicesProvider.getSliceInfo(sliceList[j].hash);
                 if(!lastSliceInfo.isExecuted) {
                     lastContextHashIsExecuted = false;
                 }
             }
 
-            const lastBlock = await this.coreContext.blockTree.minnedBlockList.get(sliceInfo.slice.blockHeight - 1);
+            const lastBlock = await this.coreProvider.blockTree.minnedBlockList.get(sliceInfo.slice.blockHeight - 1);
             if(!lastBlock) {
                 lastContextHashIsExecuted = false;
             } else {
-                const blockInfo = await this.coreContext.blockProvider.getBlockInfo(lastBlock.hash);
+                const blockInfo = await this.coreProvider.blockProvider.getBlockInfo(lastBlock.hash);
                 if(!blockInfo.isExecuted) {
                     lastContextHashIsExecuted = false;
                 }
             }
             if(lastContextHashIsExecuted) {
-                const lastContextHash = this.coreContext.blockTree.getLastHash(sliceInfo.slice.hash);
-                await this.coreContext.slicesProvider.executeCompleteSlice(this.coreContext.blockTree, lastContextHash, sliceInfo);
+                const lastContextHash = this.coreProvider.blockTree.getLastHash(sliceInfo.slice.hash);
+                await this.coreProvider.slicesProvider.executeCompleteSlice(this.coreProvider.blockTree, lastContextHash, sliceInfo);
             }
         }
         
-        await this.coreContext.blockProvider.processVotes(this.coreContext.blockTree);
+        await this.coreProvider.blockProvider.processVotes(this.coreProvider.blockTree);
     }
 }

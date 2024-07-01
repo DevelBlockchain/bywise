@@ -1,21 +1,21 @@
 import { Tx } from "@bywise/web3";
-import { CoreContext, SimulateDTO } from "../types";
+import { SimulateDTO, CompiledContext } from "../types";
 import helper from "../utils/helper";
-import { CompiledContext } from "../types/environment.types";
 import BigNumber from "bignumber.js";
+import { CoreProvider } from "../services";
 
 const EVENT_PAGE_SIZE = 100;
 
 export default class ExecuteTransactions {
     public isRun = true;
     public busy = false;
-    private coreContext;
+    private coreProvider;
     private currentHash = '';
     private nextBlockHeight = -1;
     private currentContext: SimulateDTO | undefined;
 
-    constructor(coreContext: CoreContext) {
-        this.coreContext = coreContext;
+    constructor(coreProvider: CoreProvider) {
+        this.coreProvider = coreProvider;
     }
 
     private async waitBusy() {
@@ -26,29 +26,29 @@ export default class ExecuteTransactions {
     }
 
     async run() {
-        let currentHash = this.coreContext.blockTree.getLastContextHash();
+        let currentHash = this.coreProvider.blockTree.getLastContextHash();
 
         if (this.currentHash == currentHash) {
             return;
         }
 
         this.currentHash = currentHash;
-        this.nextBlockHeight = this.coreContext.blockTree.currentMinnedBlock.height + 1;
+        this.nextBlockHeight = this.coreProvider.blockTree.currentMinnedBlock.height + 1;
 
         await this.updateContext();
     }
 
     private async updateContext() {
-        this.coreContext.applicationContext.logger.verbose(`update main context - hash: ${this.currentHash.substring(0, 10)}...`);
+        this.coreProvider.applicationContext.logger.verbose(`update main context - hash: ${this.currentHash.substring(0, 10)}...`);
 
-        await this.coreContext.environmentProvider.consolide(this.coreContext.blockTree, this.currentHash, CompiledContext.MAIN_CONTEXT_HASH);
-        const ctx = this.coreContext.transactionsProvider.createContext(this.coreContext.blockTree, CompiledContext.MAIN_CONTEXT_HASH, this.nextBlockHeight);
+        await this.coreProvider.environmentProvider.consolide(this.coreProvider.blockTree, this.currentHash, CompiledContext.MAIN_CONTEXT_HASH);
+        const ctx = this.coreProvider.transactionsProvider.createContext(this.coreProvider.blockTree, CompiledContext.MAIN_CONTEXT_HASH, this.nextBlockHeight);
 
         await this.waitBusy();
         const oldContext = this.currentContext;
         this.currentContext = ctx;
         if (oldContext) {
-            await this.coreContext.transactionsProvider.disposeContext(oldContext);
+            await this.coreProvider.transactionsProvider.disposeContext(oldContext);
         }
         await this.updateConfigs(ctx);
         this.busy = false;
@@ -64,7 +64,7 @@ export default class ExecuteTransactions {
             throw new Error('currentContext not found')
         }
 
-        const bcc = await this.coreContext.environmentProvider.get(currentContext.envContext, address);
+        const bcc = await this.coreProvider.environmentProvider.get(currentContext.envContext, address);
 
         this.busy = false;
         return bcc;
@@ -80,9 +80,9 @@ export default class ExecuteTransactions {
             throw new Error('currentContext not found')
         }
 
-        const walletCodeDTO = await this.coreContext.walletProvider.getWalletCode(currentContext.envContext, address);
-        const walletInfoDTO = await this.coreContext.walletProvider.getWalletInfo(currentContext.envContext, address);
-        const walletBalanceDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.envContext, address);
+        const walletCodeDTO = await this.coreProvider.walletProvider.getWalletCode(currentContext.envContext, address);
+        const walletInfoDTO = await this.coreProvider.walletProvider.getWalletInfo(currentContext.envContext, address);
+        const walletBalanceDTO = await this.coreProvider.walletProvider.getWalletBalance(currentContext.envContext, address);
 
         this.busy = false;
         return {
@@ -103,13 +103,13 @@ export default class ExecuteTransactions {
         }
         currentContext.checkWalletBalance = false;
         currentContext.enableReadProxy = true;
-        const output = await this.coreContext.transactionsProvider.simulateTransaction(tx, {
+        const output = await this.coreProvider.transactionsProvider.simulateTransaction(tx, {
             from: helper.getRandomHash(),
             transactionsData: []
         }, currentContext);
         currentContext.checkWalletBalance = true;
         currentContext.enableReadProxy = false;
-        this.coreContext.environmentProvider.deleteCommit(currentContext.envContext);
+        this.coreProvider.environmentProvider.deleteCommit(currentContext.envContext);
 
         this.busy = false;
         return output;
@@ -124,9 +124,9 @@ export default class ExecuteTransactions {
             throw new Error('currentContext not found')
         }
 
-        const size = await this.coreContext.eventsProvider.countEventsByKey(currentContext.envContext, contractAddress, eventName, key, value);
+        const size = await this.coreProvider.eventsProvider.countEventsByKey(currentContext.envContext, contractAddress, eventName, key, value);
         const offset = EVENT_PAGE_SIZE * page;
-        const events = await this.coreContext.eventsProvider.findByEventAndKey(currentContext.envContext, contractAddress, eventName, key, value, EVENT_PAGE_SIZE, offset);
+        const events = await this.coreProvider.eventsProvider.findByEventAndKey(currentContext.envContext, contractAddress, eventName, key, value, EVENT_PAGE_SIZE, offset);
 
         return {
             page,
@@ -146,9 +146,9 @@ export default class ExecuteTransactions {
             throw new Error('currentContext not found')
         }
 
-        const size = await this.coreContext.eventsProvider.countEvents(currentContext.envContext, contractAddress, eventName);
+        const size = await this.coreProvider.eventsProvider.countEvents(currentContext.envContext, contractAddress, eventName);
         const offset = EVENT_PAGE_SIZE * page;
-        const events = await this.coreContext.eventsProvider.findByEvent(currentContext.envContext, contractAddress, eventName, EVENT_PAGE_SIZE, offset);
+        const events = await this.coreProvider.eventsProvider.findByEvent(currentContext.envContext, contractAddress, eventName, EVENT_PAGE_SIZE, offset);
 
         return {
             page,
@@ -160,23 +160,23 @@ export default class ExecuteTransactions {
     }
 
     private async updateConfigs(currentContext: SimulateDTO) {
-        const mainWallet = await this.coreContext.walletProvider.getMainWallet();
-        const config = await this.coreContext.configsProvider.getByName(currentContext.envContext, 'blockTime');
+        const mainWallet = await this.coreProvider.walletProvider.getMainWallet();
+        const config = await this.coreProvider.configsProvider.getByName(currentContext.envContext, 'blockTime');
         const newBlockTime = parseInt(config.value);
-        const isValidator = await this.coreContext.configsProvider.isValidator(currentContext.envContext, mainWallet.address);
-        const minValue = await this.coreContext.configsProvider.getByName(currentContext.envContext, 'min-bws-block');
-        const walletDTO = await this.coreContext.walletProvider.getWalletBalance(currentContext.envContext, mainWallet.address);
+        const isValidator = await this.coreProvider.configsProvider.isValidator(currentContext.envContext, mainWallet.address);
+        const minValue = await this.coreProvider.configsProvider.getByName(currentContext.envContext, 'min-bws-block');
+        const walletDTO = await this.coreProvider.walletProvider.getWalletBalance(currentContext.envContext, mainWallet.address);
         const hasMinimumBWSToMine = !walletDTO.balance.isLessThan(new BigNumber(minValue.value));
 
-        this.coreContext.blockTime = newBlockTime;
-        this.coreContext.isValidator = isValidator;
-        this.coreContext.hasMinimumBWSToMine = hasMinimumBWSToMine;
+        this.coreProvider.blockTime = newBlockTime;
+        this.coreProvider.isValidator = isValidator;
+        this.coreProvider.hasMinimumBWSToMine = hasMinimumBWSToMine;
 
-        if (!this.coreContext.isValidator) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain}`);
+        if (!this.coreProvider.isValidator) {
+            this.coreProvider.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreProvider.chain}`);
         }
-        if (!this.coreContext.hasMinimumBWSToMine) {
-            this.coreContext.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreContext.chain} - low balance`);
+        if (!this.coreProvider.hasMinimumBWSToMine) {
+            this.coreProvider.applicationContext.logger.verbose(`not enabled to mining blocks on chain ${this.coreProvider.chain} - low balance`);
         }
     }
 }

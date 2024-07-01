@@ -1,9 +1,7 @@
-import { SimulateDTO, TransactionOutputDTO, BlockchainStatus } from '../types/transactions.type';
 import { VirtualMachineProvider } from './virtual-machine.service';
 import { Tx, TxType, Wallet, SliceData } from '@bywise/web3';
-import { ApplicationContext } from '../types/task.type';
 import { WalletProvider } from './wallet.service';
-import { BlockTree, CompiledContext, EnvironmentContext } from '../types/environment.types';
+import { ApplicationContext, SimulateDTO, TransactionOutputDTO, BlockchainStatus, BlockTree, CompiledContext, EnvironmentContext } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
 import { Transaction } from '../models';
 

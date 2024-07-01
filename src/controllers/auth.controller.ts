@@ -1,6 +1,6 @@
 import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
-import { ApplicationContext } from '../types/task.type';
+import { ApplicationContext } from '../types';
 import helper from '../utils/helper';
 import fs from 'fs';
 

@@ -1,8 +1,8 @@
 import { BlocksProvider, SlicesProvider, TransactionsProvider } from "../services";
 import { WalletProvider } from "../services/wallet.service";
-import { ApplicationContext } from "./task.type";
+import { ApplicationContext } from "../types";
 
-export class ApiContext {
+export class ApiService {
     applicationContext;
     chains: string[];
     walletProvider;

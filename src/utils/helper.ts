@@ -3,8 +3,7 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 import fs from 'fs';
 import randomstring from 'randomstring';
 import { Block, Slice, Tx, TxType, Wallet, BlockPack, BywiseHelper } from '@bywise/web3';
-import { SimulateDTO, ZeroBlockConfig } from '../types';
-import { BlockTree, CompiledContext, EnvironmentContext } from '../types/environment.types';
+import { BlockTree, CompiledContext, EnvironmentContext, SimulateDTO, ZeroBlockConfig } from '../types';
 
 const wait = async () => {
     await new Promise((resolve) => {

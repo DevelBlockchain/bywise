@@ -2,17 +2,18 @@ import express from 'express';
 import BigNumber from "bignumber.js";
 import metadataDocument from '../metadata/metadataDocument';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { ApiContext, WalletCodeDTO } from '../types';
+import { WalletCodeDTO } from '../types';
 import { RequestKeys } from '../datasource/message-queue';
 import BlockchainDebug from '../vm/BlockchainDebug';
 import { GetContract } from '../vm/BlockchainInterface';
 import { BywiseHelper, Tx, TxType } from '@bywise/web3';
 import BywiseRuntime from '../vm/BywiseRuntime';
 import helper from '../utils/helper';
+import { ApiService } from '../services';
 
-export default async function contractsController(app: express.Express, apiContext: ApiContext): Promise<void> {
+export default async function contractsController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
-    const TransactionRepository = apiContext.applicationContext.database.TransactionRepository;
+    const TransactionRepository = apiProvider.applicationContext.database.TransactionRepository;
 
     metadataDocument.addPath({
         path: "/api/v2/contracts/simulate",
@@ -43,7 +44,7 @@ export default async function contractsController(app: express.Express, apiConte
             const body: { code?: string, method?: string, inputs?: string[], contractAddress: string, from: string, amount: number, tag: string, env: any } = req.body;
             const runtimeContext = body.env;
 
-            const blockchainDebug = new BlockchainDebug(apiContext.applicationContext);
+            const blockchainDebug = new BlockchainDebug(apiProvider.applicationContext);
             blockchainDebug.loadData(runtimeContext);
 
             const getContract: GetContract = async (address: string, method: string, inputs: string[]): Promise<{ wc: WalletCodeDTO, code: string, view: boolean, payable: boolean }> => {
@@ -177,9 +178,9 @@ export default async function contractsController(app: express.Express, apiConte
     router.get('/contracts/abi/:chain/:address', async (req: express.Request, res: express.Response) => {
         const chain = req.params.chain;
         const address = req.params.address;
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
         
-        const bcc = await apiContext.applicationContext.mq.request(RequestKeys.get_contract, { chain, address: address });
+        const bcc = await apiProvider.applicationContext.mq.request(RequestKeys.get_contract, { chain, address: address });
         if (bcc) {
             const txHash = (JSON.parse(bcc)).txHash;
             const btx = await TransactionRepository.findByHash(txHash);
@@ -215,13 +216,13 @@ export default async function contractsController(app: express.Express, apiConte
         const contractAddress = req.params.contractAddress;
         const eventName = req.params.eventName;
         const page = req.query.page ? parseInt(`${req.query.page}`) : 0;
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
         try {
             if (req.query.key && req.query.value) {
                 const key = `${req.query.key}`;
                 const value = `${req.query.value}`;
-                const output = await apiContext.applicationContext.mq.request(RequestKeys.get_events_by_key, {
+                const output = await apiProvider.applicationContext.mq.request(RequestKeys.get_events_by_key, {
                     chain,
                     contractAddress,
                     eventName,
@@ -231,7 +232,7 @@ export default async function contractsController(app: express.Express, apiConte
                 });
                 return res.send(output);
             } else {
-                const output = await apiContext.applicationContext.mq.request(RequestKeys.get_events, {
+                const output = await apiProvider.applicationContext.mq.request(RequestKeys.get_events, {
                     chain,
                     contractAddress,
                     eventName,

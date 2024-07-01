@@ -1,6 +1,4 @@
-import { TransactionEvent } from '../types';
-import { EnvironmentContext } from '../types/environment.types';
-import { ApplicationContext } from '../types/task.type';
+import { ApplicationContext, TransactionEvent, EnvironmentContext } from '../types';
 import helper from '../utils/helper';
 import { EnvironmentProvider } from './environment.service';
 

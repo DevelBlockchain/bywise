@@ -1,9 +1,7 @@
 import BigNumber from "bignumber.js";
-import { ApplicationContext } from "../types/task.type";
 import { Wallet } from '@bywise/web3';
 import { EnvironmentProvider } from "./environment.service";
-import { EnvironmentContext } from "../types/environment.types";
-import { WalletBalanceDTO, WalletCodeDTO, WalletInfoDTO } from "../types";
+import { ApplicationContext, EnvironmentContext, WalletBalanceDTO, WalletCodeDTO, WalletInfoDTO } from "../types";
 
 export class WalletProvider {
 

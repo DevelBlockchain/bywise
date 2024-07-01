@@ -1,6 +1,5 @@
 import { Environment } from "../models";
-import { BlockTree, CompiledContext, EnvironmentContext } from "../types/environment.types";
-import { ApplicationContext } from "../types/task.type";
+import { ApplicationContext, BlockTree, CompiledContext, EnvironmentContext } from "../types";
 
 const ENV_BATCH = 1000;
 

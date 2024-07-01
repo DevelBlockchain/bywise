@@ -3,9 +3,7 @@ import BlockchainInterface, { BlockchainAction, TransactionMessage } from './Blo
 import { EnvironmentProvider } from '../services/environment.service';
 import { ApplicationContext, TransactionEvent, TransactionEventEntry } from '../types';
 import { WalletProvider } from '../services/wallet.service';
-import { ETHProvider } from '../services/eth.service';
 import BywiseRuntime from './BywiseRuntime';
-import { ETHAction, ETHProxyData } from '../models';
 import { BywiseHelper } from '@bywise/web3';
 import { EventsProvider } from '../services/events.service';
 import helper from '../utils/helper';
@@ -18,13 +16,11 @@ export default class BlockchainBywise implements BlockchainInterface {
     environmentProvider;
     eventsProvider;
     walletProvider;
-    ethProvider;
 
     constructor(applicationContext: ApplicationContext) {
         this.environmentProvider = new EnvironmentProvider(applicationContext);
         this.eventsProvider = new EventsProvider(applicationContext);
         this.walletProvider = new WalletProvider(applicationContext);
-        this.ethProvider = new ETHProvider(applicationContext);
     }
 
     getUUID = async (tx: TransactionMessage) => {
@@ -319,47 +315,15 @@ export default class BlockchainBywise implements BlockchainInterface {
     }
 
     newProxyAction = async (tx: TransactionMessage, proxyChain: string, proxyAction: string, proxyData: string): Promise<string> => {
-        const proxyParans: ETHProxyData = JSON.parse(proxyData);
-        tx.ctx.output.cost += await this.ethProvider.costAction(proxyChain, proxyAction, proxyParans);
-        let bywiseTx = tx.ctx.tx;
-        if (!bywiseTx) throw new Error(`BVM: bywise tx not found`);
-        const action: ETHAction = {
-            proposalId: bywiseTx.hash,
-            from: tx.contractAddress,
-            proxyChain: proxyChain,
-            proxyAction: proxyAction,
-            proxyAddresses: proxyParans.addresses,
-            proxyValues: proxyParans.values,
-            proxyStrings: proxyParans.strings,
-            proxyData: proxyParans.data,
-            error: [],
-            done: false,
-        }
-        await this.ethProvider.newAction(action);
-
-        if (tx.ctx.enableWriteProxy) {
-            await this.ethProvider.registerAction(action);
-        }
-        return '';
+        throw new Error(`BVM: not implemented`);
     }
 
     costProxyAction = async (tx: TransactionMessage, proxyChain: string, proxyAction: string, proxyData: string): Promise<string> => {
-        const proxyParans: ETHProxyData = JSON.parse(proxyData);
-        const cost = await this.ethProvider.costAction(proxyChain, proxyAction, proxyParans);
-        return `${cost}`;
+        throw new Error(`BVM: not implemented`);
     }
 
     readProxyAction = async (tx: TransactionMessage, proxyChain: string, proxyAction: string, proxyData: string): Promise<string> => {
-        if (tx.ctx.enableReadProxy) {
-            const proxyParans: ETHProxyData = JSON.parse(proxyData);
-            const returnStr = await this.ethProvider.readAction(proxyChain, proxyAction, proxyParans);
-            tx.ctx.proxyMock = [returnStr, ...tx.ctx.proxyMock];
-            return returnStr;
-        } else {
-            const returnStr = tx.ctx.proxyMock.pop();
-            if (returnStr === undefined) throw new Error('BVM: invalid readProxyAction');
-            return returnStr;
-        }
+        throw new Error(`BVM: not implemented`);
     }
 
     exposeMethods = () => {

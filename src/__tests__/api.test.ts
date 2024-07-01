@@ -2,7 +2,7 @@ import request from 'supertest';
 import Bywise from '../bywise';
 import helper from '../utils/helper';
 import { Wallet } from '@bywise/web3';
-import AuthProvider from '../services/auth.service';
+import { AuthProvider } from '../services';
 
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 

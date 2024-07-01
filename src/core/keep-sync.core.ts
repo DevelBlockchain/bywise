@@ -1,22 +1,22 @@
-import { CoreContext } from "../types";
+import { CoreProvider } from "../services";
 
 export default class KeepSync {
     public isRun = true;
-    private coreContext;
+    private coreProvider;
     private transactionsProvider;
     private slicesProvider;
     private blockProvider;
 
-    constructor(coreContext: CoreContext) {
-        this.coreContext = coreContext;
-        this.transactionsProvider = coreContext.transactionsProvider;
-        this.slicesProvider = coreContext.slicesProvider;
-        this.blockProvider = coreContext.blockProvider;
+    constructor(coreProvider: CoreProvider) {
+        this.coreProvider = coreProvider;
+        this.transactionsProvider = coreProvider.transactionsProvider;
+        this.slicesProvider = coreProvider.slicesProvider;
+        this.blockProvider = coreProvider.blockProvider;
     }
 
     async run() {
-        if (this.coreContext.network.web3.network.isConnected) {
-            const nextBlock = await this.coreContext.network.web3.blocks.getBlockPackByHeight(this.coreContext.blockTree.chain, this.coreContext.blockTree.currentMinnedBlock.height + 1);
+        if (this.coreProvider.network.web3.network.isConnected) {
+            const nextBlock = await this.coreProvider.network.web3.blocks.getBlockPackByHeight(this.coreProvider.blockTree.chain, this.coreProvider.blockTree.currentMinnedBlock.height + 1);
             if (nextBlock) {
                 for (let i = 0; i < nextBlock.txs.length; i++) {
                     const tx = nextBlock.txs[i];
@@ -29,7 +29,7 @@ export default class KeepSync {
                 await this.blockProvider.saveNewBlock(nextBlock.block);
             }
         }
-        await this.coreContext.slicesProvider.syncSlices(this.coreContext.blockTree);
-        await this.coreContext.blockProvider.syncBlocks(this.coreContext.blockTree);
+        await this.coreProvider.slicesProvider.syncSlices(this.coreProvider.blockTree);
+        await this.coreProvider.blockProvider.syncBlocks(this.coreProvider.blockTree);
     }
 }

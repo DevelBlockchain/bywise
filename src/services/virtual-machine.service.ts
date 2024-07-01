@@ -1,13 +1,11 @@
 import BigNumber from "bignumber.js";
-import { CommandDTO, SimulateDTO, TransactionOutputDTO, WalletBalanceDTO, WalletCodeDTO } from '../types/transactions.type';
+import { ApplicationContext, CommandDTO, ConfigDTO, SimulateDTO, TransactionOutputDTO, WalletBalanceDTO, WalletCodeDTO } from '../types';
 import { TxType, BywiseHelper, Tx, SliceData } from '@bywise/web3';
 import { ConfigProvider } from "./configs.service";
-import { ApplicationContext } from "../types/task.type";
 import { WalletProvider } from "./wallet.service";
 import BywiseRuntime from "../vm/BywiseRuntime";
 import BlockchainBywise from "../vm/BlockchainBywise";
 import { GetContract } from "../vm/BlockchainInterface";
-import { ConfigDTO } from "../types";
 import { Votes } from "../models";
 
 export class VirtualMachineProvider {

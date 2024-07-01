@@ -18,23 +18,23 @@ import transactionsController from '../controllers/transactions.controller';
 import contractsController from '../controllers/contracts.controller';
 import slicesController from '../controllers/slices.controller';
 import blocksController from '../controllers/blocks.controller';
-import { ApplicationContext, Task } from '../types/task.type';
+import { ApplicationContext, Task } from '../types';
 import errorMiddleware from '../middlewares/error.middleware';
-import { ApiContext } from '../types/api.type';
 import walletsController from '../controllers/wallets.controller';
 import { RoutingKeys } from '../datasource/message-queue';
+import { ApiService } from '../services/api.service';
 
 class Api implements Task {
 
     public isRun = false;
     private app;
-    private apiCtx: ApiContext;
+    private apiCtx;
     public server: any;
     private applicationContext: ApplicationContext;
 
     constructor(applicationContext: ApplicationContext) {
         this.applicationContext = applicationContext;
-        this.apiCtx = new ApiContext(applicationContext);
+        this.apiCtx = new ApiService(applicationContext);
         this.app = express();
     }
 

@@ -1,6 +1,4 @@
-import { ConfigDTO } from '../types';
-import { BlockTree, EnvironmentContext } from '../types/environment.types';
-import { ApplicationContext } from '../types/task.type';
+import { ApplicationContext, ConfigDTO, EnvironmentContext } from '../types';
 import { EnvironmentProvider } from './environment.service';
 
 type ConfigMeta = {

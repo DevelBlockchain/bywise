@@ -1,6 +1,5 @@
 import { BywiseHelper } from "@bywise/web3";
 import BigNumber from "bignumber.js";
-import { ApplicationContext } from "../types/task.type";
 
 export type ChainData = {
     hash: string;
@@ -8,7 +7,7 @@ export type ChainData = {
 }
 
 export class MinnerProvider {
-    constructor(applicationContext: ApplicationContext) {
+    constructor() {
     }
 
     calcModule = (hexA: string, hexB: string): BigNumber => {

@@ -2,13 +2,14 @@ import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
 import { Slice, Tx } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { ApiContext, BlockchainStatus } from '../types';
+import { BlockchainStatus } from '../types';
 import { Slices } from '../models';
 import { RequestKeys } from '../datasource/message-queue';
+import { ApiService } from '../services';
 
-export default async function slicesController(app: express.Express, apiContext: ApiContext): Promise<void> {
+export default async function slicesController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
-    const SliceRepository = apiContext.applicationContext.database.SliceRepository;
+    const SliceRepository = apiProvider.applicationContext.database.SliceRepository;
 
     metadataDocument.addPath({
         path: "/api/v2/slices/count/{chain}",
@@ -40,11 +41,11 @@ export default async function slicesController(app: express.Express, apiContext:
         }
 
         const chain = req.params.chain;
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
         
         let count = await SliceRepository.count(chain, status);
         if (status === BlockchainStatus.TX_MINED) {
-            const confimedSlices: Slices[] = await apiContext.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: chain });
+            const confimedSlices: Slices[] = await apiProvider.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: chain });
             count += confimedSlices.length;
         }
         return res.send({ count });
@@ -93,11 +94,11 @@ export default async function slicesController(app: express.Express, apiContext:
         if (limit > 200) return res.status(400).send({ error: "invalid limit" });
 
         const chain = req.params.chain;
-        if (!apiContext.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
         const slices: Slice[] = [];
         if (status === BlockchainStatus.TX_MINED) {
-            const confimedSlices: Slices[] = await apiContext.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: chain });
+            const confimedSlices: Slices[] = await apiProvider.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: chain });
             confimedSlices.forEach(sliceInfo => slices.push(sliceInfo.slice));
         }
         const findSlices = await SliceRepository.find(req.params.chain, status, limit, offset, order);
@@ -151,7 +152,7 @@ export default async function slicesController(app: express.Express, apiContext:
     router.get('/slices/transactions/:hash', async (req: express.Request, res: express.Response) => {
         const bslice = await SliceRepository.findByHash(req.params.hash);
         if (!bslice) return res.status(404).send({ error: "Slice not found" });
-        const btxs = await apiContext.transactionsProvider.getTransactions(bslice.slice.transactions);
+        const btxs = await apiProvider.transactionsProvider.getTransactions(bslice.slice.transactions);
         const txs: Tx[] = [];
         for (let i = 0; i < btxs.length; i++) {
             const btx = btxs[i];
@@ -180,10 +181,10 @@ export default async function slicesController(app: express.Express, apiContext:
     router.post('/slices', async (req: express.Request, res: express.Response) => {
         const slice = new Slice(req.body);
         try {
-            if (!apiContext.chains.includes(slice.chain)) {
+            if (!apiProvider.chains.includes(slice.chain)) {
                 return res.status(400).send({ error: `Node does not work with this chain` });
             }
-            await apiContext.slicesProvider.saveNewSlice(slice);
+            await apiProvider.slicesProvider.saveNewSlice(slice);
             return res.send({ message: 'OK' });
         } catch (err: any) {
             return res.status(400).send({ error: err.message });

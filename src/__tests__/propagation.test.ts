@@ -3,7 +3,7 @@ import helper from '../utils/helper';
 import { Block, BlockPack, Wallet } from '@bywise/web3';
 import { ChainConfig } from '../types';
 import Bywise from '../bywise';
-import { ConfigProvider } from '../services/configs.service';
+import { ConfigProvider } from '../services';
 
 var node0: Bywise;
 var node1: Bywise;

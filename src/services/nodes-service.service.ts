@@ -1,7 +1,7 @@
 import { BywiseNode, InfoNode } from '@bywise/web3/lib/types';
 import { ApplicationContext } from '../types/task.type';
 import helper from '../utils/helper';
-import AuthProvider from './auth.service';
+import { AuthProvider } from './auth.service';
 import { WalletProvider } from './wallet.service';
 const pjson = require('./../../package.json');
 

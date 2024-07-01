@@ -1,7 +1,7 @@
 import { Block, Wallet } from '@bywise/web3';
 import Bywise from '../bywise';
-import { EnvironmentProvider } from '../services/environment.service';
-import { BlockTree, CompiledContext, EnvironmentContext } from '../types/environment.types';
+import { EnvironmentProvider } from '../services';
+import { BlockTree, CompiledContext, EnvironmentContext } from '../types';
 import helper from '../utils/helper';
 
 var bywise: Bywise;

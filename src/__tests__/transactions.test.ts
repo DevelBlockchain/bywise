@@ -1,12 +1,9 @@
 import fs from 'fs';
 import { BlockPack, BywiseHelper, Tx, TxType, Wallet } from '@bywise/web3';
 import Bywise from '../bywise';
-import { BlocksProvider, EnvironmentProvider, TransactionsProvider } from '../services';
-import { WalletProvider } from '../services/wallet.service';
+import { ConfigProvider, WalletProvider, BlocksProvider, EnvironmentProvider, TransactionsProvider } from '../services';
 import helper from '../utils/helper';
-import { ChainConfig } from '../types';
-import { ConfigProvider } from '../services/configs.service';
-import { CompiledContext } from '../types/environment.types';
+import { CompiledContext, ChainConfig } from '../types';
 
 var bywise: Bywise;
 var transactionsProvider: TransactionsProvider;
