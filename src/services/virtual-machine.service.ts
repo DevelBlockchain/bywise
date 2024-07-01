@@ -24,19 +24,6 @@ export class VirtualMachineProvider {
     this.blockchainBywise = new BlockchainBywise(applicationContext);
   }
 
-  async calcFee(ctx: SimulateDTO, size: BigNumber, amount: BigNumber, cost: BigNumber): Promise<string> {
-    let feeBasic = (await this.configsProvider.getByName(ctx.envContext, 'feeBasic')).toNumber();
-    let feeCoefSize = (await this.configsProvider.getByName(ctx.envContext, 'feeCoefSize')).toNumber();
-    let feeCoefAmount = (await this.configsProvider.getByName(ctx.envContext, 'feeCoefAmount')).toNumber();
-    let feeCoefCost = (await this.configsProvider.getByName(ctx.envContext, 'feeCoefCost')).toNumber();
-
-    let fee = feeBasic;
-    fee = fee.plus(feeCoefSize.multipliedBy(size));
-    fee = fee.plus(feeCoefAmount.multipliedBy(amount));
-    fee = fee.plus(feeCoefCost.multipliedBy(cost));
-    return new BigNumber(fee.toPrecision(5)).toString();
-  }
-
   async executeTransaction(tx: Tx, slice: { from: string, transactionsData?: SliceData[] }, ctx: SimulateDTO): Promise<TransactionOutputDTO> {
     ctx.sliceFrom = slice.from;
     ctx.output = new TransactionOutputDTO();
@@ -219,7 +206,20 @@ export class VirtualMachineProvider {
     return ctx.output;
   }
 
-  async checkAdminAddress(ctx: SimulateDTO) {
+  private async calcFee(ctx: SimulateDTO, size: BigNumber, amount: BigNumber, cost: BigNumber): Promise<string> {
+    let feeBasic = (await this.configsProvider.getByName(ctx.envContext, 'feeBasic')).toNumber();
+    let feeCoefSize = (await this.configsProvider.getByName(ctx.envContext, 'feeCoefSize')).toNumber();
+    let feeCoefAmount = (await this.configsProvider.getByName(ctx.envContext, 'feeCoefAmount')).toNumber();
+    let feeCoefCost = (await this.configsProvider.getByName(ctx.envContext, 'feeCoefCost')).toNumber();
+
+    let fee = feeBasic;
+    fee = fee.plus(feeCoefSize.multipliedBy(size));
+    fee = fee.plus(feeCoefAmount.multipliedBy(amount));
+    fee = fee.plus(feeCoefCost.multipliedBy(cost));
+    return new BigNumber(fee.toPrecision(5)).toString();
+  }
+
+  private async checkAdminAddress(ctx: SimulateDTO) {
     if (ctx.tx && ctx.envContext.blockHeight > 0) {
       let isAdmin = await this.configsProvider.isAdmin(ctx.envContext, ctx.tx.from[0]);
       if (!isAdmin) {
@@ -228,7 +228,7 @@ export class VirtualMachineProvider {
     }
   }
 
-  async blockchainCommand(ctx: SimulateDTO, cmd: CommandDTO): Promise<void> {
+  private async blockchainCommand(ctx: SimulateDTO, cmd: CommandDTO): Promise<void> {
     if (!ctx.tx) throw new Error(`Blockchain Command Forbidden`);
     ctx.tx = new Tx(ctx.tx);
 
@@ -293,7 +293,7 @@ export class VirtualMachineProvider {
     }
   }
 
-  async setConfig(ctx: SimulateDTO, cmd: CommandDTO): Promise<void> {
+  private async setConfig(ctx: SimulateDTO, cmd: CommandDTO): Promise<void> {
     await this.checkAdminAddress(ctx);
 
     if (cmd.name == 'setConfig') {
@@ -388,7 +388,7 @@ export class VirtualMachineProvider {
     }
   }
 
-  async setInfo(ctx: SimulateDTO, cmd: CommandDTO): Promise<void> {
+  private async setInfo(ctx: SimulateDTO, cmd: CommandDTO): Promise<void> {
     if ((!ctx.tx)) {
       throw new Error(`setInfo forbidden`);
     }
