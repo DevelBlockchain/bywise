@@ -1,24 +1,11 @@
 import BigNumber from "bignumber.js";
-import { Wallet } from '@bywise/web3';
-import { EnvironmentProvider } from "./environment.service";
-import { ApplicationContext, EnvironmentContext, WalletBalanceDTO, WalletCodeDTO, WalletInfoDTO } from "../types";
+import { WalletBalanceDTO, WalletCodeDTO, WalletInfoDTO } from "../types";
+import { RuntimeContext } from "../vm/RuntimeContext";
 
 export class WalletProvider {
 
-  private applicationContext: ApplicationContext;
-  private environmentProvider: EnvironmentProvider;
-
-  constructor(applicationContext: ApplicationContext) {
-    this.applicationContext = applicationContext;
-    this.environmentProvider = new EnvironmentProvider(applicationContext);
-  }
-
-  async getMainWallet(): Promise<Wallet> {
-    return this.applicationContext.mainWallet;
-  }
-
-  async getWalletInfo(envContext: EnvironmentContext, address: string): Promise<WalletInfoDTO> {
-    let walletDTO = await this.environmentProvider.get(envContext, `${address}-WI`);
+  async getWalletInfo(ctx: RuntimeContext, address: string): Promise<WalletInfoDTO> {
+    let walletDTO = await ctx.get(`${address}-WI`);
     if (walletDTO) {
       return {
         ...JSON.parse(walletDTO),
@@ -28,15 +15,15 @@ export class WalletProvider {
     return { address: address };
   }
 
-  async setWalletInfo(envContext: EnvironmentContext, walletDTO: WalletInfoDTO): Promise<void> {
-    await this.environmentProvider.set(envContext, `${walletDTO.address}-WI`, JSON.stringify({
+  async setWalletInfo(ctx: RuntimeContext, walletDTO: WalletInfoDTO): Promise<void> {
+    await ctx.set(`${walletDTO.address}-WI`, JSON.stringify({
       ...walletDTO,
       address: undefined
     }));
   }
 
-  async getWalletBalance(envContext: EnvironmentContext, address: string): Promise<WalletBalanceDTO> {
-    let walletDTO = await this.environmentProvider.get(envContext, `${address}-WB`);
+  async getWalletBalance(ctx: RuntimeContext, address: string): Promise<WalletBalanceDTO> {
+    let walletDTO = await ctx.get(`${address}-WB`);
     if (walletDTO) {
       return {
         balance: new BigNumber(walletDTO),
@@ -49,12 +36,12 @@ export class WalletProvider {
     };
   }
 
-  async setWalletBalance(envContext: EnvironmentContext, walletDTO: WalletBalanceDTO): Promise<void> {
-    await this.environmentProvider.set(envContext, `${walletDTO.address}-WB`, walletDTO.balance.toString());
+  async setWalletBalance(ctx: RuntimeContext, walletDTO: WalletBalanceDTO): Promise<void> {
+    await ctx.set(`${walletDTO.address}-WB`, walletDTO.balance.toString());
   }
 
-  async getWalletCode(envContext: EnvironmentContext, address: string): Promise<WalletCodeDTO | null> {
-    let walletDTO = await this.environmentProvider.get(envContext, `${address}-WC`);
+  async getWalletCode(ctx: RuntimeContext, address: string): Promise<WalletCodeDTO | null> {
+    let walletDTO = await ctx.get(`${address}-WC`);
     if (walletDTO) {
       return {
         ...JSON.parse(walletDTO),
@@ -64,8 +51,8 @@ export class WalletProvider {
     return null;
   }
 
-  async setWalletCode(envContext: EnvironmentContext, walletCodeDTO: WalletCodeDTO): Promise<void> {
-    await this.environmentProvider.set(envContext, `${walletCodeDTO.address}-WC`, JSON.stringify({
+  async setWalletCode(ctx: RuntimeContext, walletCodeDTO: WalletCodeDTO): Promise<void> {
+    await ctx.set(`${walletCodeDTO.address}-WC`, JSON.stringify({
       ...walletCodeDTO,
       address: undefined
     }));

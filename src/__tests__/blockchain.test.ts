@@ -31,7 +31,7 @@ beforeAll(async () => {
         initialNodes: [],
         zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: wallet.seed,
-        startServices: ['api', 'core', 'network'],
+        startServices: ['api', 'core', 'network', 'vm'],
     });
 
     web3 = new Web3({
@@ -73,7 +73,7 @@ describe('simple transactions', () => {
             expect(res.status).not.toEqual('mempool');
             expect(res.status == 'confirmed' || res.status == 'mined').toEqual(true);
         }
-    }, 30000);
+    }, 15000);
     
     test('send add balance', async () => {
         const addr = new Wallet();
@@ -85,24 +85,29 @@ describe('simple transactions', () => {
         }
 
         const tx = await web3.transactions.buildConfig.addBalance(wallet, chain, addr.address, `1000`);
-        await web3.transactions.sendTransactionSync(tx);
+        let error = await web3.transactions.sendTransaction(tx);
+        expect(error).toEqual(undefined);
+        await web3.transactions.waitConfirmation(tx.hash, 10000);
+        await helper.sleep(2000);
 
         addressInfo = await web3.wallets.getWalletInfo(addr.address, chain);
         expect(addressInfo !== undefined).toEqual(true);
         if (addressInfo !== undefined) {
             expect(addressInfo.balance).toEqual('1000');
         }
-    }, 30000);
+    }, 15000);
 
     test('make transfer', async () => {
         const addr1 = new Wallet();
         const addr2 = new Wallet();
 
         let tx = await web3.transactions.buildConfig.addBalance(wallet, chain, addr1.address, `1000`);
-        await web3.transactions.sendTransactionSync(tx);
-
+        let output = await web3.transactions.sendTransactionSync(tx);
+        expect(output.error).toEqual(undefined);
+        
         tx = await web3.transactions.buildSimpleTx(addr1, chain, addr2.address, `300`);
-        await web3.transactions.sendTransactionSync(tx);
+        output = await web3.transactions.sendTransactionSync(tx);
+        expect(output.error).toEqual(undefined);
 
         let addressInfo = await web3.wallets.getWalletInfo(addr1.address, chain);
         expect(addressInfo !== undefined).toEqual(true);
@@ -116,7 +121,7 @@ describe('simple transactions', () => {
             expect(addressInfo.balance).toEqual('300');
         }
     }, 30000);
-
+    
     test('simulate ERC20', async () => {
         let env = JSON.parse(fs.readFileSync('./assets/enviroment.json', 'utf8'));
 
@@ -241,7 +246,7 @@ describe('simple transactions', () => {
         expect(simulate.error).toEqual(undefined);
         expect(simulate.output).toEqual('4000000000000000000000');
     }, 30000);
-
+    
     test('deploy ERC20', async () => {
         const addr1 = (new Wallet()).address;
 
@@ -338,7 +343,7 @@ describe('simple transactions', () => {
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual('10000000');
     }, 30000);
-
+    
     test('vm-tests', async () => {
         const tests = fs.readdirSync('./assets/vm-tests');
         const env = JSON.parse(fs.readFileSync('./assets/enviroment.json', 'utf8'));
@@ -372,7 +377,7 @@ describe('simple transactions', () => {
         }
 
     }, 30000);
-
+    
     test('ERC20 many transactions', async () => {
         const addr1 = (new Wallet()).address;
 
@@ -444,5 +449,5 @@ describe('simple transactions', () => {
         );
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual(`${total}`);
-    }, 100000);
+    }, 60000);
 });

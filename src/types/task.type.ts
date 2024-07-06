@@ -3,7 +3,7 @@ import winston from "winston";
 import Database from "../datasource/database";
 import MessageQueue from "../datasource/message-queue";
 
-export type BywiseStartServices = 'api' | 'core' | 'network'
+export type BywiseStartServices = 'api' | 'core' | 'network' | 'vm'
 
 export type BywiseStartNodeConfig = {
     name: string;

@@ -46,7 +46,7 @@ export default class ExecuteSlices {
             }
             if(lastContextHashIsExecuted) {
                 const lastContextHash = this.coreProvider.blockTree.getLastHash(sliceInfo.slice.hash);
-                await this.coreProvider.slicesProvider.executeCompleteSlice(this.coreProvider.blockTree, lastContextHash, sliceInfo);
+                await this.coreProvider.slicesProvider.executeCompleteSlice(this.coreProvider.blockTree, lastContextHash, sliceInfo.slice.blockHeight, sliceInfo);
             }
         }
         

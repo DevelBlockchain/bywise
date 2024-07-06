@@ -1,6 +1,6 @@
-import { TxType, Slice, Tx } from '@bywise/web3';
+import { TxType, Tx } from '@bywise/web3';
 import BigNumber from "bignumber.js";
-import { EnvironmentContext } from './environment.types';
+import { EnvironmentChanges, EnvironmentContext } from './environment.types';
 
 export enum BlockchainStatus {
   TX_MEMPOOL = 'mempool',
@@ -68,27 +68,6 @@ export type ValueBooleanDTO = {
   value: boolean;
 }
 
-export class SimulateDTO {
-
-  constructor(envContext: EnvironmentContext) {
-    this.envContext = envContext;
-  }
-
-  envContext: EnvironmentContext;
-  slicesModels: Slice[] = [];
-  transactionsModels: Tx[] = [];
-  totalFee: BigNumber = new BigNumber(0);
-  sliceFrom: string = '';
-  nonce: number = 0;
-  feeCostType: number = 0;
-  checkWalletBalance: boolean = true;
-  enableWriteProxy: boolean = false;
-  enableReadProxy: boolean = false;
-  proxyMock: string[] = [];
-  tx?: Tx = undefined;
-  output = new TransactionOutputDTO()
-}
-
 export type VariableDTO = {
   value: any;
 }
@@ -105,25 +84,44 @@ export type TransactionEvent = {
   hash: string;
 }
 
+export type TransactionChanges = {
+  get: string[];
+  walletAddress: string[];
+  walletAmount: string[];
+  envOut: EnvironmentChanges
+}
+
 export class TransactionOutputDTO {
   cost: number;
   size: number;
   fee: string;
   feeUsed: string;
+  debit: string;
   logs: string[];
   events: TransactionEvent[];
   error?: string;
+  stack?: string;
   output: any;
-  payableContracts = new Map<string, string>();
+  changes: TransactionChanges;
 
   constructor() {
     this.cost = 0;
     this.size = 0;
     this.fee = '';
     this.feeUsed = '';
+    this.debit = '';
     this.logs = [];
     this.events = [];
     this.output = '';
+    this.changes = {
+      get: [],
+      walletAddress: [],
+      walletAmount: [],
+      envOut: {
+        keys: [],
+        values: [],
+      }
+    };
   }
 }
 
@@ -177,4 +175,13 @@ export type WalletCodeDTO = {
   abi: ABIMethod[];
   code: string;
   calls: string[];
+}
+
+export type TransactionsToExecute = {
+  id: string;
+  error?: string;
+  env: EnvironmentContext;
+  txs: Tx[];
+  outputs: TransactionOutputDTO[];
+  envOut: EnvironmentChanges;
 }

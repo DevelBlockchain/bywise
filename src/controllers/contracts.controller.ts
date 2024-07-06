@@ -1,15 +1,10 @@
 import express from 'express';
-import BigNumber from "bignumber.js";
 import metadataDocument from '../metadata/metadataDocument';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { WalletCodeDTO } from '../types';
 import { RequestKeys } from '../datasource/message-queue';
-import BlockchainDebug from '../vm/BlockchainDebug';
-import { GetContract } from '../vm/BlockchainInterface';
-import { BywiseHelper, Tx, TxType } from '@bywise/web3';
-import BywiseRuntime from '../vm/BywiseRuntime';
-import helper from '../utils/helper';
 import { ApiService } from '../services';
+import { Tx, TxType } from '@bywise/web3';
+import { CompiledContext, TransactionsToExecute } from '../types';
 
 export default async function contractsController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
@@ -43,110 +38,42 @@ export default async function contractsController(app: express.Express, apiProvi
         try {
             const body: { code?: string, method?: string, inputs?: string[], contractAddress: string, from: string, amount: number, tag: string, env: any } = req.body;
             const runtimeContext = body.env;
+            const contractAddress = body.contractAddress;
 
-            const blockchainDebug = new BlockchainDebug(apiProvider.applicationContext);
-            blockchainDebug.loadData(runtimeContext);
-
-            const getContract: GetContract = async (address: string, method: string, inputs: string[]): Promise<{ wc: WalletCodeDTO, code: string, view: boolean, payable: boolean }> => {
-                if (!BywiseHelper.isValidAddress(address)) throw new Error(`Invalid address`);
-                if (inputs === undefined) throw new Error(`inputs array not found`);
-                if (!Array.isArray(inputs)) throw new Error(`Inputs need be an array`);
-                const wc: WalletCodeDTO = runtimeContext.contractAddress[address];
-                if (!wc) throw new Error(`Contract not found`);
-                let foundMethod = false;
-                let view = false;
-                let payable = false;
-                for (let i = 0; i < wc.abi.length; i++) {
-                    const abiMethod = wc.abi[i];
-                    if (abiMethod.name === method) {
-                        foundMethod = true;
-                        view = abiMethod.view;
-                        payable = abiMethod.payable;
-                        if (inputs.length !== abiMethod.parameters.length) throw new Error(`expected ${abiMethod.parameters.length} inputs`);
-                    }
-                }
-                if (!foundMethod) throw new Error(`Invalid method`);
-                return {
-                    payable,
-                    view,
-                    wc,
-                    code: `globalThis.contract.${method}(${inputs.map(i => `"${i}"`).join(',')});`
-                }
-            }
-
-            if (runtimeContext.contractAddress[body.contractAddress]) {
-                if (!body.method) throw new Error(`need method`);
-                if (body.inputs === undefined) throw new Error(`need inputs`);
-
-                const contract = await getContract(body.contractAddress, body.method, body.inputs);
-
-                const ctx = helper.createSimulationContext('local');
-                ctx.nonce = runtimeContext.nonce++;
-                ctx.envContext.blockHeight = runtimeContext.blockHeight;
-                ctx.tx = new Tx();
-                ctx.tx.version = '2';
-                ctx.tx.chain = 'local';
-                ctx.tx.from = [body.from];
-                ctx.tx.to = [body.contractAddress];
-                ctx.tx.amount = [`${body.amount}`];
-                ctx.tx.fee = '0.12';
-                ctx.tx.type = TxType.TX_CONTRACT_EXE;
-                ctx.tx.created = Math.floor(Date.now() / 1000);
-                ctx.tx.hash = ctx.tx.toHash();
-
-                await blockchainDebug.internalTransfer(body.from, ctx.tx.to[0], ctx.tx.amount[0]);
-                await blockchainDebug.payFee(body.from, ctx.tx.fee);
-
-                const sendAmount = `${req.body.amount}`;
-
-                if (!contract.payable && !(new BigNumber(sendAmount)).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
-
-                const output = await BywiseRuntime.execInContract(blockchainDebug, getContract, ctx, req.body.contractAddress, contract.wc, req.body.from, sendAmount, contract.code);
-
-                runtimeContext.data = blockchainDebug.export();
-
-                return res.send({
-                    env: runtimeContext,
-                    output: output,
-                    logs: ctx.output.logs
-                });
+            const tx = new Tx();
+            tx.version = '2';
+            tx.chain = 'local';
+            tx.from = [body.from];
+            tx.to = [contractAddress];
+            tx.amount = [`${body.amount}`];
+            tx.fee = '50';
+            tx.created = Math.floor(Date.now() / 1000);
+            if(body.code) {
+                tx.type = TxType.TX_CONTRACT;
+                tx.data = { contractAddress, code: body.code };
             } else {
-                if (!body.code) throw new Error(`need code`);
-
-                const contractAddress = body.contractAddress;
-                const ctx = helper.createSimulationContext('local');
-                ctx.nonce = runtimeContext.nonce++;
-                ctx.envContext.blockHeight = runtimeContext.blockHeight;
-                ctx.tx = new Tx();
-                ctx.tx.version = '2';
-                ctx.tx.chain = 'local';
-                ctx.tx.from = [body.from];
-                ctx.tx.to = [BywiseHelper.ZERO_ADDRESS];
-                ctx.tx.amount = [`${body.amount}`];
-                ctx.tx.fee = '0.12';
-                ctx.tx.type = TxType.TX_CONTRACT;
-                ctx.tx.created = Math.floor(Date.now() / 1000);
-                ctx.tx.hash = ctx.tx.toHash();
-
-                await blockchainDebug.internalTransfer(body.from, contractAddress, ctx.tx.amount[0]);
-                await blockchainDebug.payFee(body.from, ctx.tx.fee);
-
-                if (!(new BigNumber(`${body.amount}`)).isEqualTo(new BigNumber('0'))) throw new Error(`Method not is payable`);
-
-                const output = await BywiseRuntime.execContract(blockchainDebug, getContract, ctx, contractAddress, body.from, `${body.amount}`, body.code);
-
-                runtimeContext.data = blockchainDebug.export();
-                runtimeContext.contractAddress[contractAddress] = output;
-
-                return res.send({
-                    env: runtimeContext,
-                    output: {
-                        abi: output.abi,
-                        contractAddress: contractAddress,
-                    },
-                    logs: ctx.output.logs
-                });
+                tx.type = TxType.TX_CONTRACT_EXE;
+                tx.data = [{ method: body.method, inputs: body.inputs }];
             }
+            tx.hash = tx.toHash();
+
+            const env = {
+                chain: tx.chain,
+                fromContextHash: CompiledContext.SIMULATE_CONTEXT_HASH,
+                blockHeight: runtimeContext.blockHeight,
+                changes: runtimeContext.memory
+            }
+            const tte:TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, env });
+
+            runtimeContext.memory = tte.envOut;
+            if(body.code && !tte.error) {
+                runtimeContext.contractAddress[contractAddress] = tte.outputs[0].output;
+            }
+
+            return res.send({
+                env: runtimeContext,
+                ...tte.outputs[0]
+            });
         } catch (err: any) {
             if (err.cause && err.cause.stack)
                 err.cause.stack = err.cause.stack.replace(/eval\.js/g, 'contract.js').replace(/<eval>/g, '<contract>').replace(/<anonymous>/g, '<contract>')
@@ -179,7 +106,7 @@ export default async function contractsController(app: express.Express, apiProvi
         const chain = req.params.chain;
         const address = req.params.address;
         if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-        
+
         const bcc = await apiProvider.applicationContext.mq.request(RequestKeys.get_contract, { chain, address: address });
         if (bcc) {
             const txHash = (JSON.parse(bcc)).txHash;

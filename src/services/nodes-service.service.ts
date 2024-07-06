@@ -2,7 +2,6 @@ import { BywiseNode, InfoNode } from '@bywise/web3/lib/types';
 import { ApplicationContext } from '../types/task.type';
 import helper from '../utils/helper';
 import { AuthProvider } from './auth.service';
-import { WalletProvider } from './wallet.service';
 const pjson = require('./../../package.json');
 
 const EXPIRE = 240; // SECONDS
@@ -10,18 +9,18 @@ const EXPIRE = 240; // SECONDS
 export class NodesProvider {
 
   private authProvider;
-  private walletProvider;
+  private mainWallet;
   private applicationContext;
 
   constructor(applicationContext: ApplicationContext) {
     this.applicationContext = applicationContext;
+    this.mainWallet = applicationContext.mainWallet;
     this.authProvider = new AuthProvider(applicationContext);
-    this.walletProvider = new WalletProvider(applicationContext);
   }
 
   createMyNode = async (): Promise<BywiseNode> => {
     let token = await this.authProvider.createNodeToken(EXPIRE);
-    let account = await this.walletProvider.getMainWallet();
+    let account = await this.mainWallet;
     let myNode = new BywiseNode({
       chains: this.applicationContext.zeroBlocks.map(block => block.chain),
       address: account.address,
@@ -34,9 +33,8 @@ export class NodesProvider {
   }
 
   getInfoNode = async (connectedNodes: BywiseNode[]): Promise<InfoNode> => {
-    let account = await this.walletProvider.getMainWallet();
     const myInfo: InfoNode = {
-      address: account.address,
+      address: this.mainWallet.address,
       host: this.applicationContext.myHost,
       version: pjson.version,
       timestamp: helper.getNow(),

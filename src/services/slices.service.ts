@@ -1,4 +1,4 @@
-import { Slice } from '@bywise/web3';
+import { Slice, Tx } from '@bywise/web3';
 import { ApplicationContext, BlockTree, BlockchainStatus, CompiledContext } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
 import { Slices } from '../models';
@@ -14,12 +14,12 @@ export class SlicesProvider {
   private mq;
   private logger;
 
-  constructor(applicationContext: ApplicationContext) {
+  constructor(applicationContext: ApplicationContext, transactionsProvider: TransactionsProvider) {
     this.mq = applicationContext.mq;
     this.logger = applicationContext.logger;
     this.TransactionRepository = applicationContext.database.TransactionRepository;
     this.SliceRepository = applicationContext.database.SliceRepository;
-    this.transactionsProvider = new TransactionsProvider(applicationContext);
+    this.transactionsProvider = transactionsProvider;
     this.environmentProvider = new EnvironmentProvider(applicationContext);
   }
 
@@ -76,19 +76,36 @@ export class SlicesProvider {
     return sliceInfo;
   }
 
-  async executeCompleteSlice(blockTree: BlockTree, lastContextHash: string, sliceInfo: Slices) {
+  async executeCompleteSlice(blockTree: BlockTree, lastContextHash: string, blockHeight: number, sliceInfo: Slices) {
     await this.environmentProvider.consolide(blockTree, lastContextHash, CompiledContext.SLICE_CONTEXT_HASH);
-    const ctx = this.transactionsProvider.createContext(blockTree, CompiledContext.SLICE_CONTEXT_HASH, sliceInfo.slice.blockHeight);
     let error = false;
     try {
       sliceInfo.outputs = [];
+      const txs: Tx[] = [];
       for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
         const txHash = sliceInfo.slice.transactions[j];
         let txInfo = await this.transactionsProvider.getTxInfo(txHash);
-        const output = await this.transactionsProvider.simulateTransaction(txInfo.tx, sliceInfo.slice, ctx);
-        sliceInfo.outputs.push(output);
-        if (output.error) {
-          this.logger.error(`Invalid transaction - tx.hash: ${txInfo.tx.hash} - error: "${output.error}"`)
+        txs.push(txInfo.tx);
+      }
+      const env = {
+        chain: blockTree.chain,
+        fromContextHash: CompiledContext.SLICE_CONTEXT_HASH,
+        blockHeight: blockHeight,
+        changes: {
+          keys: [],
+          values: [],
+        }
+      }
+      const tte = await this.transactionsProvider.simulateTransactions(txs, env);
+      sliceInfo.outputs = tte.outputs;
+      for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
+        const txHash = sliceInfo.slice.transactions[j];
+        const output = sliceInfo.outputs[j];
+        if (!output) {
+          this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "Transaction Output Not Found"`)
+          error = true;
+        } else if (output.error) {
+          this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "${output.error}"`)
           error = true;
         }
       }
@@ -97,18 +114,17 @@ export class SlicesProvider {
         sliceInfo.status = BlockchainStatus.TX_FAILED;
       } else {
         sliceInfo.isExecuted = true;
-        this.environmentProvider.commit(ctx.envContext);
-        await this.environmentProvider.push(ctx.envContext, sliceInfo.slice.hash);
+        await this.environmentProvider.push(tte.envOut, blockTree.chain, sliceInfo.slice.hash);
         this.logger.verbose(`exec-slices: exec slice - height: ${sliceInfo.slice.blockHeight} - txs: ${sliceInfo.slice.transactionsCount} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
-        
-        if(blockTree.bestSlice) {
-          if(blockTree.bestSlice.blockHeight < sliceInfo.slice.blockHeight ||
+
+        if (blockTree.bestSlice) {
+          if (blockTree.bestSlice.blockHeight < sliceInfo.slice.blockHeight ||
             blockTree.bestSlice.height < sliceInfo.slice.height ||
             blockTree.bestSlice.height == sliceInfo.slice.height && blockTree.bestSlice.transactionsCount < sliceInfo.slice.transactionsCount) {
             blockTree.bestSlice = sliceInfo.slice;
             sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
           }
-        } else if(sliceInfo.slice.blockHeight > blockTree.currentMinnedBlock.height) {
+        } else if (sliceInfo.slice.blockHeight > blockTree.currentMinnedBlock.height) {
           blockTree.bestSlice = sliceInfo.slice;
         }
 
@@ -126,7 +142,6 @@ export class SlicesProvider {
       error = true;
     }
     await this.updateSlice(sliceInfo);
-    await this.transactionsProvider.disposeContext(ctx);
     return error;
   }
 

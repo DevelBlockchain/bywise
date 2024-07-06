@@ -1,5 +1,5 @@
 import { Environment } from "../models";
-import { ApplicationContext, BlockTree, CompiledContext, EnvironmentContext } from "../types";
+import { ApplicationContext, BlockTree, CompiledContext, EnvironmentChanges, EnvironmentContext } from "../types";
 
 const ENV_BATCH = 1000;
 
@@ -52,38 +52,9 @@ export class EnvironmentProvider {
         }
     }
 
-    private async getFromContextEnv(envContext: EnvironmentContext, key: string): Promise<Environment> {
-        let env = envContext.setStageKeys.get(key);
-        if (!env) {
-            env = envContext.setMainKeys.get(key);
-        }
-        if (!env) {
-            env = envContext.getStageKeys.get(key);
-        }
-        if (!env) {
-            env = envContext.getMainKeys.get(key);
-        }
-        if (!env) {
-            const from_context_env = await this.EnvironmentRepository.get(envContext.blockTree.chain, key, envContext.fromContextHash);
-            if (from_context_env) {
-                env = from_context_env;
-            }
-        }
-        if (!env) {
-            env = {
-                chain: envContext.blockTree.chain,
-                key: key,
-                hash: envContext.fromContextHash,
-                value: null,
-            }
-        }
-        envContext.getStageKeys.set(key, env);
-        return env;
-    }
-
     async getList(envContext: EnvironmentContext, key: string, limit: number, offset: number): Promise<Environment[]> {
         let envs: Environment[];
-        envs = await this.EnvironmentRepository.findByChainAndHashAndKey(envContext.blockTree.chain, envContext.fromContextHash, key, limit, offset);
+        envs = await this.EnvironmentRepository.findByChainAndHashAndKey(envContext.chain, envContext.fromContextHash, key, limit, offset);
         envs = envs.map(env => {
             env.key = env.key.replace(key + '-', '');
             return env;
@@ -92,83 +63,35 @@ export class EnvironmentProvider {
     }
 
     async getListSize(envContext: EnvironmentContext, key: string): Promise<number> {
-        return await this.EnvironmentRepository.countByChainAndHashAndKey(envContext.blockTree.chain, envContext.fromContextHash, key);
+        return await this.EnvironmentRepository.countByChainAndHashAndKey(envContext.chain, envContext.fromContextHash, key);
     }
 
-    async has(envContext: EnvironmentContext, key: string): Promise<boolean> {
-        const env = await this.getFromContextEnv(envContext, key);
-        if (env.value !== null) {
-            return true;
+    async get(envContext: EnvironmentContext, key: string): Promise<Environment | null> {
+        const from_context_env = await this.EnvironmentRepository.get(envContext.chain, key, envContext.fromContextHash);
+        if (from_context_env) {
+            return from_context_env;
         }
-        return false;
-    }
-
-    async get(envContext: EnvironmentContext, key: string): Promise<string> {
-        const env = await this.getFromContextEnv(envContext, key);
-        if (env.value !== null) {
-            return env.value;
-        }
-        return '';
+        return null;
     }
 
     async set(envContext: EnvironmentContext, key: string, value: string): Promise<void> {
-        const newEnv: Environment = {
-            chain: envContext.blockTree.chain,
+        await this.EnvironmentRepository.saveMany([{
             key: key,
-            hash: CompiledContext.MAIN_CONTEXT_HASH,
             value: value,
-        };
-        envContext.setStageKeys.set(newEnv.key, newEnv);
+            chain: envContext.chain,
+            hash: envContext.fromContextHash,
+        }]);
     }
 
-    delete(envContext: EnvironmentContext, key: string): void {
-        const newEnv: Environment = {
-            chain: envContext.blockTree.chain,
-            key: key,
-            hash: CompiledContext.MAIN_CONTEXT_HASH,
-            value: null,
-        };
-        envContext.setStageKeys.set(newEnv.key, newEnv);
-    }
-
-    deleteCommit(envContext: EnvironmentContext) {
-        envContext.setStageKeys.clear();
-        envContext.getStageKeys.clear();
-    }
-
-    changes(envContext: EnvironmentContext) {
-        let get = [];
-        let set = [];
-        for (let [key, env] of envContext.getStageKeys) {
-            if (!key.startsWith('config-')) {
-                get.push(key);
-            }
-        }
-        for (let [key, env] of envContext.setStageKeys) {
-            set.push([key, env.value]);
-        }
-        return { get, set };
-    }
-
-    commit(envContext: EnvironmentContext) {
-        for (let [key, env] of envContext.setStageKeys) {
-            envContext.setMainKeys.set(key, env);
-        }
-        for (let [key, env] of envContext.getStageKeys) {
-            envContext.getMainKeys.set(key, env);
-        }
-        envContext.setStageKeys.clear();
-        envContext.getStageKeys.clear();
-    }
-
-    async push(envContext: EnvironmentContext, toContextHash: string) {
-        if (envContext.setStageKeys.size > 0) throw new Error(`Environment context not commited`);
+    async push(changes: EnvironmentChanges, chain: string, toContextHash: string) {
         const saveEnvs: Environment[] = [];
-        for (let [key, env] of envContext.setMainKeys) {
+        for (let i = 0; i < changes.keys.length; i++) {
+            const key = changes.keys[i];
+            const value = changes.values[i];
             saveEnvs.push({
-                chain: env.chain,
-                key: env.key,
-                value: env.value,
+                key: key,
+                value: value,
+                chain: chain,
                 hash: toContextHash,
             });
         }

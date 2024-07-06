@@ -7,10 +7,12 @@ import { CoreProvider } from "../services";
 export default class MintBlocks {
     public isRun = true;
     private coreProvider;
+    private mainWallet;
     private BlockRepository;
 
     constructor(coreProvider: CoreProvider) {
         this.coreProvider = coreProvider;
+        this.mainWallet = coreProvider.applicationContext.mainWallet;
         this.BlockRepository = coreProvider.applicationContext.database.BlockRepository;
     }
 
@@ -21,7 +23,7 @@ export default class MintBlocks {
         const now = helper.getNow()
         const currentBlock = this.coreProvider.blockTree.currentMinnedBlock;
         const blockTime = this.coreProvider.blockTime;
-        const mainWallet = await this.coreProvider.walletProvider.getMainWallet();
+        const mainWallet = this.mainWallet;
 
         let myBlocks;
         let height = currentBlock.height - 1;
@@ -71,7 +73,7 @@ export default class MintBlocks {
     async tryMintBlock(fromBlock: Block) {
         const now = helper.getNow()
         const blockTime = this.coreProvider.blockTime;
-        const mainWallet = await this.coreProvider.walletProvider.getMainWallet();
+        const mainWallet = this.mainWallet;
 
         let from = fromBlock.from;
         if (fromBlock.lastHash !== BlockTree.ZERO_HASH) {

@@ -3,7 +3,7 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 import fs from 'fs';
 import randomstring from 'randomstring';
 import { Block, Slice, Tx, TxType, Wallet, BlockPack, BywiseHelper } from '@bywise/web3';
-import { BlockTree, CompiledContext, EnvironmentContext, SimulateDTO, ZeroBlockConfig } from '../types';
+import { BlockTree, ZeroBlockConfig } from '../types';
 
 const wait = async () => {
     await new Promise((resolve) => {
@@ -159,26 +159,6 @@ const createNewBlockZero = async (chain: string, wallet: Wallet = new Wallet(), 
     return { block, slices, txs };
 }
 
-const createSimulationContext = (chain: string) => {
-    const simulationId = getRandomHash();
-
-    const block = new Block();
-    block.height = 0;
-    block.chain = chain;
-    block.slices = [];
-    block.version = '';
-    block.from = '';
-    block.created = Math.floor(Date.now() / 1000);
-    block.lastHash = BlockTree.ZERO_HASH;
-    block.hash = simulationId;
-
-    const blockTree = new BlockTree(chain);
-    blockTree.addBlock(block);
-
-    const envContext = new EnvironmentContext(blockTree, block.height, CompiledContext.MAIN_CONTEXT_HASH);
-    return new SimulateDTO(envContext);
-}
-
 const numberToString = (n: number | string) => {
     let str = `${n}`;
     if (!/^[0-9]+$/.test(str)) throw new Error(`invalid number ${n}`);
@@ -196,7 +176,6 @@ const stringToHash = (str: string) => {
 const getNow = () => Math.floor(Date.now() / 1000);
 
 const helper = {
-    createSimulationContext,
     createNewBlockZero,
     getRandomHash,
     getRandomString,

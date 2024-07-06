@@ -1,5 +1,5 @@
-import { ApplicationContext, ConfigDTO, EnvironmentContext } from '../types';
-import { EnvironmentProvider } from './environment.service';
+import { ConfigDTO } from '../types';
+import { RuntimeContext } from '../vm/RuntimeContext';
 
 type ConfigMeta = {
   lastValue: string,
@@ -11,12 +11,6 @@ type ConfigMeta = {
 export class ConfigProvider {
 
   static MIN_BWS_VALUE = '10000';
-
-  private environmentProvider: EnvironmentProvider;
-
-  constructor(applicationContext: ApplicationContext) {
-    this.environmentProvider = new EnvironmentProvider(applicationContext);
-  }
 
   private getDefaultConfigs(): ConfigDTO[] {
     let configs: ConfigDTO[] = [];
@@ -100,36 +94,36 @@ export class ConfigProvider {
     return null;
   }
 
-  async isValidator(envContext: EnvironmentContext, address: string): Promise<boolean> {
+  async isValidator(ctx: RuntimeContext, address: string): Promise<boolean> {
     try {
-      const isValidatorAddress = await this.getByName(envContext, `validator-${address}`);
+      const isValidatorAddress = await this.getByName(ctx, `validator-${address}`);
       return isValidatorAddress.toBoolean();
     } catch (err) {
       return false;
     }
   }
 
-  async isAdmin(envContext: EnvironmentContext, address: string): Promise<boolean> {
+  async isAdmin(ctx: RuntimeContext, address: string): Promise<boolean> {
     try {
-      const isAdminAddress = await this.getByName(envContext, `admin-address-${address}`);
+      const isAdminAddress = await this.getByName(ctx, `admin-address-${address}`);
       return isAdminAddress.toBoolean();
     } catch (err) {
       return false;
     }
   }
 
-  async getByName(envContext: EnvironmentContext, name: string): Promise<ConfigDTO> {
+  async getByName(ctx: RuntimeContext, name: string): Promise<ConfigDTO> {
     let cfg = new ConfigDTO({
-      chain: envContext.blockTree.chain,
+      chain: ctx.env.chain,
       name: name,
       value: 'false',
       type: 'boolean',
     });
-    let configEnv = await this.environmentProvider.get(envContext, `config-${name}`);
+    let configEnv = await ctx.get(`config-${name}`);
     if (configEnv) {
       let cfgMeta: ConfigMeta = JSON.parse(configEnv);
       cfg.type = cfgMeta.type;
-      if (envContext.blockHeight - cfgMeta.lastUpdate > 60 || cfgMeta.lastUpdate === 0) {
+      if (ctx.env.blockHeight - cfgMeta.lastUpdate > 60 || cfgMeta.lastUpdate === 0) {
         cfg.setValue(cfgMeta.value);
       } else {
         cfg.setValue(cfgMeta.lastValue);
@@ -143,20 +137,20 @@ export class ConfigProvider {
     return new ConfigDTO(cfg);
   }
 
-  async setConfig(envContext: EnvironmentContext, cfg: ConfigDTO) {
+  async setConfig(ctx: RuntimeContext, cfg: ConfigDTO) {
     let defaultCfg = this.findByName(cfg.name);
     const newConfigValue: ConfigMeta = {
       lastValue: defaultCfg !== null ? defaultCfg.value : (cfg.type === 'boolean' ? 'false' : '0'),
       value: cfg.value,
-      lastUpdate: envContext.blockHeight,
+      lastUpdate: ctx.env.blockHeight,
       type: cfg.type
     }
 
-    let configEnv = await this.environmentProvider.get(envContext, `config-${cfg.name}`);
+    let configEnv = await ctx.get(`config-${cfg.name}`);
     if (configEnv) {
       let cfgMeta: ConfigMeta = JSON.parse(configEnv);
       newConfigValue.lastValue = cfgMeta.value;
     }
-    await this.environmentProvider.set(envContext, `config-${cfg.name}`, JSON.stringify(newConfigValue));
+    await ctx.set(`config-${cfg.name}`, JSON.stringify(newConfigValue));
   }
 }

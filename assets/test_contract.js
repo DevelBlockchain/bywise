@@ -1,6 +1,13 @@
 import BywiseUtils, { StorageValue } from 'bywise-utils.js';
 
 class TestContract {
+
+    infinty() {
+        let count = 0;
+        while(true) {
+            count++;
+        }
+    }
  
     value = new StorageValue('0');
  
@@ -11,6 +18,13 @@ class TestContract {
  
     getValue() { // @view
         return this.value.get();
+    }
+
+    incrementValue(amount) {
+        let value = parseInt(this.value.get());
+        value += parseInt(amount);
+        this.value.set(value);
+        return value;
     }
 
     increment(contractAddress) {
@@ -34,7 +48,7 @@ class TestContract {
 
     hardwork(value) {
         value = parseInt(value)
-        var count = 0;
+        let count = 0;
         for (let i = 0; i < value; i++) {
             for (let j = 0; j < value; j++) {
                 count += i;

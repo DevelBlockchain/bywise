@@ -15,7 +15,7 @@ export default class VoteBlocks {
         if (!this.coreProvider.isValidator || !this.coreProvider.hasMinimumBWSToMine) {
             return;
         }
-        const mainWallet = await this.coreProvider.walletProvider.getMainWallet();
+        const mainWallet = this.coreProvider.applicationContext.mainWallet;
         const currentBlock = await this.coreProvider.blockTree.currentMinnedBlock;
 
         const blockTime = this.coreProvider.blockTime;
@@ -56,7 +56,7 @@ export default class VoteBlocks {
         if (block.chain === 'mainnet' || block.chain === 'testnet' || block.chain === 'local') {
             return;
         }
-        const mainWallet = await this.coreProvider.walletProvider.getMainWallet();
+        const mainWallet = this.coreProvider.applicationContext.mainWallet;
 
         const web3 = new Web3({
             initialNodes: ['https://node1.bywise.org'],

@@ -9,7 +9,7 @@ var node0: Bywise;
 var node1: Bywise;
 var node2: Bywise;
 var b0: BlockPack;
-const blockDelay = 3000;
+const blockDelay = 5000;
 const keyJWT = helper.getRandomString();
 const chain = 'local';
 const port0 = Math.floor(Math.random() * 7000 + 3000);
@@ -43,7 +43,7 @@ beforeAll(async () => {
         initialNodes: [],
         zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: node0Wallet.seed,
-        startServices: ['api'],
+        startServices: ['api', 'vm'],
     });
 
     node1 = await Bywise.newBywiseInstance({
@@ -56,7 +56,7 @@ beforeAll(async () => {
         initialNodes: [],
         zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: node1Wallet.seed,
-        startServices: ['api'],
+        startServices: ['api', 'vm'],
     });
 
     node2 = await Bywise.newBywiseInstance({
@@ -69,11 +69,14 @@ beforeAll(async () => {
         initialNodes: [],
         zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: node2Wallet.seed,
-        startServices: ['api'],
+        startServices: ['api', 'vm'],
     });
 }, 2000);
 
 beforeEach(async () => {
+    await node0.vm.stop();
+    await node1.vm.stop();
+    await node2.vm.stop();
     await node0.core.stop();
     await node1.core.stop();
     await node2.core.stop();
@@ -86,9 +89,13 @@ beforeEach(async () => {
     await node1.applicationContext.database.drop();
     await node2.applicationContext.database.drop();
 
-    await node0.core.blockProvider.setNewZeroBlock(b0);
-    await node1.core.blockProvider.setNewZeroBlock(b0);
-    await node2.core.blockProvider.setNewZeroBlock(b0);
+    await node0.vm.start();
+    await node1.vm.start();
+    await node2.vm.start();
+    
+    await node0.blockProvider.setNewZeroBlock(b0);
+    await node1.blockProvider.setNewZeroBlock(b0);
+    await node2.blockProvider.setNewZeroBlock(b0);
 
     await node0.core.network.start([]);
     await node1.core.network.start([]);

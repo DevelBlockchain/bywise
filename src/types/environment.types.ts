@@ -1,6 +1,4 @@
 import { Block, Slice } from "@bywise/web3";
-import { Environment } from "../models";
-import { BywiseRuntimeInstance } from "../vm/BywiseRuntime";
 
 export type NodeBlockTree = {
     hash: string,
@@ -222,32 +220,17 @@ export enum CompiledContext {
     MAIN_CONTEXT_HASH = 'main_context',
     SLICE_CONTEXT_HASH = 'slice_context',
     SLICE_MINT_CONTEXT_HASH = 'slice_mint_context',
+    SIMULATE_CONTEXT_HASH = 'simulate_context',
 }
 
-export class EnvironmentContext {
-    public blockTree: BlockTree;
-    public blockHeight: number;
-    public fromContextHash: CompiledContext;
-    public executedContracts: Map<string, BywiseRuntimeInstance> = new Map();
-    public setMainKeys: Map<string, Environment> = new Map();
-    public getMainKeys: Map<string, Environment> = new Map();
-    public setStageKeys: Map<string, Environment> = new Map();
-    public getStageKeys: Map<string, Environment> = new Map();
+export type EnvironmentChanges = {
+    keys: string[];
+    values: (string | null)[];
+}
 
-    constructor(blockTree: BlockTree, blockHeight: number, fromContextHash: CompiledContext) {
-        this.blockTree = blockTree;
-        this.blockHeight = blockHeight;
-        this.fromContextHash = fromContextHash;
-    }
-
-    async dispose() {
-        for (let [contract, br] of this.executedContracts) {
-            await br.dispose();
-        }
-        this.setStageKeys.clear();
-        this.getStageKeys.clear();
-        this.setMainKeys.clear();
-        this.getMainKeys.clear();
-        this.executedContracts.clear();
-    }
+export type EnvironmentContext = {
+    chain: string;
+    fromContextHash: CompiledContext;
+    blockHeight: number;
+    changes: EnvironmentChanges;
 }

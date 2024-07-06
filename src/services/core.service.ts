@@ -17,26 +17,22 @@ export class CoreProvider {
     transactionsProvider;
     minnerProvider;
     environmentProvider;
-    configsProvider;
-    walletProvider;
     eventsProvider;
 
     blockTime = 60;
     isValidator = false;
     hasMinimumBWSToMine = false;
 
-    constructor(applicationContext: ApplicationContext, network: Network, blockTree: BlockTree) {
+    constructor(applicationContext: ApplicationContext, network: Network, blockTree: BlockTree, blockProvider: BlocksProvider, slicesProvider: SlicesProvider, transactionsProvider: TransactionsProvider) {
         this.applicationContext = applicationContext;
         this.network = network;
         this.blockTree = blockTree;
         this.chain = blockTree.chain;
-        this.blockProvider = new BlocksProvider(applicationContext);
-        this.slicesProvider = new SlicesProvider(applicationContext);
-        this.transactionsProvider = new TransactionsProvider(applicationContext);
+        this.blockProvider = blockProvider;
+        this.transactionsProvider = transactionsProvider;
+        this.slicesProvider = slicesProvider;
         this.environmentProvider = new EnvironmentProvider(applicationContext);
         this.minnerProvider = new MinnerProvider();
-        this.configsProvider = new ConfigProvider(applicationContext);
-        this.walletProvider = new WalletProvider(applicationContext);
         this.eventsProvider = new EventsProvider(applicationContext);
     }
 }

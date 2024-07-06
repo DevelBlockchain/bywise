@@ -1,4 +1,4 @@
-import { ApplicationContext, BlockTree, Task } from '../types';
+import { ApplicationContext, BlockTree, EnvironmentContext, Task } from '../types';
 import { BlocksProvider, SlicesProvider, TransactionsProvider } from '../services';
 import helper from '../utils/helper';
 import PipelineChain from '../core/pipeline-chain.core';
@@ -22,9 +22,9 @@ class Core implements Task {
     constructor(applicationContext: ApplicationContext) {
         this.applicationContext = applicationContext;
         this.network = new Network(applicationContext);
-        this.blockProvider = new BlocksProvider(applicationContext);
-        this.transactionsProvider = new TransactionsProvider(applicationContext);
-        this.slicesProvider = new SlicesProvider(applicationContext);
+        this.transactionsProvider = new TransactionsProvider(applicationContext, this);
+        this.slicesProvider = new SlicesProvider(applicationContext, this.transactionsProvider);
+        this.blockProvider = new BlocksProvider(applicationContext, this.slicesProvider, this.transactionsProvider);
     }
 
     async runCore() {
@@ -35,7 +35,7 @@ class Core implements Task {
 
                 const blockTree = await this.blockProvider.getBlockTree(chain);
 
-                const coreProvider = new CoreProvider(this.applicationContext, this.network, blockTree);
+                const coreProvider = new CoreProvider(this.applicationContext, this.network, blockTree, this.blockProvider, this.slicesProvider, this.transactionsProvider);
                 runChain = new PipelineChain(coreProvider);
 
                 await runChain.start();
@@ -117,11 +117,11 @@ class Core implements Task {
             }
         });
 
-        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx }) => {
+        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx, env?: EnvironmentContext }) => {
             const tx = new Tx(data.tx);
             const pipelineChain = this.runChains.get(tx.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.executeSimulation(tx);
+                return await pipelineChain.executeTransactionsTask.executeSimulation(tx, data.env);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
@@ -189,6 +189,7 @@ class Core implements Task {
                 throw new Error(`Node does not work with this chain`);
             }
         });
+        
         this.keepRun();
     }
 

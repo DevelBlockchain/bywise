@@ -12,9 +12,12 @@ export enum RoutingKeys {
     find_slice = 'find_slice',
     find_block = 'find_block',
     started_api = 'started_api',
+    set_transactions_to_execute = 'set_transactions_to_execute',
+    add_transactions_to_execute = 'add_transactions_to_execute',
 }
 
 export enum RequestKeys {
+    get_transactions_to_execute = 'get_transactions_to_execute',
     get_connected_nodes = 'get_connected_nodes',
     get_contract = 'get_contract',
     get_info_wallet = 'get_info_wallet',
@@ -52,6 +55,7 @@ export default class MessageQueue {
     private actions: { key: string, action: MessageListener }[] = [];
     private requestActions: { key: string, action: MessageListener }[] = [];
     private path: string;
+    private isRun = true;
 
     constructor(path: string) {
         this.path = path;
@@ -59,7 +63,7 @@ export default class MessageQueue {
             if (worker_threads.parentPort) {
                 MessageQueue.eventEmitter = worker_threads.parentPort;
                 MessageQueue.postMethod = (value: any) => {
-                    if (!worker_threads.parentPort) throw new Error(`O.o`);
+                    if (!worker_threads.parentPort) throw new Error(`Run to the hills!`);
                     worker_threads.parentPort.postMessage(value);
                 };
             } else {
@@ -149,7 +153,7 @@ export default class MessageQueue {
         }
         MessageQueue.postMethod(msg);
         const uptime = Date.now() + 30000;
-        while (uptime > Date.now()) {
+        while (uptime > Date.now() && this.isRun) {
             for (let i = 0; i < this.responses.length; i++) {
                 const rsp = this.responses[i];
                 if (rsp.request === request && rsp.isResponse) {
@@ -173,6 +177,7 @@ export default class MessageQueue {
         MessageQueue.postMethod = (value: any) => {};
         const nullVar: any = null;
         MessageQueue.eventEmitter = nullVar;
+        this.isRun = false;
     }
 
     addMessageListener(key: RoutingKeys, action: MessageListener) {

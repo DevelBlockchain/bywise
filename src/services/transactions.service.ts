@@ -1,35 +1,30 @@
-import { VirtualMachineProvider } from './virtual-machine.service';
-import { Tx, TxType, Wallet, SliceData } from '@bywise/web3';
-import { WalletProvider } from './wallet.service';
-import { ApplicationContext, SimulateDTO, TransactionOutputDTO, BlockchainStatus, BlockTree, CompiledContext, EnvironmentContext } from '../types';
+import { Tx, TxType, Wallet } from '@bywise/web3';
+import { ApplicationContext, BlockchainStatus, CompiledContext, TransactionsToExecute, Task, EnvironmentContext } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
 import { Transaction } from '../models';
+import helper from '../utils/helper';
 
 export class TransactionsProvider {
 
-  private virtualMachineProvider;
   private mq;
+  private task;
   private TransactionRepository;
-  private walletProvider;
+  private mainWallet;
+  private transactionsToExecute: Map<string, TransactionsToExecute> = new Map();
 
-  constructor(applicationContext: ApplicationContext) {
+  constructor(applicationContext: ApplicationContext, task: Task) {
+    this.task = task;
     this.TransactionRepository = applicationContext.database.TransactionRepository;
     this.mq = applicationContext.mq;
-    this.virtualMachineProvider = new VirtualMachineProvider(applicationContext);
-    this.walletProvider = new WalletProvider(applicationContext);
-  }
+    this.mainWallet = applicationContext.mainWallet;
 
-  createContext(blockTree: BlockTree, contextHash: CompiledContext, blockHeight: number) {
-    const envContext = new EnvironmentContext(blockTree, blockHeight, contextHash);
-    return new SimulateDTO(envContext);
-  }
-
-  async disposeContext(ctx: SimulateDTO) {
-    await ctx.envContext.dispose();
+    this.mq.addMessageListener(RoutingKeys.set_transactions_to_execute, async (data: TransactionsToExecute) => {
+      this.transactionsToExecute.set(data.id, data);
+    });
   }
 
   async createNewTransaction(chain: string, to: string, amount: string, fee: string, type: TxType, data: any = {}, foreignKeys?: string[]) {
-    let wallet = await this.walletProvider.getMainWallet();
+    let wallet = await this.mainWallet;
     let tx = new Tx();
     tx.version = '2';
     tx.chain = chain;
@@ -63,14 +58,32 @@ export class TransactionsProvider {
     return tx;
   }
 
-  async simulateTransaction(tx: Tx, slice: { from: string, transactionsData?: SliceData[] }, ctx: SimulateDTO): Promise<TransactionOutputDTO> {
-    ctx.output.error = undefined;
-    try {
-      await this.virtualMachineProvider.executeTransaction(tx, slice, ctx);
-    } catch (err: any) {
-      ctx.output.error = err.message;
+  async simulateTransactions(txs: Tx[], env: EnvironmentContext): Promise<TransactionsToExecute> {
+    if(!this.task.isRun) throw new Error(`task not run`);
+    let tte: TransactionsToExecute = {
+      id: helper.getRandomHash(),
+      env: env,
+      txs: txs,
+      outputs: [],
+      envOut: {
+        keys: [],
+        values: [],
+      }
     }
-    return ctx.output;
+    this.transactionsToExecute.set(tte.id, tte);
+    this.mq.send(RoutingKeys.add_transactions_to_execute, tte);
+
+    do {
+      const tteOutput = this.transactionsToExecute.get(tte.id);
+      if (tteOutput && tteOutput.outputs.length > 0) {
+        tte = tteOutput;
+        this.transactionsToExecute.delete(tte.id);
+      } else {
+        await helper.sleep(50);
+      }
+    } while (tte.outputs.length == 0 && this.task.isRun);
+
+    return tte;
   }
 
   async saveNewTransaction(tx: Tx) {

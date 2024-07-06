@@ -2,7 +2,6 @@ import { Wallet, BlockPack, Slice } from '@bywise/web3';
 import Bywise from '../bywise';
 import { ChainData, MinnerProvider } from '../services/minner.service';
 import helper from '../utils/helper';
-import { BlocksProvider, SlicesProvider } from '../services';
 
 const hash = '0000000000000000000000ff0000000000000000ff0000000000000000000000';
 const addrA = 'BWS1MU0000000000000000000000ff0000000000000000a25';
@@ -11,8 +10,6 @@ const wallet = new Wallet();
 var bywise: Bywise;
 var b0: BlockPack;
 var minnerProvider: MinnerProvider;
-var slicesProvider: SlicesProvider;
-var blocksProvider: BlocksProvider;
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 
 beforeAll(async () => {
@@ -27,11 +24,9 @@ beforeAll(async () => {
         initialNodes: [],
         zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: wallet.seed,
-        startServices: [],
+        startServices: ['vm'],
     });
     minnerProvider = new MinnerProvider();
-    slicesProvider = new SlicesProvider(bywise.applicationContext);
-    blocksProvider = new BlocksProvider(bywise.applicationContext);
 }, 30000)
 
 beforeEach(async () => {
@@ -133,7 +128,7 @@ describe('consensus algorithm', () => {
 
 describe('get slices', () => {
     test('consecutive slices', async () => {
-        let blockTree = await blocksProvider.setNewZeroBlock(b0);
+        let blockTree = await bywise.blockProvider.setNewZeroBlock(b0);
 
         let bestSlices = blockTree.getBestSlice(wallet.address, 1);
         expect(bestSlices.length).toEqual(0);
@@ -153,14 +148,14 @@ describe('get slices', () => {
             slice.end = i == 5;
             slice.hash = slice.toHash();
             slice.sign = await wallet.signHash(slice.hash);
-            const bslice = await slicesProvider.saveNewSlice(slice);
+            const bslice = await bywise.slicesProvider.saveNewSlice(slice);
             bslice.isComplete = true;
             bslice.isExecuted = true;
-            await slicesProvider.updateSlice(bslice);
+            await bywise.slicesProvider.updateSlice(bslice);
             slices.push(slice);
         }
 
-        blockTree = await blocksProvider.getBlockTree('local');
+        blockTree = await bywise.blockProvider.getBlockTree('local');
         bestSlices = blockTree.getBestSlice(wallet.address, 1);
 
         expect(bestSlices.length).toEqual(slices.length);
@@ -173,7 +168,7 @@ describe('get slices', () => {
     });
 
     test('consecutive slices - missing one', async () => {
-        let blockTree = await blocksProvider.setNewZeroBlock(b0);
+        let blockTree = await bywise.blockProvider.setNewZeroBlock(b0);
 
         let bestSlices = blockTree.getBestSlice(wallet.address, 1);
         expect(bestSlices.length).toEqual(0);
@@ -194,15 +189,15 @@ describe('get slices', () => {
             slice.hash = slice.toHash();
             slice.sign = await wallet.signHash(slice.hash);
             if (i !== 3) {
-                const bslice = await slicesProvider.saveNewSlice(slice);
+                const bslice = await bywise.slicesProvider.saveNewSlice(slice);
                 bslice.isComplete = true;
                 bslice.isExecuted = true;
-                await slicesProvider.updateSlice(bslice);
+                await bywise.slicesProvider.updateSlice(bslice);
             }
             slices.push(slice);
         }
 
-        blockTree = await blocksProvider.getBlockTree('local');
+        blockTree = await bywise.blockProvider.getBlockTree('local');
         bestSlices = blockTree.getBestSlice(wallet.address, 1);
 
         expect(bestSlices.length).toEqual(3);
@@ -215,7 +210,7 @@ describe('get slices', () => {
     });
 
     test('consecutive slices - with update', async () => {
-        let blockTree = await blocksProvider.setNewZeroBlock(b0);
+        let blockTree = await bywise.blockProvider.setNewZeroBlock(b0);
 
         // create first slices
         for (let i = 0; i <= 5; i++) {
@@ -232,10 +227,10 @@ describe('get slices', () => {
             slice.end = false;
             slice.hash = slice.toHash();
             slice.sign = await wallet.signHash(slice.hash);
-            const bslice = await slicesProvider.saveNewSlice(slice);
+            const bslice = await bywise.slicesProvider.saveNewSlice(slice);
             bslice.isComplete = true;
             bslice.isExecuted = true;
-            await slicesProvider.updateSlice(bslice);
+            await bywise.slicesProvider.updateSlice(bslice);
         }
 
         // update slices with more transactions
@@ -254,14 +249,14 @@ describe('get slices', () => {
             slice.end = i == 5;
             slice.hash = slice.toHash();
             slice.sign = await wallet.signHash(slice.hash);
-            const bslice = await slicesProvider.saveNewSlice(slice);
+            const bslice = await bywise.slicesProvider.saveNewSlice(slice);
             bslice.isComplete = true;
             bslice.isExecuted = true;
-            await slicesProvider.updateSlice(bslice);
+            await bywise.slicesProvider.updateSlice(bslice);
             slices.push(slice);
         }
 
-        blockTree = await blocksProvider.getBlockTree('local');
+        blockTree = await bywise.blockProvider.getBlockTree('local');
         const bestSlices = blockTree.getBestSlice(wallet.address, 1);
 
         expect(bestSlices.length).toEqual(slices.length);
@@ -277,10 +272,10 @@ describe('get slices', () => {
 describe('get blocktree', () => {
     test('check build blocktree', async () => {
         await expect(async () => {
-            await blocksProvider.getBlockTree('local');
+            await bywise.blockProvider.getBlockTree('local');
         }).rejects.toThrow('get first imutable block of local not found');
 
-        let blockTree = await blocksProvider.setNewZeroBlock(b0);
+        let blockTree = await bywise.blockProvider.setNewZeroBlock(b0);
 
         expect(blockTree.blockMap.size).toEqual(2);
         expect(blockTree.sliceMap.size).toEqual(1);

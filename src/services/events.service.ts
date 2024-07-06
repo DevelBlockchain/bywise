@@ -11,8 +11,12 @@ export class EventsProvider {
   }
 
   async saveEvents(envContext: EnvironmentContext, event: TransactionEvent) {
+    let indexStr = '0';
     let eventIntexString = await this.environmentProvider.get(envContext, `events-CI`);
-    let index = BigInt(eventIntexString ? eventIntexString : '0');
+    if(eventIntexString && eventIntexString.value) {
+      indexStr = eventIntexString.value;
+    }
+    let index = BigInt(indexStr);
     index++;
     await this.environmentProvider.set(envContext, `events-${event.contractAddress}-EE-${helper.stringToHash(event.eventName)}-${helper.numberToString(index.toString())}`, event.hash);
     for (let j = 0; j < event.entries.length; j++) {

@@ -1,21 +1,18 @@
 import { BlocksProvider, SlicesProvider, TransactionsProvider } from "../services";
-import { WalletProvider } from "../services/wallet.service";
-import { ApplicationContext } from "../types";
+import { ApplicationContext, Task } from "../types";
 
 export class ApiService {
     applicationContext;
     chains: string[];
-    walletProvider;
     blockProvider;
     slicesProvider;
     transactionsProvider;
 
-    constructor(applicationContext: ApplicationContext) {
+    constructor(applicationContext: ApplicationContext, task: Task) {
         this.applicationContext = applicationContext;
         this.chains = applicationContext.zeroBlocks.map(block => block.chain);
-        this.walletProvider = new WalletProvider(applicationContext);
-        this.blockProvider = new BlocksProvider(applicationContext);
-        this.slicesProvider = new SlicesProvider(applicationContext);
-        this.transactionsProvider = new TransactionsProvider(applicationContext);
+        this.transactionsProvider = new TransactionsProvider(applicationContext, task);
+        this.slicesProvider = new SlicesProvider(applicationContext, this.transactionsProvider);
+        this.blockProvider = new BlocksProvider(applicationContext, this.slicesProvider, this.transactionsProvider);
     }
 }

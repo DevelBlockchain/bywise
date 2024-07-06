@@ -34,7 +34,7 @@ class Api implements Task {
 
     constructor(applicationContext: ApplicationContext) {
         this.applicationContext = applicationContext;
-        this.apiCtx = new ApiService(applicationContext);
+        this.apiCtx = new ApiService(applicationContext, this);
         this.app = express();
     }
 

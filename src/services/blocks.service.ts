@@ -20,13 +20,13 @@ export class BlocksProvider {
   private SliceRepository;
   private VotesRepository;
 
-  constructor(applicationContext: ApplicationContext) {
+  constructor(applicationContext: ApplicationContext, slicesProvider: SlicesProvider, transactionsProvider: TransactionsProvider) {
     this.applicationContext = applicationContext;
     this.mq = applicationContext.mq;
     this.environmentProvider = new EnvironmentProvider(applicationContext);
     this.minnerProvider = new MinnerProvider();
-    this.slicesProvider = new SlicesProvider(applicationContext);
-    this.transactionsProvider = new TransactionsProvider(applicationContext);
+    this.slicesProvider = slicesProvider;
+    this.transactionsProvider = transactionsProvider;
     this.BlockRepository = applicationContext.database.BlockRepository;
     this.SliceRepository = applicationContext.database.SliceRepository;
     this.VotesRepository = applicationContext.database.VotesRepository;
@@ -356,7 +356,7 @@ export class BlocksProvider {
       const slice = blockPack.slices[i];
       let sliceInfo = await this.slicesProvider.saveNewSlice(slice);
       sliceInfo = await this.slicesProvider.syncSliceByHash(blockTree, slice.hash);
-      await this.slicesProvider.executeCompleteSlice(blockTree, lastContextHash, sliceInfo);
+      await this.slicesProvider.executeCompleteSlice(blockTree, lastContextHash, slice.blockHeight, sliceInfo);
 
       await this.environmentProvider.mergeContext(blockTree.chain, slice.hash, CompiledContext.SLICE_CONTEXT_HASH);
       await this.environmentProvider.setLastConsolidatedContextHash(blockTree, slice.hash, CompiledContext.SLICE_CONTEXT_HASH);

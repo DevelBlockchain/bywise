@@ -2,7 +2,7 @@ import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
 import { Tx } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { BlockchainStatus, TransactionOutputDTO, TransactionsDTO } from '../types';
+import { BlockchainStatus, TransactionOutputDTO, TransactionsDTO, TransactionsToExecute } from '../types';
 import { Transaction } from '../models';
 import { RequestKeys } from '../datasource/message-queue';
 import { ApiService } from '../services';
@@ -219,9 +219,9 @@ export default async function transactionsController(app: express.Express, apiPr
         try {
             if (!apiProvider.chains.includes(tx.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
             tx.fee = '0';
-            const output = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
+            const tte:TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
 
-            return res.send(output);
+            return res.send(tte.outputs[0]);
         } catch (err: any) {
             return res.status(400).send({ error: err.message });
         }
@@ -290,7 +290,7 @@ export default async function transactionsController(app: express.Express, apiPr
             if (body.token !== process.env.TOKEN) return res.status(400).send({ error: `Forbidden - invalid token` });
             if (!apiProvider.chains.includes(body.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
-            const mainWallet = await apiProvider.walletProvider.getMainWallet();
+            const mainWallet = await apiProvider.applicationContext.mainWallet;
             const tx = new Tx();
             tx.version = '2';
             tx.chain = body.chain;
