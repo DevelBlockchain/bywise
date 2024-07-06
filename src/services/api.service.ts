@@ -8,11 +8,11 @@ export class ApiService {
     slicesProvider;
     transactionsProvider;
 
-    constructor(applicationContext: ApplicationContext, task: Task) {
+    constructor(applicationContext: ApplicationContext, transactionsProvider: TransactionsProvider, slicesProvider: SlicesProvider, blockProvider: BlocksProvider) {
         this.applicationContext = applicationContext;
-        this.chains = applicationContext.zeroBlocks.map(block => block.chain);
-        this.transactionsProvider = new TransactionsProvider(applicationContext, task);
-        this.slicesProvider = new SlicesProvider(applicationContext, this.transactionsProvider);
-        this.blockProvider = new BlocksProvider(applicationContext, this.slicesProvider, this.transactionsProvider);
+        this.chains = applicationContext.chains;
+        this.transactionsProvider = transactionsProvider;
+        this.slicesProvider = slicesProvider;
+        this.blockProvider = blockProvider;
     }
 }

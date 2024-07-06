@@ -99,7 +99,7 @@ export default class ExecuteTransactions {
         };
     }
 
-    async executeSimulation(tx: Tx, env?: EnvironmentContext) {
+    async executeSimulation(tx: Tx, env?: EnvironmentContext, ignoreBalance?: boolean) {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
@@ -107,11 +107,10 @@ export default class ExecuteTransactions {
             this.busy = false;
             throw new Error('currentContext not found')
         }
-        tx.fee = '1000000000';
         if(!env) {
             env = currentContext.env
         }
-        const tte = await this.coreProvider.transactionsProvider.simulateTransactions([tx], env);
+        const tte = await this.coreProvider.transactionsProvider.simulateTransactions([tx], env, ignoreBalance);
 
         this.busy = false;
         return tte;

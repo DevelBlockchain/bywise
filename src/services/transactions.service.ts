@@ -58,12 +58,13 @@ export class TransactionsProvider {
     return tx;
   }
 
-  async simulateTransactions(txs: Tx[], env: EnvironmentContext): Promise<TransactionsToExecute> {
+  async simulateTransactions(txs: Tx[], env: EnvironmentContext, ignoreBalance: boolean = false): Promise<TransactionsToExecute> {
     if(!this.task.isRun) throw new Error(`task not run`);
     let tte: TransactionsToExecute = {
       id: helper.getRandomHash(),
       env: env,
       txs: txs,
+      ignoreBalance: ignoreBalance,
       outputs: [],
       envOut: {
         keys: [],

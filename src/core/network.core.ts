@@ -21,7 +21,7 @@ export default class Network implements Task {
             myHost: this.applicationContext.myHost,
             debug: false,
             createConnection: () => this.nodeProvider.createMyNode(),
-            getChains: async () => this.applicationContext.zeroBlocks.map(block => block.chain)
+            getChains: async () => this.applicationContext.chains
         });
     }
 

@@ -207,7 +207,7 @@ export default class PipelineChain implements Task {
 
     async start() {
         this.isRun = true;
-        this.coreProvider.applicationContext.logger.verbose(`watch ${this.coreProvider.chain} chain`)
+        this.coreProvider.applicationContext.logger.info(`#### START CHAIN ${this.coreProvider.chain}`)
         await this.runPipeline();
     }
 

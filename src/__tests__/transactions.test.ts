@@ -3,7 +3,7 @@ import { BlockPack, BywiseHelper, Tx, TxType, Wallet } from '@bywise/web3';
 import Bywise from '../bywise';
 import { ConfigProvider, EnvironmentProvider } from '../services';
 import helper from '../utils/helper';
-import { CompiledContext, ChainConfig } from '../types';
+import { CompiledContext, ChainConfig, EnvironmentContext } from '../types';
 
 var bywise: Bywise;
 var environmentProvider: EnvironmentProvider;
@@ -13,7 +13,7 @@ const chain = 'local';
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 const wallet = new Wallet();
 
-const DEAFAUT_MAIN_ENV = {
+const DEAFAUT_MAIN_ENV: EnvironmentContext = {
     chain,
     fromContextHash: CompiledContext.MAIN_CONTEXT_HASH,
     blockHeight: 1,

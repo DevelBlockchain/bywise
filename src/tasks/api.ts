@@ -23,6 +23,7 @@ import errorMiddleware from '../middlewares/error.middleware';
 import walletsController from '../controllers/wallets.controller';
 import { RoutingKeys } from '../datasource/message-queue';
 import { ApiService } from '../services/api.service';
+import { BlocksProvider, SlicesProvider, TransactionsProvider } from '../services';
 
 class Api implements Task {
 
@@ -34,7 +35,10 @@ class Api implements Task {
 
     constructor(applicationContext: ApplicationContext) {
         this.applicationContext = applicationContext;
-        this.apiCtx = new ApiService(applicationContext, this);
+        const transactionsProvider = new TransactionsProvider(applicationContext, this);
+        const slicesProvider = new SlicesProvider(applicationContext, transactionsProvider);
+        const blockProvider = new BlocksProvider(applicationContext, slicesProvider, transactionsProvider);
+        this.apiCtx = new ApiService(applicationContext, transactionsProvider, slicesProvider, blockProvider);
         this.app = express();
     }
 

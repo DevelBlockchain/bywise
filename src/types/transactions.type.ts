@@ -179,6 +179,7 @@ export type WalletCodeDTO = {
 
 export type TransactionsToExecute = {
   id: string;
+  ignoreBalance: boolean;
   error?: string;
   env: EnvironmentContext;
   txs: Tx[];

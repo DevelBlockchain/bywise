@@ -219,7 +219,7 @@ export default async function transactionsController(app: express.Express, apiPr
         try {
             if (!apiProvider.chains.includes(tx.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
             tx.fee = '0';
-            const tte:TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
+            const tte:TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, ignoreBalance: true });
 
             return res.send(tte.outputs[0]);
         } catch (err: any) {

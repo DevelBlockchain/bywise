@@ -3,7 +3,7 @@ import { ApplicationContext, CommandDTO, ConfigDTO, Task, TransactionOutputDTO, 
 import { TxType, BywiseHelper, Tx } from '@bywise/web3';
 import { ConfigProvider } from "./configs.service";
 import { WalletProvider } from "./wallet.service";
-import { Environment, Votes } from "../models";
+import { Votes } from "../models";
 import { EnvironmentProvider } from "./environment.service";
 import { BywiseRuntimeInstance } from "../vm/BywiseRuntimeInstance";
 import helper from "../utils/helper";
@@ -67,7 +67,7 @@ export class VirtualMachineProvider {
 
       let output = new TransactionOutputDTO();
       try {
-        output = await this.executeTransaction(tx, ctx);
+        output = await this.executeTransaction(tx, ctx, tte.ignoreBalance);
         if (!output.error) {
           for (let j = 0; j < output.changes.walletAddress.length; j++) {
             const address = output.changes.walletAddress[j];
@@ -97,7 +97,7 @@ export class VirtualMachineProvider {
               await this.walletProvider.setWalletBalance(ctx, walletDTO);
             }
           }
-          if (debit.isGreaterThan(new BigNumber(0))) {
+          if (!tte.ignoreBalance && debit.isGreaterThan(new BigNumber(0))) {
             output.error = `Insuficient funds`;
           }
         }
@@ -123,7 +123,7 @@ export class VirtualMachineProvider {
     tte.outputs = outputs;
   }
 
-  private async executeTransaction(tx: Tx, ctx: RuntimeContext): Promise<TransactionOutputDTO> {
+  private async executeTransaction(tx: Tx, ctx: RuntimeContext, ignoreBalance: boolean): Promise<TransactionOutputDTO> {
     const output = new TransactionOutputDTO();
     ctx.tx = tx;
     ctx.cost = 0;
@@ -222,7 +222,7 @@ export class VirtualMachineProvider {
     if (ctx.tx.type === TxType.TX_COMMAND || ctx.tx.type === TxType.TX_BLOCKCHAIN_COMMAND) {
       feeUsed = "0";
     }
-    if ((new BigNumber(ctx.tx.fee).isLessThan(new BigNumber(feeUsed)))) {
+    if (!ignoreBalance && (new BigNumber(ctx.tx.fee).isLessThan(new BigNumber(feeUsed)))) {
       throw new Error(`Invalid fee`);
     }
     debit = debit.plus(new BigNumber(feeUsed));

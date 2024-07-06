@@ -3,7 +3,7 @@ import winston from "winston";
 import Database from "../datasource/database";
 import MessageQueue from "../datasource/message-queue";
 
-export type BywiseStartServices = 'api' | 'core' | 'network' | 'vm'
+export type BywiseStartServices = 'api' | 'core' | 'network' | 'vm' | 'vm_worker'
 
 export type BywiseStartNodeConfig = {
     name: string;
@@ -29,7 +29,7 @@ export type ApplicationContext = {
     port: number;
     https?: { cert: string, key: string };
     initialNodes: string[];
-    zeroBlocks: Block[];
+    chains: string[];
     nodeLimit: number;
     keyJWT: string;
     mainWallet: Wallet;

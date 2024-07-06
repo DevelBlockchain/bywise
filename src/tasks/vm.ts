@@ -6,16 +6,17 @@ import { RequestKeys, RoutingKeys } from '../datasource/message-queue';
 class VM implements Task {
 
     public isRun = false;
-    private firstVM = false;
+    public isFirst = false;
     private applicationContext;
     private mq;
+    private logger;
     private virtualMachineProvider;
     private transactionsToExecute: TransactionsToExecute[] = [];
 
-    constructor(applicationContext: ApplicationContext, firstVM: boolean) {
+    constructor(applicationContext: ApplicationContext) {
         this.applicationContext = applicationContext;
-        this.firstVM = firstVM;
         this.mq = applicationContext.mq;
+        this.logger = applicationContext.logger;
         this.virtualMachineProvider = new VirtualMachineProvider(applicationContext, this);
     }
 
@@ -24,11 +25,14 @@ class VM implements Task {
             const tte: TransactionsToExecute | null = await this.mq.request(RequestKeys.get_transactions_to_execute);
 
             if (tte) {
+                let uptime = Date.now();
                 await this.virtualMachineProvider.executeTransactions(tte);
+                uptime = Date.now() - uptime;
+                this.logger.debug(`VM ${this.mq.getThreadId()} - executed ${tte.txs.length} in ${uptime} ms - TPS ${(tte.txs.length/(uptime/1000)).toFixed(2)}`);
                 await this.mq.send(RoutingKeys.set_transactions_to_execute, tte);
+            } else {
+                await helper.sleep(50);
             }
-
-            await helper.sleep(50);
         }
     }
 
@@ -38,7 +42,7 @@ class VM implements Task {
             return;
         }
         this.isRun = true;
-        if (this.firstVM) {
+        if (this.isFirst) {
             this.transactionsToExecute = [];
             this.applicationContext.mq.addRequestListener(RequestKeys.get_transactions_to_execute, async () => {
                 return this.transactionsToExecute.pop();

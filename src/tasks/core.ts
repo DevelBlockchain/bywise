@@ -28,11 +28,10 @@ class Core implements Task {
     }
 
     async runCore() {
-        for (let i = 0; i < this.applicationContext.zeroBlocks.length; i++) {
-            const chain = this.applicationContext.zeroBlocks[i].chain;
+        for (let i = 0; i < this.applicationContext.chains.length; i++) {
+            const chain = this.applicationContext.chains[i];
             let runChain = this.runChains.get(chain);
             if (runChain === undefined) {
-
                 const blockTree = await this.blockProvider.getBlockTree(chain);
 
                 const coreProvider = new CoreProvider(this.applicationContext, this.network, blockTree, this.blockProvider, this.slicesProvider, this.transactionsProvider);
@@ -60,7 +59,7 @@ class Core implements Task {
     }
 
     async start() {
-        if(this.isRun) {
+        if (this.isRun) {
             this.applicationContext.logger.error("CORE already started!");
             return;
         }
@@ -117,11 +116,11 @@ class Core implements Task {
             }
         });
 
-        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx, env?: EnvironmentContext }) => {
+        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx, env?: EnvironmentContext, ignoreBalance?: boolean }) => {
             const tx = new Tx(data.tx);
             const pipelineChain = this.runChains.get(tx.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.executeSimulation(tx, data.env);
+                return await pipelineChain.executeTransactionsTask.executeSimulation(tx, data.env, data.ignoreBalance);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
@@ -189,7 +188,7 @@ class Core implements Task {
                 throw new Error(`Node does not work with this chain`);
             }
         });
-        
+
         this.keepRun();
     }
 

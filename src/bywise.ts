@@ -22,7 +22,7 @@ export default class Bywise {
             port: bywiseStartNodeConfig.port,
             https: bywiseStartNodeConfig.https,
             nodeLimit,
-            zeroBlocks: [],
+            chains: [],
             keyJWT: bywiseStartNodeConfig.keyJWT,
             mainWallet: mainWallet,
             myHost: bywiseStartNodeConfig.myHost,
@@ -35,24 +35,22 @@ export default class Bywise {
             await database.drop();
         }
 
-        const vms = [];
-        let firstVM: VM | null = null;
-        for (let i = 0; i < bywiseStartNodeConfig.startServices.length; i++) {
-            const service = bywiseStartNodeConfig.startServices[i];
-            if (service === 'vm') {
-                const vm: VM = new VM(applicationContext, firstVM == null);
-                logger.info(`#### START VM-${vms.length}`);
-                await vm.start();
-                vms.push(vm);
-                firstVM = vm;
-            }
+        const vm = new VM(applicationContext);
+        if (bywiseStartNodeConfig.startServices.includes('vm_worker')) {
+            logger.info(`#### START VM WORKER`)
+            vm.isFirst = false;
+            await vm.start();
+        } else if (bywiseStartNodeConfig.startServices.includes('vm')) {
+            logger.info(`#### START VM`);
+            vm.isFirst = true;
+            await vm.start();
         }
 
         if (bywiseStartNodeConfig.zeroBlocks.length > 0) {
-            if (!firstVM) throw new Error('VM is necessary to configure chain');
-            const transactionsProvider = new TransactionsProvider(applicationContext, firstVM);
+            const transactionsProvider = new TransactionsProvider(applicationContext, vm);
             const slicesProvider = new SlicesProvider(applicationContext, transactionsProvider);
             const blockProvider = new BlocksProvider(applicationContext, slicesProvider, transactionsProvider);
+
             for (let i = 0; i < bywiseStartNodeConfig.zeroBlocks.length; i++) {
                 const zeroBlockJson: any = JSON.parse(bywiseStartNodeConfig.zeroBlocks[i]);
                 const zeroBlock: BlockPack = {
@@ -63,9 +61,10 @@ export default class Bywise {
                 logger.info(`#### CONFIGURE CHAIN "${zeroBlock.block.chain}"`);
                 await blockProvider.setNewZeroBlock(zeroBlock);
             }
-            const zeroBlocks = await database.BlockRepository.findZeroBlocks();
-            applicationContext.zeroBlocks = zeroBlocks.map(block => block.block);
         }
+
+        const zeroBlocks = await database.BlockRepository.findZeroBlocks();
+        applicationContext.chains = zeroBlocks.map(blockInfo => blockInfo.block.chain);
 
         const api = new Api(applicationContext);
         const core = new Core(applicationContext);
@@ -84,29 +83,33 @@ export default class Bywise {
         }
 
         logger.info(`#### DONE`)
-        return new Bywise(applicationContext, api, core, vms);
+        return new Bywise(applicationContext, api, core, vm);
     }
 
-    private constructor(applicationContext: ApplicationContext, api: Api, core: Core, vms: VM[]) {
+    private constructor(applicationContext: ApplicationContext, api: Api, core: Core, vm: VM) {
         this.applicationContext = applicationContext;
         this.api = api;
         this.core = core;
-        this.vm = vms[0];
-        this.vms = vms;
-        if(this.vm) {
+        this.vm = vm;
+        if (this.vm.isRun) {
             this.transactionsProvider = new TransactionsProvider(applicationContext, this.vm);
+            this.slicesProvider = new SlicesProvider(applicationContext, this.transactionsProvider);
+            this.blockProvider = new BlocksProvider(applicationContext, this.slicesProvider, this.transactionsProvider);
+        } else if (this.api.isRun) {
+            this.transactionsProvider = new TransactionsProvider(applicationContext, this.api);
+            this.slicesProvider = new SlicesProvider(applicationContext, this.transactionsProvider);
+            this.blockProvider = new BlocksProvider(applicationContext, this.slicesProvider, this.transactionsProvider);
         } else {
             this.transactionsProvider = new TransactionsProvider(applicationContext, this.core);
+            this.slicesProvider = new SlicesProvider(applicationContext, this.transactionsProvider);
+            this.blockProvider = new BlocksProvider(applicationContext, this.slicesProvider, this.transactionsProvider);
         }
-        this.slicesProvider = new SlicesProvider(applicationContext, this.transactionsProvider);
-        this.blockProvider = new BlocksProvider(applicationContext, this.slicesProvider, this.transactionsProvider);
     }
 
     applicationContext: ApplicationContext;
     api: Api;
     core: Core;
     vm: VM;
-    vms: VM[];
     transactionsProvider;
     slicesProvider;
     blockProvider;
@@ -114,10 +117,7 @@ export default class Bywise {
     stop = async () => {
         await this.api.stop();
         await this.core.stop();
-        for (let i = 0; i < this.vms.length; i++) {
-            const vm = this.vms[i];
-            await vm.stop();
-        }
+        await this.vm.stop();
         await this.core.network.stop();
         await this.applicationContext.mq.stop();
         await helper.sleep(300);

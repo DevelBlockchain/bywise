@@ -22,7 +22,7 @@ export class NodesProvider {
     let token = await this.authProvider.createNodeToken(EXPIRE);
     let account = await this.mainWallet;
     let myNode = new BywiseNode({
-      chains: this.applicationContext.zeroBlocks.map(block => block.chain),
+      chains: this.applicationContext.chains,
       address: account.address,
       host: this.applicationContext.myHost,
       version: pjson.version,
@@ -38,7 +38,7 @@ export class NodesProvider {
       host: this.applicationContext.myHost,
       version: pjson.version,
       timestamp: helper.getNow(),
-      chains: this.applicationContext.zeroBlocks.map(block => block.chain),
+      chains: this.applicationContext.chains,
       explorers: [],
       nodes: connectedNodes,
     }

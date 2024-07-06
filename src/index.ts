@@ -212,7 +212,7 @@ const main = async () => {
                     initialNodes: [],
                     zeroBlocks: zeroBlocks,
                     mainWalletSeed: wallet,
-                    startServices: [],
+                    startServices: ['vm'],
                 });
                 await b.stop();
             } else {
@@ -229,19 +229,73 @@ const main = async () => {
                 initialNodes: initialNodes,
                 zeroBlocks: [],
                 mainWalletSeed: wallet,
-                startServices: ['core', 'network'],
+                startServices: [],
             });
             await newBywiseWorker(true, {
                 name: name,
                 port: port,
                 keyJWT: keyJWT,
-                https: https ? { cert, key } : undefined,
                 isLog: isLog,
                 myHost: host,
                 initialNodes: initialNodes,
                 zeroBlocks: [],
                 mainWalletSeed: wallet,
-                startServices: ['api'],
+                startServices: ['vm'],
+            });
+            await newBywiseWorker(true, {
+                name: name,
+                port: port,
+                keyJWT: keyJWT,
+                isLog: isLog,
+                myHost: host,
+                initialNodes: initialNodes,
+                zeroBlocks: [],
+                mainWalletSeed: wallet,
+                startServices: ["vm_worker"],
+            });
+            await newBywiseWorker(true, {
+                name: name,
+                port: port,
+                keyJWT: keyJWT,
+                isLog: isLog,
+                myHost: host,
+                initialNodes: initialNodes,
+                zeroBlocks: [],
+                mainWalletSeed: wallet,
+                startServices: ["vm_worker"],
+            });
+            await newBywiseWorker(true, {
+                name: name,
+                port: port,
+                keyJWT: keyJWT,
+                isLog: isLog,
+                myHost: host,
+                initialNodes: initialNodes,
+                zeroBlocks: [],
+                mainWalletSeed: wallet,
+                startServices: ["vm_worker"],
+            });
+            await newBywiseWorker(true, {
+                name: name,
+                port: port,
+                keyJWT: keyJWT,
+                isLog: isLog,
+                myHost: host,
+                initialNodes: initialNodes,
+                zeroBlocks: [],
+                mainWalletSeed: wallet,
+                startServices: ["vm_worker"],
+            });
+            await newBywiseWorker(true, {
+                name: name,
+                port: port,
+                keyJWT: keyJWT,
+                isLog: isLog,
+                myHost: host,
+                initialNodes: initialNodes,
+                zeroBlocks: [],
+                mainWalletSeed: wallet,
+                startServices: ['api', 'core', 'network'],
             });
         }
         if (getCmd('-start-debug')) {
@@ -254,7 +308,7 @@ const main = async () => {
                 initialNodes: initialNodes,
                 zeroBlocks: [],
                 mainWalletSeed: wallet,
-                startServices: ['core', 'api', 'network'],
+                startServices: ['core', 'api', 'network', 'vm'],
             });
         }
     } catch (err: any) {
