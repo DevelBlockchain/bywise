@@ -1,8 +1,8 @@
-import { TransactionEvent, TransactionEventEntry } from '../types';
 import helper from '../utils/helper';
 import { RuntimeContext } from './RuntimeContext';
 import { BywiseRuntimeInstance } from './BywiseRuntimeInstance';
 import BigNumber from 'bignumber.js';
+import { TransactionEvent, TransactionEventEntry } from '@bywise/web3';
 
 export type BlockchainAction = {
     action: ((vm: BywiseRuntimeInstance, ctx: RuntimeContext, ...parans: any[]) => Promise<string>),

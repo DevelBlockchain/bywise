@@ -1,4 +1,4 @@
-import { ApplicationContext, BlockTree, EnvironmentContext, Task } from '../types';
+import { ApplicationContext, BlockchainStatus, BlockTree, EnvironmentContext, Task } from '../types';
 import { BlocksProvider, SlicesProvider, TransactionsProvider } from '../services';
 import helper from '../utils/helper';
 import PipelineChain from '../core/pipeline-chain.core';
@@ -81,7 +81,7 @@ class Core implements Task {
         });
         this.applicationContext.mq.addMessageListener(RoutingKeys.find_tx, async (message: any) => {
             if (this.network.web3.network.isConnected) {
-                const findedTx = await this.network.web3.transactions.getTransactionByHash(message);
+                const findedTx = await this.network.web3.transactions.getTransactionByHash(message) as any;
                 if (findedTx) {
                     try {
                         await this.transactionsProvider.saveNewTransaction(new Tx(findedTx));
@@ -116,11 +116,19 @@ class Core implements Task {
             }
         });
 
-        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx, env?: EnvironmentContext, ignoreBalance?: boolean }) => {
+        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx, fromSlice: string, env?: EnvironmentContext, ignoreBalance?: boolean }) => {
             const tx = new Tx(data.tx);
             const pipelineChain = this.runChains.get(tx.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.executeSimulation(tx, data.env, data.ignoreBalance);
+                const txInfo = {
+                    tx: tx,
+                    isExecuted: false,
+                    slicesHash: '',
+                    blockHash: '',
+                    create: Date.now(),
+                    status: BlockchainStatus.TX_MEMPOOL
+                  }
+                return await pipelineChain.executeTransactionsTask.executeSimulation(txInfo, data.env, data.ignoreBalance);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }

@@ -1,8 +1,8 @@
-import { Block, Slice, SliceData, Tx, TxType } from "@bywise/web3";
-import { BlockchainStatus, BlockTree, CompiledContext, TransactionOutputDTO } from "../types";
+import { Block, EnvironmentChanges, Slice, SliceData, Tx, TxOutput, TxType } from "@bywise/web3";
+import { BlockchainStatus, BlockTree, CompiledContext } from "../types";
 import helper from "../utils/helper";
 import PipelineChain from "./pipeline-chain.core";
-import { Slices } from "../models";
+import { Slices, Transaction } from "../models";
 import { CoreProvider } from "../services";
 
 const TIME_LIMIT_SLICE = 5000;
@@ -80,7 +80,7 @@ export default class MintSlices {
             return;
         }
 
-        let newTransactions: Tx[] = [];
+        let newTransactions: Transaction[] = [];
         let transactionsData: SliceData[] = [];
         const env = {
             chain: this.coreProvider.blockTree.chain,
@@ -112,7 +112,7 @@ export default class MintSlices {
             tx.sign = [await mainWallet.signHash(tx.hash)];
             const txInfo = await this.coreProvider.transactionsProvider.saveNewTransaction(tx);
             transactions.set(txInfo.tx.hash, true);
-            newTransactions.push(txInfo.tx);
+            newTransactions.push(txInfo);
         }
 
         const uptime = new Date().getTime();
@@ -128,11 +128,29 @@ export default class MintSlices {
                     if (txInfo.tx.created < currentTime / 1000 - 60) {
                         this.coreProvider.applicationContext.logger.verbose(`mint slice - ignore transaction by time ${txInfo.tx.created} < ${currentTime / 1000 - 60}`);
                         txInfo.status = BlockchainStatus.TX_FAILED;
-                        txInfo.output = new TransactionOutputDTO();
-                        txInfo.output.error = 'TIMEOUT';
+                        txInfo.output = {
+                            error: 'TIMEOUT',
+                            feeUsed: '0',
+                            fee: '0',
+                            cost: 0,
+                            size: 0,
+                            fromSlice: lastSliceHash,
+                            debit: '0',
+                            logs: [],
+                            events: [],
+                            changes: {
+                                get: [],
+                                walletAddress: [],
+                                walletAmount: [],
+                                envOut: {
+                                    keys: [],
+                                    values: [],
+                                },
+                            },
+                        };
                         await this.coreProvider.transactionsProvider.updateTransaction(txInfo);
                     } else {
-                        newTransactions.push(txInfo.tx);
+                        newTransactions.push(txInfo);
                     }
                 }
                 if (!this.pipelineChain.isRun) return;
@@ -160,31 +178,33 @@ export default class MintSlices {
                 tx.sign = [await mainWallet.signHash(tx.hash)];
                 const txInfo = await this.coreProvider.transactionsProvider.saveNewTransaction(tx);
                 transactions.set(txInfo.tx.hash, true);
-                newTransactions.push(tx);
+                newTransactions.push(txInfo);
                 end = true;
                 this.coreProvider.applicationContext.logger.verbose(`mint slice - mint by END`);
             }
         }
         if (newTransactions.length > 0) {
-            const tte = await this.transactionsProvider.simulateTransactions(newTransactions, env);
+            const tte = await this.transactionsProvider.simulateTransactions(newTransactions, lastSliceHash, env);
             const newTransactionsHash: string[] = [];
+            const outputs: TxOutput[] = [];
             for (let i = 0; i < tte.outputs.length; i++) {
-                const tx = tte.txs[i];
+                const txInfo = tte.txs[i];
                 const output = tte.outputs[i];
                 if (!output.error) {
-                    newTransactionsHash.push(tx.hash);
+                    newTransactionsHash.push(txInfo.tx.hash);
+                    outputs.push(output);
                 } else {
-                    const txInfo = await this.transactionsProvider.getTxInfo(tx.hash);
-                    txInfo.status = BlockchainStatus.TX_FAILED;
-                    txInfo.output = output;
-                    await this.coreProvider.transactionsProvider.updateTransaction(txInfo);
+                    const txInfoUpdated = await this.transactionsProvider.getTxInfo(txInfo.tx.hash);
+                    txInfoUpdated.status = BlockchainStatus.TX_FAILED;
+                    txInfoUpdated.output = output;
+                    await this.coreProvider.transactionsProvider.updateTransaction(txInfoUpdated);
                 }
             }
             if (newTransactionsHash.length > 0) {
                 lastSliceHeight++;
                 await this.environmentProvider.push(tte.envOut, env.chain, CompiledContext.SLICE_MINT_CONTEXT_HASH);
                 const sliceInfo = await this.mintSlice(lastSliceHeight, newTransactionsHash, transactionsData, currentMinnedBlock, end);
-                //await this.saveExecutedSlices(sliceInfo, outputs, ctx);
+                await this.saveExecutedSlices(sliceInfo, tte.envOut, outputs);
             }
         }
     }
@@ -231,12 +251,12 @@ export default class MintSlices {
         this.coreProvider.blockTree.addSlice(slice);
         return bslice;
     }
-    /*
-    private async saveExecutedSlices(sliceInfo: Slices, outputs: TransactionOutputDTO[]) {
+
+    private async saveExecutedSlices(sliceInfo: Slices, changes: EnvironmentChanges, outputs: TxOutput[]) {
         sliceInfo.isExecuted = true;
         sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
         sliceInfo.outputs = outputs;
-        await this.environmentProvider.push(ctx.envContext, sliceInfo.slice.hash);
+        await this.environmentProvider.push(changes, sliceInfo.slice.chain, sliceInfo.slice.hash);
         for (let j = 0; j < sliceInfo.slice.transactions.length; j++) {
             const txHash = sliceInfo.slice.transactions[j];
             let txInfo = await this.transactionsProvider.getTxInfo(txHash);
@@ -247,5 +267,4 @@ export default class MintSlices {
         await this.coreProvider.slicesProvider.updateSlice(sliceInfo);
         this.coreProvider.blockTree.bestSlice = sliceInfo.slice;
     }
-    */
 }

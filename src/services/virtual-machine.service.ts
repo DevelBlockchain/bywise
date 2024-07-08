@@ -1,50 +1,21 @@
 import BigNumber from "bignumber.js";
-import { ApplicationContext, CommandDTO, ConfigDTO, Task, TransactionOutputDTO, TransactionsToExecute, WalletBalanceDTO } from '../types';
-import { TxType, BywiseHelper, Tx } from '@bywise/web3';
+import { ApplicationContext, CommandDTO, ConfigDTO, Task, TransactionsToExecute, WalletBalanceDTO } from '../types';
+import { TxType, BywiseHelper, Tx, TxOutput } from '@bywise/web3';
 import { ConfigProvider } from "./configs.service";
 import { WalletProvider } from "./wallet.service";
 import { Votes } from "../models";
 import { EnvironmentProvider } from "./environment.service";
 import { BywiseRuntimeInstance } from "../vm/BywiseRuntimeInstance";
-import helper from "../utils/helper";
 import { RuntimeContext } from "../vm/RuntimeContext";
 
-const INSTANCES_SIZE = 5;
-
-type VMInstance = {
-  vm: BywiseRuntimeInstance,
-  busy: boolean
-}
-
 export class VirtualMachineProvider {
-
-  private instances: VMInstance[] = [];
-  private getInstance = async () => {
-    if (this.instances.length == 0) {
-      for (let i = 0; i < INSTANCES_SIZE; i++) {
-        this.instances.push({
-          busy: false,
-          vm: new BywiseRuntimeInstance()
-        })
-      }
-    }
-    while (true) {
-      for (let i = 0; i < this.instances.length; i++) {
-        const instance = this.instances[i];
-        if (!instance.busy) {
-          instance.busy = true;
-          return instance;
-        }
-      }
-      await helper.sleep(100);
-    }
-  }
 
   private environmentProvider;
   private configsProvider;
   private walletProvider;
   private applicationContext;
   private task;
+  private vm;
 
   constructor(applicationContext: ApplicationContext, task: Task) {
     this.applicationContext = applicationContext;
@@ -52,6 +23,7 @@ export class VirtualMachineProvider {
     this.environmentProvider = new EnvironmentProvider(applicationContext);
     this.configsProvider = new ConfigProvider();
     this.walletProvider = new WalletProvider();
+    this.vm = new BywiseRuntimeInstance();
   }
 
   async executeTransactions(tte: TransactionsToExecute): Promise<void> {
@@ -62,12 +34,56 @@ export class VirtualMachineProvider {
     tte.envOut.values = [];
     for (let i = 0; i < tte.txs.length; i++) {
       if (!this.task.isRun) return;
-      
-      const tx = tte.txs[i];
 
-      let output = new TransactionOutputDTO();
+      const txInfo = tte.txs[i];
+      const tx = txInfo.tx;
+
+      let output: TxOutput = {
+        feeUsed: '0',
+        fee: '0',
+        cost: 0,
+        size: 0,
+        fromSlice: tte.fromSlice,
+        debit: '0',
+        logs: [],
+        events: [],
+        changes: {
+          get: [],
+          walletAddress: [],
+          walletAmount: [],
+          envOut: {
+            keys: [],
+            values: [],
+          },
+        },
+      };
       try {
-        output = await this.executeTransaction(tx, ctx, tte.ignoreBalance);
+        if (txInfo.output && txInfo.slicesHash === tte.fromSlice) {
+          output = txInfo.output;
+          let changedKey = null;
+          for (let i = 0; i < output.changes.get.length; i++) {
+            const key = output.changes.get[i];
+            if (ctx.setMainKeys.has(key)) {
+              changedKey = key;
+            }
+          }
+          if (changedKey) {
+            output.error = `Environment changed - "${changedKey}"`;
+          } else {
+            for (let i = 0; i < output.changes.envOut.keys.length; i++) {
+              const key = output.changes.envOut.keys[i];
+              const value = output.changes.envOut.values[i];
+              ctx.setStageKeys.set(key, {
+                chain: ctx.env.chain,
+                hash: ctx.env.fromContextHash,
+                key: key,
+                value: value,
+              })
+            }
+          }
+        } else {
+          await this.executeTransaction(tx, ctx, tte.ignoreBalance, output);
+        }
         if (!output.error) {
           for (let j = 0; j < output.changes.walletAddress.length; j++) {
             const address = output.changes.walletAddress[j];
@@ -102,7 +118,7 @@ export class VirtualMachineProvider {
           }
         }
       } catch (err: any) {
-        if(err.message && typeof err.message == 'string') {
+        if (err.message && typeof err.message == 'string') {
           output.error = err.message;
         } else {
           output.error = `Error: ${JSON.stringify(err)}`
@@ -123,10 +139,11 @@ export class VirtualMachineProvider {
     tte.outputs = outputs;
   }
 
-  private async executeTransaction(tx: Tx, ctx: RuntimeContext, ignoreBalance: boolean): Promise<TransactionOutputDTO> {
-    const output = new TransactionOutputDTO();
+  private async executeTransaction(tx: Tx, ctx: RuntimeContext, ignoreBalance: boolean, output: TxOutput): Promise<void> {
     ctx.tx = tx;
     ctx.cost = 0;
+    ctx.logs = [];
+    ctx.events = [];
     ctx.balances = new Map();
 
     const feeCostType = parseInt((await this.configsProvider.getByName(ctx, 'feeCostType')).value);
@@ -153,15 +170,13 @@ export class VirtualMachineProvider {
 
       ctx.sender = ctx.tx.from[0];
       ctx.amount = contractAmount.toString();
-      const instance = await this.getInstance();
-      const result = await instance.vm.deploy(ctx, contractAddress, code);
-      instance.busy = false;
+      const result = await this.vm.deploy(ctx, contractAddress, code);
 
-      if(result.error) {
+      if (result.error) {
         output.cost = ctx.cost;
         output.error = result.error;
         output.stack = result.stack;
-        return output;
+        return;
       }
       await this.walletProvider.setWalletCode(ctx, {
         address: contractAddress,
@@ -180,19 +195,16 @@ export class VirtualMachineProvider {
         const amount = ctx.tx.amount[i];
 
         if (BywiseHelper.isContractAddress(contractAddress)) {
-          const instance = await this.getInstance();
-
           ctx.sender = ctx.tx.from[0];
           ctx.amount = amount;
-          const contract = await instance.vm.getContract(ctx, amount, contractAddress, ctx.tx.data[i].method, ctx.tx.data[i].inputs);
-          const result = await instance.vm.exec(ctx, contract.wc, contract.exeCode);
-          instance.busy = false;
+          const contract = await this.vm.getContract(ctx, amount, contractAddress, ctx.tx.data[i].method, ctx.tx.data[i].inputs);
+          const result = await this.vm.exec(ctx, contract.wc, contract.exeCode);
 
-          if(result.error) {
+          if (result.error) {
             output.cost = ctx.cost;
             output.error = result.error;
             output.stack = result.stack;
-            return output;
+            return;
           }
           ctx.output = result.result;
         }
@@ -236,7 +248,7 @@ export class VirtualMachineProvider {
     output.events = ctx.events;
     output.output = ctx.output;
     ctx.setChanges(output.changes);
-    return output;
+    return;
   }
 
   private async calcFee(ctx: RuntimeContext, size: BigNumber, amount: BigNumber, cost: BigNumber): Promise<string> {

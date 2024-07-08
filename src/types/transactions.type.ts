@@ -1,6 +1,7 @@
-import { TxType, Tx } from '@bywise/web3';
+import { TxType, Tx, EnvironmentChanges, TxOutput } from '@bywise/web3';
 import BigNumber from "bignumber.js";
-import { EnvironmentChanges, EnvironmentContext } from './environment.types';
+import { Transaction } from '../models';
+import { EnvironmentContext } from './environment.types';
 
 export enum BlockchainStatus {
   TX_MEMPOOL = 'mempool',
@@ -21,7 +22,7 @@ export type TxSimpleModelDTO = {
 export class TransactionsDTO {
   tx: Tx;
   status: string;
-  output?: TransactionOutputDTO;
+  output?: TxOutput;
   slicesHash?: string;
   blockHash?: string;
 
@@ -70,59 +71,6 @@ export type ValueBooleanDTO = {
 
 export type VariableDTO = {
   value: any;
-}
-
-export type TransactionEventEntry = {
-  key: string;
-  value: string;
-}
-
-export type TransactionEvent = {
-  contractAddress: string;
-  eventName: string;
-  entries: TransactionEventEntry[];
-  hash: string;
-}
-
-export type TransactionChanges = {
-  get: string[];
-  walletAddress: string[];
-  walletAmount: string[];
-  envOut: EnvironmentChanges
-}
-
-export class TransactionOutputDTO {
-  cost: number;
-  size: number;
-  fee: string;
-  feeUsed: string;
-  debit: string;
-  logs: string[];
-  events: TransactionEvent[];
-  error?: string;
-  stack?: string;
-  output: any;
-  changes: TransactionChanges;
-
-  constructor() {
-    this.cost = 0;
-    this.size = 0;
-    this.fee = '';
-    this.feeUsed = '';
-    this.debit = '';
-    this.logs = [];
-    this.events = [];
-    this.output = '';
-    this.changes = {
-      get: [],
-      walletAddress: [],
-      walletAmount: [],
-      envOut: {
-        keys: [],
-        values: [],
-      }
-    };
-  }
 }
 
 export class CommandDTO {
@@ -181,8 +129,9 @@ export type TransactionsToExecute = {
   id: string;
   ignoreBalance: boolean;
   error?: string;
+  fromSlice: string;
   env: EnvironmentContext;
-  txs: Tx[];
-  outputs: TransactionOutputDTO[];
+  txs: Transaction[];
+  outputs: TxOutput[];
   envOut: EnvironmentChanges;
 }

@@ -1,5 +1,6 @@
+import { EnvironmentChanges } from "@bywise/web3";
 import { Environment } from "../models";
-import { ApplicationContext, BlockTree, CompiledContext, EnvironmentChanges, EnvironmentContext } from "../types";
+import { ApplicationContext, BlockTree, CompiledContext, EnvironmentContext } from "../types";
 
 const ENV_BATCH = 1000;
 

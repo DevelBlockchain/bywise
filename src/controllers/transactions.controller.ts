@@ -1,8 +1,8 @@
 import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
-import { Tx } from '@bywise/web3';
+import { Tx, TxOutput } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { BlockchainStatus, TransactionOutputDTO, TransactionsDTO, TransactionsToExecute } from '../types';
+import { BlockchainStatus, TransactionsDTO, TransactionsToExecute } from '../types';
 import { Transaction } from '../models';
 import { RequestKeys } from '../datasource/message-queue';
 import { ApiService } from '../services';
@@ -218,9 +218,7 @@ export default async function transactionsController(app: express.Express, apiPr
         const tx = new Tx(req.body);
         try {
             if (!apiProvider.chains.includes(tx.chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-            tx.fee = '0';
-            const tte:TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, ignoreBalance: true });
-
+            const tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, ignoreBalance: true });
             return res.send(tte.outputs[0]);
         } catch (err: any) {
             return res.status(400).send({ error: err.message });
@@ -303,7 +301,7 @@ export default async function transactionsController(app: express.Express, apiPr
             tx.foreignKeys = body.foreignKeys;
             tx.created = Math.floor(Date.now() / 1000);
 
-            let output: TransactionOutputDTO = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
+            let output: TxOutput = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
 
             tx.fee = output.feeUsed;
             tx.hash = tx.toHash();

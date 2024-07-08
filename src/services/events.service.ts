@@ -1,4 +1,5 @@
-import { ApplicationContext, TransactionEvent, EnvironmentContext } from '../types';
+import { TransactionEvent } from '@bywise/web3';
+import { ApplicationContext, EnvironmentContext } from '../types';
 import helper from '../utils/helper';
 import { EnvironmentProvider } from './environment.service';
 

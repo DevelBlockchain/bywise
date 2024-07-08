@@ -1,5 +1,5 @@
 import { Tx, TxType, Wallet } from '@bywise/web3';
-import { ApplicationContext, BlockchainStatus, CompiledContext, TransactionsToExecute, Task, EnvironmentContext } from '../types';
+import { ApplicationContext, BlockchainStatus, TransactionsToExecute, Task, EnvironmentContext } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
 import { Transaction } from '../models';
 import helper from '../utils/helper';
@@ -58,12 +58,13 @@ export class TransactionsProvider {
     return tx;
   }
 
-  async simulateTransactions(txs: Tx[], env: EnvironmentContext, ignoreBalance: boolean = false): Promise<TransactionsToExecute> {
-    if(!this.task.isRun) throw new Error(`task not run`);
+  async simulateTransactions(txs: Transaction[], fromSlice: string, env: EnvironmentContext, ignoreBalance: boolean = false): Promise<TransactionsToExecute> {
+    if (!this.task.isRun) throw new Error(`task not run`);
     let tte: TransactionsToExecute = {
       id: helper.getRandomHash(),
       env: env,
       txs: txs,
+      fromSlice: fromSlice,
       ignoreBalance: ignoreBalance,
       outputs: [],
       envOut: {

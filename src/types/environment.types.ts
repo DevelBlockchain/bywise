@@ -1,4 +1,4 @@
-import { Block, Slice } from "@bywise/web3";
+import { Block, EnvironmentChanges, Slice } from "@bywise/web3";
 
 export type NodeBlockTree = {
     hash: string,
@@ -221,11 +221,6 @@ export enum CompiledContext {
     SLICE_CONTEXT_HASH = 'slice_context',
     SLICE_MINT_CONTEXT_HASH = 'slice_mint_context',
     SIMULATE_CONTEXT_HASH = 'simulate_context',
-}
-
-export type EnvironmentChanges = {
-    keys: string[];
-    values: (string | null)[];
 }
 
 export type EnvironmentContext = {

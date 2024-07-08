@@ -4,6 +4,7 @@ import helper from "../utils/helper";
 import BigNumber from "bignumber.js";
 import { ConfigProvider, CoreProvider, WalletProvider } from "../services";
 import { RuntimeContext } from "../vm/RuntimeContext";
+import { Transaction } from "../models";
 
 const EVENT_PAGE_SIZE = 100;
 
@@ -99,7 +100,7 @@ export default class ExecuteTransactions {
         };
     }
 
-    async executeSimulation(tx: Tx, env?: EnvironmentContext, ignoreBalance?: boolean) {
+    async executeSimulation(tx: Transaction, env?: EnvironmentContext, ignoreBalance?: boolean) {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
@@ -110,7 +111,7 @@ export default class ExecuteTransactions {
         if(!env) {
             env = currentContext.env
         }
-        const tte = await this.coreProvider.transactionsProvider.simulateTransactions([tx], env, ignoreBalance);
+        const tte = await this.coreProvider.transactionsProvider.simulateTransactions([tx], this.currentHash, env, ignoreBalance);
 
         this.busy = false;
         return tte;

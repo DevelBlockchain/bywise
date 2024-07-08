@@ -3,13 +3,14 @@ import { BlockPack, BywiseHelper, Tx, TxType, Wallet } from '@bywise/web3';
 import Bywise from '../bywise';
 import { ConfigProvider, EnvironmentProvider } from '../services';
 import helper from '../utils/helper';
-import { CompiledContext, ChainConfig, EnvironmentContext } from '../types';
+import { CompiledContext, ChainConfig, EnvironmentContext, BlockchainStatus } from '../types';
 
 var bywise: Bywise;
 var environmentProvider: EnvironmentProvider;
 var b0: BlockPack;
 
 const chain = 'local';
+var fromSlice = '';
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 const wallet = new Wallet();
 
@@ -27,6 +28,15 @@ const ERCCode = fs.readFileSync('./assets/ERC20.js', 'utf8');
 const ERCCodeV2 = fs.readFileSync('./assets/ERC20_v2.js', 'utf8');
 const ERCCodeTestContract = fs.readFileSync('./assets/test_contract.js', 'utf8');
 
+const convertoToTxInfo = (txs: Tx[]) => txs.map(tx => ({
+    tx: tx,
+    isExecuted: false,
+    slicesHash: '',
+    blockHash: '',
+    create: Date.now(),
+    status: BlockchainStatus.TX_MEMPOOL
+}))
+
 beforeAll(async () => {
     const nodeWallet = new Wallet();
     b0 = await helper.createNewBlockZero(chain, nodeWallet, [
@@ -37,6 +47,7 @@ beforeAll(async () => {
         ChainConfig.addValidator(nodeWallet.address),
         ChainConfig.setBalance(nodeWallet.address, ConfigProvider.MIN_BWS_VALUE),
     ]);
+    fromSlice = b0.slices[0].hash;
     bywise = await Bywise.newBywiseInstance({
         name: `test${port0}`,
         port: port0,
@@ -78,7 +89,7 @@ describe('basic tests', () => {
         const blockTree = await bywise.blockProvider.getBlockTree(chain);
         const currentMinnedBlock = blockTree.currentMinnedBlock;
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -112,7 +123,7 @@ describe('basic tests', () => {
         );
         tx.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -184,7 +195,7 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
@@ -252,7 +263,7 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
@@ -337,7 +348,7 @@ describe('basic tests', () => {
         );
         tx3.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual("Insuficient funds");
         expect(tte.txs.length).toEqual(3);
         expect(tte.outputs.length).toEqual(3);
@@ -410,7 +421,7 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
@@ -476,7 +487,7 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual("Insuficient funds");
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
@@ -562,7 +573,7 @@ describe('set configs', () => {
         );
         tx3.isValid();
 
-        let tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3], { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        let tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(3);
         expect(tte.outputs.length).toEqual(3);
@@ -627,7 +638,7 @@ describe('set configs', () => {
         tx1.isValid();
 
         blockHeight++; // next block
-        tte = await bywise.transactionsProvider.simulateTransactions([tx1], { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -643,7 +654,7 @@ describe('set configs', () => {
         });
 
         blockHeight += 10; // wait 10 blocks
-        tte = await bywise.transactionsProvider.simulateTransactions([tx1], { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -659,7 +670,7 @@ describe('set configs', () => {
         });
 
         blockHeight += 100; // wait 100 blocks
-        tte = await bywise.transactionsProvider.simulateTransactions([tx1], { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -706,7 +717,7 @@ describe('contracts', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs[1].output).toEqual("SimpleToken");
     }, 3000);
@@ -797,7 +808,7 @@ describe('contracts', () => {
         );
         tx5.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3, tx4, tx5], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3, tx4, tx5]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.outputs.length).toEqual(5);
         expect(tte.outputs[0].error).toEqual(undefined);
         expect(tte.outputs[1].error).toEqual(undefined);
@@ -850,7 +861,7 @@ describe('contracts', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(2);
         expect(tte.outputs[1].events).toEqual([{
@@ -891,7 +902,7 @@ describe('contracts', () => {
             [{ method: "hardwork", inputs: ['100'] }]
         );
         tx2.isValid();
-        let tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], DEAFAUT_MAIN_ENV);
+        let tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.outputs.length).toEqual(2);
         expect(tte.outputs[0].error).toEqual(undefined);
         expect(tte.outputs[0].cost).toEqual(30);
@@ -909,7 +920,7 @@ describe('contracts', () => {
             [{ method: "hardwork", inputs: ['1000'] }]
         );
         tx2.isValid();
-        tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], DEAFAUT_MAIN_ENV);
+        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.outputs.length).toEqual(2);
         expect(tte.outputs[0].error).toEqual(undefined);
         expect(tte.outputs[0].cost).toEqual(30);
@@ -927,13 +938,13 @@ describe('contracts', () => {
             [{ method: "infinty", inputs: [] }]
         );
         tx2.isValid();
-        tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], DEAFAUT_MAIN_ENV);
+        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.outputs.length).toEqual(2);
         expect(tte.outputs[0].error).toEqual(undefined);
         expect(tte.outputs[0].cost).toEqual(30);
         expect(typeof tte.outputs[1].error).toEqual("string");
         expect(tte.outputs[1].error).toEqual("interrupted");
-        expect(tte.outputs[1].output).toEqual("");
+        expect(tte.outputs[1].output).toEqual(undefined);
         expect(tte.outputs[1].cost).toEqual(1026);
     }, 3000);
 
@@ -1003,7 +1014,7 @@ describe('contracts', () => {
         tx4.hash = tx2.toHash();
         tx4.sign.push(await wallet.signHash(tx2.hash));
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3, tx4], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3, tx4]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.outputs.length).toEqual(4);
         expect(tte.outputs[0].error).toEqual(undefined);
         expect(tte.outputs[1].error).toEqual(undefined);
@@ -1113,7 +1124,7 @@ describe('contracts', () => {
         tx6.hash = tx2.toHash();
         tx6.sign.push(await wallet.signHash(tx2.hash));
 
-        const tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3, tx4, tx5, tx6], DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3, tx4, tx5, tx6]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.outputs.length).toEqual(6);
         expect(tte.outputs[0].error).toEqual(undefined);
         expect(tte.outputs[1].error).toEqual(undefined);
@@ -1174,7 +1185,7 @@ describe('contracts', () => {
         );
         tx2.isValid();
 
-        let tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], {
+        let tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, {
             chain,
             fromContextHash: CompiledContext.MAIN_CONTEXT_HASH,
             blockHeight: blockHeight,
@@ -1218,7 +1229,7 @@ describe('contracts', () => {
         tx2.isValid();
 
         blockHeight++; // next block
-        tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(2);
         expect(tte.outputs[0].cost).toEqual(30);
@@ -1231,7 +1242,7 @@ describe('contracts', () => {
         expect(tte.outputs[1].feeUsed).toEqual("0");
 
         blockHeight += 10; // wait 10 blocks
-        tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(2);
         expect(tte.outputs[0].cost).toEqual(30);
@@ -1244,7 +1255,7 @@ describe('contracts', () => {
         expect(tte.outputs[1].feeUsed).toEqual("0");
 
         blockHeight += 100; // wait 100 blocks
-        tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(2);
         expect(tte.outputs[0].cost).toEqual(30);
@@ -1303,7 +1314,7 @@ describe('contracts', () => {
         );
         tx3.isValid();
 
-        let tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3], DEAFAUT_MAIN_ENV);
+        let tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3]), fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(3);
         expect(tte.outputs[0].changes).toEqual({
@@ -1485,7 +1496,7 @@ describe('stress testing', () => {
         }
 
         let uptime = new Date().getTime();
-        const tte = await bywise.transactionsProvider.simulateTransactions(txs, DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo(txs), fromSlice, DEAFAUT_MAIN_ENV);
         uptime = (new Date().getTime() - uptime) / 1000;
 
         expect(tte.error).toEqual(undefined);
@@ -1537,7 +1548,7 @@ describe('stress testing', () => {
         txs.push(tx);
 
         let uptime = new Date().getTime();
-        const tte = await bywise.transactionsProvider.simulateTransactions(txs, DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo(txs), fromSlice, DEAFAUT_MAIN_ENV);
         uptime = (new Date().getTime() - uptime) / 1000;
 
         expect(tte.error).toEqual(undefined);
@@ -1590,7 +1601,7 @@ describe('stress testing', () => {
         txs.push(tx);
 
         let uptime = new Date().getTime();
-        const tte = await bywise.transactionsProvider.simulateTransactions(txs, DEAFAUT_MAIN_ENV);
+        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo(txs), fromSlice, DEAFAUT_MAIN_ENV);
         uptime = (new Date().getTime() - uptime) / 1000;
 
         expect(tte.error).toEqual(undefined);

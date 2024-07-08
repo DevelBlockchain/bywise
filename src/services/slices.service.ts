@@ -1,7 +1,7 @@
 import { Slice, Tx } from '@bywise/web3';
 import { ApplicationContext, BlockTree, BlockchainStatus, CompiledContext } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
-import { Slices } from '../models';
+import { Slices, Transaction } from '../models';
 import { TransactionsProvider } from './transactions.service';
 import { EnvironmentProvider } from './environment.service';
 
@@ -81,11 +81,11 @@ export class SlicesProvider {
     let error = false;
     try {
       sliceInfo.outputs = [];
-      const txs: Tx[] = [];
+      const txs: Transaction[] = [];
       for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
         const txHash = sliceInfo.slice.transactions[j];
         let txInfo = await this.transactionsProvider.getTxInfo(txHash);
-        txs.push(txInfo.tx);
+        txs.push(txInfo);
       }
       const env = {
         chain: blockTree.chain,
@@ -96,7 +96,7 @@ export class SlicesProvider {
           values: [],
         }
       }
-      const tte = await this.transactionsProvider.simulateTransactions(txs, env);
+      const tte = await this.transactionsProvider.simulateTransactions(txs, lastContextHash, env);
       sliceInfo.outputs = tte.outputs;
       for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
         const txHash = sliceInfo.slice.transactions[j];

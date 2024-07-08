@@ -45,7 +45,6 @@ afterAll(async () => {
 }, 2000)
 
 describe('simple transactions', () => {
-
     test('send transaction', async () => {
         let tx = new Tx();
         tx.version = '2';

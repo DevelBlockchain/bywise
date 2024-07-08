@@ -81,8 +81,12 @@ const main = async () => {
         let https = false;
         let key = '';
         let cert = '';
+        let keyJWT = helper.getRandomString();
         if (process.env.SEED) {
             wallet = process.env.SEED;
+        }
+        if (process.env.TOKEN) {
+            keyJWT = process.env.TOKEN;
         }
         if (process.env.KEY_PATH) {
             key = process.env.KEY_PATH;
@@ -108,7 +112,6 @@ const main = async () => {
                 wallet = process.env.SEED2
             }
         }
-        const keyJWT = helper.getRandomString();
         let name = 'bywise-node';
         let port = 3000;
         let isLog = false;

@@ -1,5 +1,5 @@
 import { CoreProvider } from "../services";
-import { BlockchainStatus, TransactionOutputDTO } from "../types";
+import { BlockchainStatus } from "../types";
 import helper from "../utils/helper";
 
 export default class InvalideteOldTransactions {
@@ -23,8 +23,26 @@ export default class InvalideteOldTransactions {
             const tx = oldTxs[i];
             if (tx.tx.created < now - 240) {
                 tx.status = BlockchainStatus.TX_FAILED;
-                tx.output = new TransactionOutputDTO();
-                tx.output.error = 'TIMEOUT';
+                tx.output = {
+                    error: 'TIMEOUT',
+                    feeUsed: '0',
+                    fee: '0',
+                    cost: 0,
+                    size: 0,
+                    fromSlice: '',
+                    debit: '0',
+                    logs: [],
+                    events: [],
+                    changes: {
+                        get: [],
+                        walletAddress: [],
+                        walletAmount: [],
+                        envOut: {
+                            keys: [],
+                            values: [],
+                        },
+                    },
+                };
                 await this.coreProvider.transactionsProvider.updateTransaction(tx);
             }
         }

@@ -1,6 +1,6 @@
-import { BywiseHelper, Tx } from "@bywise/web3";
+import { BywiseHelper, TransactionChanges, TransactionEvent, Tx } from "@bywise/web3";
 import { Environment } from "../models";
-import { EnvironmentContext, TransactionChanges, TransactionEvent } from "../types";
+import { EnvironmentContext } from "../types";
 import BigNumber from "bignumber.js";
 import { EnvironmentProvider } from "../services";
 
