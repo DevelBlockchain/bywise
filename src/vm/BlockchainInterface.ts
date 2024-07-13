@@ -11,7 +11,7 @@ export type BlockchainAction = {
 
 export default class BlockchainInterface {
 
-    static readonly MAX_VALUE_LENGTH = 1000000;
+    static readonly MAX_VALUE_LENGTH = 10000;
     static readonly MAX_INDEX_LENGTH = 20;
 
     getUUID = async (ctx: RuntimeContext) => {

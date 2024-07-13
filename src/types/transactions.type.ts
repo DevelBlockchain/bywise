@@ -1,6 +1,4 @@
 import { TxType, Tx, EnvironmentChanges, TxOutput } from '@bywise/web3';
-import BigNumber from "bignumber.js";
-import { Transaction } from '../models';
 import { EnvironmentContext } from './environment.types';
 
 export enum BlockchainStatus {
@@ -114,7 +112,7 @@ export type WalletInfoDTO = {
 
 export type WalletBalanceDTO = {
   address: string;
-  balance: BigNumber;
+  balance: bigint;
 }
 
 export type WalletCodeDTO = {
@@ -127,11 +125,22 @@ export type WalletCodeDTO = {
 
 export type TransactionsToExecute = {
   id: string;
+  vmIndex: number;
   ignoreBalance: boolean;
   error?: string;
   fromSlice: string;
   env: EnvironmentContext;
-  txs: Transaction[];
+  txs: Tx[];
   outputs: TxOutput[];
   envOut: EnvironmentChanges;
+}
+
+export type MempoolTx = {
+  tx: Tx,
+  status: string,
+  isExecuted: boolean,
+  output?: TxOutput,
+  slicesHash: string,
+  blockHash: string,
+  received: number,
 }

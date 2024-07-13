@@ -21,6 +21,8 @@ export default class Bywise {
             database,
             port: bywiseStartNodeConfig.port,
             https: bywiseStartNodeConfig.https,
+            vmSize: bywiseStartNodeConfig.vmSize,
+            vmIndex: bywiseStartNodeConfig.vmIndex,
             nodeLimit,
             chains: [],
             keyJWT: bywiseStartNodeConfig.keyJWT,
@@ -36,13 +38,8 @@ export default class Bywise {
         }
 
         const vm = new VM(applicationContext);
-        if (bywiseStartNodeConfig.startServices.includes('vm_worker')) {
-            logger.info(`#### START VM WORKER`)
-            vm.isFirst = false;
-            await vm.start();
-        } else if (bywiseStartNodeConfig.startServices.includes('vm')) {
+        if (bywiseStartNodeConfig.startServices.includes('vm')) {
             logger.info(`#### START VM`);
-            vm.isFirst = true;
             await vm.start();
         }
 

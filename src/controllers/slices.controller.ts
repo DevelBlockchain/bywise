@@ -152,12 +152,7 @@ export default async function slicesController(app: express.Express, apiProvider
     router.get('/slices/transactions/:hash', async (req: express.Request, res: express.Response) => {
         const bslice = await SliceRepository.findByHash(req.params.hash);
         if (!bslice) return res.status(404).send({ error: "Slice not found" });
-        const btxs = await apiProvider.transactionsProvider.getTransactions(bslice.slice.transactions);
-        const txs: Tx[] = [];
-        for (let i = 0; i < btxs.length; i++) {
-            const btx = btxs[i];
-            txs.push(new Tx(btx.tx));
-        }
+        const txs = await apiProvider.transactionsProvider.getTransactions(bslice.slice.transactions);
         return res.send(txs);
     });
 

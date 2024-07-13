@@ -1,9 +1,10 @@
 import { Block } from "@bywise/web3";
+import { Task } from "../types";
 import { Blocks, Votes } from "../models";
 import helper from "../utils/helper";
 import { CoreProvider } from "../services";
 
-export default class ConsensusAlgorithm {
+export default class ConsensusAlgorithm implements Task {
     public isRun = true;
     private coreProvider;
     private BlockRepository;
@@ -13,14 +14,20 @@ export default class ConsensusAlgorithm {
         this.BlockRepository = coreProvider.applicationContext.database.BlockRepository;
     }
 
-    async run() {
-        const blockTime = this.coreProvider.blockTime;
-        const currentBlock = this.coreProvider.blockTree.currentMinnedBlock;
-
-        await this.selectNewBlock(blockTime, currentBlock);
+    async start() {
     }
 
-    private async selectNewBlock(blockTime: number, currentBlock: Block) {
+    async stop() {
+    }
+
+    async run() {
+        const blockTime = this.coreProvider.blockTime;
+        const currentBlock = this.coreProvider.currentBlock;
+
+        return await this.selectNewBlock(blockTime, currentBlock);
+    }
+
+    private async selectNewBlock(blockTime: number, currentBlock: Block): Promise<boolean> {
         let lastBlocks = await this.BlockRepository.findByChainAndGreaterHeight(currentBlock.chain, currentBlock.height);
         lastBlocks = lastBlocks.filter(info => (info.isExecuted));
 
@@ -65,7 +72,9 @@ export default class ConsensusAlgorithm {
 
         if (currentBlock.hash !== bestBlock.block.hash) {
             this.coreProvider.applicationContext.logger.info(`consensus - change current block ${bestBlock.block.height} - ${bestBlock.block.hash.substring(0, 10)}... by ${changeReason}`);
-            await this.coreProvider.blockProvider.selectMinedBlock(this.coreProvider.blockTree, bestBlock.block.hash);
+            await this.coreProvider.blockProvider.selectMinedBlock(this.coreProvider.chain, bestBlock.block.hash);
+            this.coreProvider.currentBlock = bestBlock.block;
+            return true;
         } else {
             if (nextBlocks.length > 0) {
                 if (helper.getNow() < currentBlock.created + blockTime) {
@@ -79,9 +88,12 @@ export default class ConsensusAlgorithm {
                     }
                 }
                 this.coreProvider.applicationContext.logger.info(`consensus - consolide block ${bestBlock.block.height} - ${bestBlock.block.lastHash.substring(0, 10)}... - votes: ${bestBlockByVotesMax} - options: ${currentBlocks.length} -> next block ${bestBlock.block.hash.substring(0, 10)}...`);
-                await this.coreProvider.blockProvider.selectMinedBlock(this.coreProvider.blockTree, bestBlock.block.hash);
+                await this.coreProvider.blockProvider.selectMinedBlock(this.coreProvider.chain, bestBlock.block.hash);
+                this.coreProvider.currentBlock = bestBlock.block;
+                return true;
             }
         }
+        return false;
     }
 
     private countChainVotes(hash: string, votes: Votes[]): number {

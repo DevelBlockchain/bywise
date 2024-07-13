@@ -23,13 +23,13 @@ beforeAll(async () => {
     b0 = await helper.createNewBlockZero(chain, node0Wallet, [
         ChainConfig.addAdmin(node0Wallet.address),
         ChainConfig.addValidator(node0Wallet.address),
-        ChainConfig.setBalance(node0Wallet.address, ConfigProvider.MIN_BWS_VALUE),
+        ChainConfig.addBalance(node0Wallet.address, ConfigProvider.MIN_BWS_VALUE),
         ChainConfig.addAdmin(node1Wallet.address),
         ChainConfig.addValidator(node1Wallet.address),
-        ChainConfig.setBalance(node1Wallet.address, ConfigProvider.MIN_BWS_VALUE),
+        ChainConfig.addBalance(node1Wallet.address, ConfigProvider.MIN_BWS_VALUE),
         ChainConfig.addAdmin(node2Wallet.address),
         ChainConfig.addValidator(node2Wallet.address),
-        ChainConfig.setBalance(node2Wallet.address, ConfigProvider.MIN_BWS_VALUE),
+        ChainConfig.addBalance(node2Wallet.address, ConfigProvider.MIN_BWS_VALUE),
         ChainConfig.setConfig('blockTime', `${blockDelay / 1000}`),
     ]);
 

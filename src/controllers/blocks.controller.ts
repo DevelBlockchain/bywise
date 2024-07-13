@@ -39,7 +39,7 @@ export default async function blocksController(app: express.Express, apiProvider
         }
         const chain = req.params.chain;
         if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-        const count = await BlockRepository.countBlocksByStatus(status, chain);
+        const count = await BlockRepository.countBlocksByStatus(chain, status);
         return res.send({ count });
     });
 
@@ -87,7 +87,7 @@ export default async function blocksController(app: express.Express, apiProvider
 
         const chain = req.params.chain;
         if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-        const blocks = await BlockRepository.findBlocksLastsByStatus(status, chain, limit, offset, order);
+        const blocks = await BlockRepository.findBlocksLastsByStatus(chain, status, limit, offset, order);
 
         return res.send(blocks.map(block => ({ ...(new Block(block.block)), status: block.status })));
     });

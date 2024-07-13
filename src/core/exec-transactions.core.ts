@@ -1,14 +1,14 @@
-import { Tx } from "@bywise/web3";
 import { CompiledContext, EnvironmentContext } from "../types";
 import helper from "../utils/helper";
-import BigNumber from "bignumber.js";
 import { ConfigProvider, CoreProvider, WalletProvider } from "../services";
 import { RuntimeContext } from "../vm/RuntimeContext";
-import { Transaction } from "../models";
+import { Tx } from "@bywise/web3";
+import { Task } from "../types";
 
 const EVENT_PAGE_SIZE = 100;
+const SIMULATE_BATCH = 500;
 
-export default class ExecuteTransactions {
+export default class ExecuteTransactions implements Task {
     public isRun = true;
     public busy = false;
     private coreProvider;
@@ -24,6 +24,12 @@ export default class ExecuteTransactions {
         this.configProvider = new ConfigProvider();
     }
 
+    async start() {
+    }
+
+    async stop() {
+    }
+
     private async waitBusy() {
         while (this.busy) {
             await helper.sleep(10);
@@ -32,25 +38,27 @@ export default class ExecuteTransactions {
     }
 
     async run() {
-        let currentHash = this.coreProvider.blockTree.getLastContextHash();
-
-        if (this.currentHash == currentHash) {
-            return;
-        }
-
-        this.currentHash = currentHash;
-        this.nextBlockHeight = this.coreProvider.blockTree.currentMinnedBlock.height + 1;
-
-        await this.updateContext();
+        await this.waitBusy();
+        const update = await this.updateContext();
+        this.busy = false;
+        return update;
     }
 
-    private async updateContext() {
-        await this.waitBusy();
+    private async updateContext(): Promise<boolean> {
+        const currentSlice = await this.coreProvider.blockProvider.getLastContext(this.coreProvider.chain);
+
+        if (this.currentHash == currentSlice.slice.hash) {
+            return false;
+        }
+
+        this.currentHash = currentSlice.slice.hash;
+        this.nextBlockHeight = this.coreProvider.currentBlock.height + 1;
+
         this.coreProvider.applicationContext.logger.verbose(`update main context - hash: ${this.currentHash.substring(0, 10)}...`);
 
-        await this.coreProvider.environmentProvider.consolide(this.coreProvider.blockTree, this.currentHash, CompiledContext.MAIN_CONTEXT_HASH);
+        await this.coreProvider.environmentProvider.compile(this.coreProvider.chain, this.currentHash, CompiledContext.MAIN_CONTEXT_HASH);
         this.currentContext = new RuntimeContext(this.coreProvider.environmentProvider, {
-            chain: this.coreProvider.blockTree.chain,
+            chain: this.coreProvider.chain,
             blockHeight: this.nextBlockHeight,
             fromContextHash: CompiledContext.MAIN_CONTEXT_HASH,
             changes: {
@@ -59,7 +67,7 @@ export default class ExecuteTransactions {
             }
         });
         await this.updateConfigs(this.currentContext);
-        this.busy = false;
+        return true;
     }
 
     async getContract(address: string) {
@@ -100,7 +108,7 @@ export default class ExecuteTransactions {
         };
     }
 
-    async executeSimulation(tx: Transaction, env?: EnvironmentContext, ignoreBalance?: boolean) {
+    async executeSimulation(tx: Tx, env?: EnvironmentContext, ignoreBalance?: boolean) {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
@@ -108,7 +116,7 @@ export default class ExecuteTransactions {
             this.busy = false;
             throw new Error('currentContext not found')
         }
-        if(!env) {
+        if (!env) {
             env = currentContext.env
         }
         const tte = await this.coreProvider.transactionsProvider.simulateTransactions([tx], this.currentHash, env, ignoreBalance);
@@ -172,7 +180,7 @@ export default class ExecuteTransactions {
         const isValidator = await this.configProvider.isValidator(ctx, mainWallet.address);
         const minValue = await this.configProvider.getByName(ctx, 'min-bws-block');
         const walletDTO = await this.walletProvider.getWalletBalance(ctx, mainWallet.address);
-        const hasMinimumBWSToMine = !walletDTO.balance.isLessThan(new BigNumber(minValue.value));
+        const hasMinimumBWSToMine = walletDTO.balance >= BigInt(minValue.value);
 
         this.coreProvider.blockTime = newBlockTime;
         this.coreProvider.isValidator = isValidator;

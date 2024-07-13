@@ -17,7 +17,6 @@ export enum RoutingKeys {
 }
 
 export enum RequestKeys {
-    get_transactions_to_execute = 'get_transactions_to_execute',
     get_connected_nodes = 'get_connected_nodes',
     get_contract = 'get_contract',
     get_info_wallet = 'get_info_wallet',
@@ -30,6 +29,7 @@ export enum RequestKeys {
     db_has = 'db_has',
     db_get = 'db_get',
     db_get_many = 'db_get_many',
+    db_get_all = 'db_get_all',
     db_find = 'db_find',
     db_count = 'db_count',
     db_del = 'db_del',

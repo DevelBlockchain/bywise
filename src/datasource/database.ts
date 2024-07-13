@@ -53,6 +53,9 @@ class DatabaseWorker {
         mq.addRequestListener(RequestKeys.db_get, async (key: string) => {
             return await this.get(key);
         });
+        mq.addRequestListener(RequestKeys.db_get_all, async (key: string) => {
+            return await this.getAll(key);
+        });
         mq.addRequestListener(RequestKeys.db_get_many, async (keys: string[]) => {
             return await this.getMany(keys);
         });
@@ -120,6 +123,10 @@ class DatabaseWorker {
             }
         }
         return values
+    }
+
+    async getAll(key: string): Promise<any[]> {
+        return await this.db.values({ gt: `${key}-`, lt: `${key}.`.normalize('NFKD') }).all();
     }
 
     async count(key: string): Promise<number> {
@@ -201,6 +208,9 @@ class Database {
     }
 
     async saveMany(arr: SaveRequest[]): Promise<void> {
+        if (arr.length == 0) {
+            return;
+        }
         return await this.mq.request(RequestKeys.db_save_many, arr);
     }
 
@@ -243,6 +253,10 @@ class Database {
 
     async count(key: string): Promise<number> {
         return await this.mq.request(RequestKeys.db_count, key);
+    }
+
+    async getAll(key: string): Promise<any> {
+        return await this.mq.request(RequestKeys.db_get_all, key);
     }
 
     async get(key: string): Promise<any> {

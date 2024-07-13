@@ -1,50 +1,52 @@
 import { CoreProvider } from "../services";
 import { BlockchainStatus } from "../types";
 import helper from "../utils/helper";
+import { Task } from "../types";
 
-export default class InvalideteOldTransactions {
+export default class InvalideteOldTransactions implements Task {
     public isRun = true;
     private coreProvider;
-    private lastUpdate = 0;
 
     constructor(coreProvider: CoreProvider) {
         this.coreProvider = coreProvider;
     }
 
+    async start() {
+    }
+
+    async stop() {
+    }
+
     async run() {
         const now = helper.getNow();
-        if (now < this.lastUpdate + 10) {
-            return;
-        }
-        this.lastUpdate = now;
-
         const oldTxs = await this.coreProvider.applicationContext.database.TransactionRepository.findByChainAndStatus(this.coreProvider.chain, BlockchainStatus.TX_MEMPOOL);
+        const transactions = []
         for (let i = 0; i < oldTxs.length; i++) {
-            const tx = oldTxs[i];
-            if (tx.tx.created < now - 240) {
-                tx.status = BlockchainStatus.TX_FAILED;
-                tx.output = {
+            const txInfo = oldTxs[i];
+            if (txInfo.received < now - 240) {
+                txInfo.status = BlockchainStatus.TX_FAILED;
+                txInfo.output = {
                     error: 'TIMEOUT',
                     feeUsed: '0',
-                    fee: '0',
                     cost: 0,
                     size: 0,
-                    fromSlice: '',
+                    ctx: '',
                     debit: '0',
                     logs: [],
                     events: [],
-                    changes: {
-                        get: [],
-                        walletAddress: [],
-                        walletAmount: [],
-                        envOut: {
-                            keys: [],
-                            values: [],
-                        },
+                    get: [],
+                    walletAddress: [],
+                    walletAmount: [],
+                    envs: {
+                        keys: [],
+                        values: [],
                     },
+                    output: undefined,
                 };
-                await this.coreProvider.transactionsProvider.updateTransaction(tx);
+                transactions.push(txInfo);
             }
         }
+        await this.coreProvider.transactionsProvider.updateTransactions(transactions);
+        return transactions.length > 0;
     }
 }

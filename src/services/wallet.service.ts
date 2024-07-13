@@ -26,12 +26,12 @@ export class WalletProvider {
     let walletDTO = await ctx.get(`${address}-WB`);
     if (walletDTO) {
       return {
-        balance: new BigNumber(walletDTO),
+        balance: BigInt(walletDTO),
         address: address
       };
     }
     return {
-      balance: new BigNumber(0),
+      balance: BigInt(0),
       address: address
     };
   }

@@ -7,6 +7,5 @@ export type Blocks = {
   distance: string,
   countTrys: number,
   isComplete: boolean,
-  isExecuted: boolean,
-  isImmutable: boolean,
+  isExecuted: boolean
 };

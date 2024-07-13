@@ -12,28 +12,16 @@ export class EnvironmentRepository {
     async saveMany(env: Environment[]) {
         let batch: SaveRequest[] = [];
         env.forEach(env => {
-            batch.push({ key: `${this.table}-${env.chain}-key-${env.key}-${env.hash}`, data: env });
             batch.push({ key: `${this.table}-${env.chain}-hash-${env.hash}-${env.key}`, data: env });
         })
         await this.db.saveMany(batch);
     }
 
-    async save(env: Environment) {
-        await this.db.saveMany([
-            { key: `${this.table}-${env.chain}-key-${env.key}-${env.hash}`, data: env },
-            { key: `${this.table}-${env.chain}-hash-${env.hash}-${env.key}`, data: env },
-        ])
+    async getByChainAndHash(chain: string, hash: string): Promise<Environment[]> {
+        return await this.db.getAll(`${this.table}-${chain}-hash-${hash}`);
     }
 
-    async findByChainAndKey(chain: string, key: string, limit: number, offset: number): Promise<Environment[]> {
-        return await this.db.find(`${this.table}-${chain}-key-${key}`, limit, offset);
-    }
-
-    async findByChainAndHash(chain: string, hash: string, limit: number, offset: number): Promise<Environment[]> {
-        return await this.db.find(`${this.table}-${chain}-hash-${hash}`, limit, offset);
-    }
-    
-    async findByChainAndHashAndKey(chain: string, hash: string, key: string, limit: number, offset: number): Promise<Environment[]> {
+    async findByChainAndHashAndKey(chain: string, hash: string, key: string , limit: number, offset: number): Promise<Environment[]> {
         return await this.db.find(`${this.table}-${chain}-hash-${hash}-${key}`, limit, offset);
     }
 
@@ -41,20 +29,15 @@ export class EnvironmentRepository {
         return await this.db.count(`${this.table}-${chain}-hash-${hash}`);
     }
 
-    async countByChainAndHashAndKey(chain: string, hash: string, key: string): Promise<number> {
+    async count(chain: string, hash: string, key: string): Promise<number> {
         return await this.db.count(`${this.table}-${chain}-hash-${hash}-${key}`);
     }
 
-    async get(chain: string, key: string, hash: string): Promise<Environment | null> {
-        return await this.db.get(`${this.table}-${chain}-key-${key}-${hash}`);
+    async get(chain: string, hash: string, key: string): Promise<Environment | null> {
+        return await this.db.get(`${this.table}-${chain}-hash-${hash}-${key}`);
     }
 
-    async delMany(envs: Environment[]): Promise<void> {
-        const keys: string[] = [];
-        envs.forEach(env => {
-            keys.push(`${this.table}-${env.chain}-key-${env.key}-${env.hash}`);
-            keys.push(`${this.table}-${env.chain}-hash-${env.hash}-${env.key}`);
-        })
-        return await this.db.del(keys);
+    async delAll(chain: string, hash: string): Promise<void> {
+        return await this.db.delMany(`${this.table}-${chain}-hash-${hash}`);
     }
 }

@@ -25,7 +25,7 @@ export default class Network implements Task {
         });
     }
 
-    public mainLoop = async () => {
+    async run() {
         while (this.isRun) {
             for (let i = 0; i < 1000 && this.isRun; i++) { // 60 seconds
                 await helper.sleep(60);
@@ -34,6 +34,7 @@ export default class Network implements Task {
                 await this.web3.network.connect();
             }
         }
+        return true;
     }
 
     connectedNodesSize = () => {
@@ -65,7 +66,7 @@ export default class Network implements Task {
         await this.web3.network.connect(initialNodes);
         this.applicationContext.logger.verbose(`web3 - connections: ${this.web3.network.connectedNodes.length} -  initialNodes: ${this.applicationContext.initialNodes.join(", ")}`)
         this.applicationContext.logger.info(`web3 - host: ${this.applicationContext.myHost}`)
-        this.mainLoop();
+        this.run();
     };
 
     async stop() {

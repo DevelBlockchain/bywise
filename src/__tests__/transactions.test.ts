@@ -33,7 +33,7 @@ const convertoToTxInfo = (txs: Tx[]) => txs.map(tx => ({
     isExecuted: false,
     slicesHash: '',
     blockHash: '',
-    create: Date.now(),
+    received: Date.now(),
     status: BlockchainStatus.TX_MEMPOOL
 }))
 
@@ -45,7 +45,7 @@ beforeAll(async () => {
         ChainConfig.addAdmin(wallet.address),
         ChainConfig.addAdmin(nodeWallet.address),
         ChainConfig.addValidator(nodeWallet.address),
-        ChainConfig.setBalance(nodeWallet.address, ConfigProvider.MIN_BWS_VALUE),
+        ChainConfig.addBalance(nodeWallet.address, ConfigProvider.MIN_BWS_VALUE),
     ]);
     fromSlice = b0.slices[0].hash;
     bywise = await Bywise.newBywiseInstance({
@@ -99,61 +99,6 @@ describe('basic tests', () => {
             walletAmount: [],
             envOut: { keys: [], values: [] }
         });
-    }, 1000);
-
-    test('set balance', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
-        const tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
-            wallet,
-            chain,
-            wallet.address,
-            '0',
-            '0',
-            TxType.TX_COMMAND,
-            {
-                name: "setBalance",
-                input: [
-                    wallet.address,
-                    "100"
-                ]
-            }
-        );
-        tx.isValid();
-
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.error).toEqual(undefined);
-        expect(tte.txs.length).toEqual(1);
-        expect(tte.outputs.length).toEqual(1);
-        expect(tte.outputs[0].changes).toEqual({
-            get: [],
-            walletAddress: [],
-            walletAmount: [],
-            envOut: {
-                keys: [
-                    `${wallet.address}-WB`,
-                ], values: [
-                    `100`,
-                ]
-            }
-        });
-        expect(tte.envOut).toEqual({
-            keys: [
-                `${wallet.address}-WB`,
-            ], values: [
-                `100`,
-            ]
-        });
-
-        let walletBalanceEnv = await environmentProvider.get(DEAFAUT_MAIN_ENV, `${wallet.address}-WB`);
-        expect(walletBalanceEnv).toEqual(null);
-
-        await environmentProvider.push(tte.envOut, chain, CompiledContext.MAIN_CONTEXT_HASH);
-
-        walletBalanceEnv = await environmentProvider.get(DEAFAUT_MAIN_ENV, `${wallet.address}-WB`);
-        expect(walletBalanceEnv?.value).toEqual("100");
     }, 1000);
 
     test('add balance', async () => {
@@ -537,7 +482,7 @@ describe('set configs', () => {
             '0',
             TxType.TX_COMMAND,
             {
-                name: "setBalance",
+                name: "addBalance",
                 input: [
                     wallet.address,
                     "100"
@@ -1159,7 +1104,7 @@ describe('contracts', () => {
             '0',
             TxType.TX_COMMAND,
             {
-                name: "setBalance",
+                name: "addBalance",
                 input: [
                     wallet.address,
                     "100"
@@ -1283,7 +1228,7 @@ describe('contracts', () => {
             '0',
             TxType.TX_COMMAND,
             {
-                name: "setBalance",
+                name: "addBalance",
                 input: [
                     wallet.address,
                     "100"
@@ -1481,7 +1426,7 @@ describe('stress testing', () => {
         for (let i = 0; i < 100; i++) {
             let tx = new Tx();
             tx.chain = chain;
-            tx.version = "2";
+            tx.version = "3";
             tx.from = [wallet.address];
             tx.to = [wallet.address];
             tx.amount = ['0'];
@@ -1523,7 +1468,7 @@ describe('stress testing', () => {
         for (let i = 0; i < 100; i++) {
             tx = new Tx();
             tx.chain = chain;
-            tx.version = "2";
+            tx.version = "3";
             tx.from = [wallet.address];
             tx.to = [contractAddress];
             tx.amount = ['0'];
@@ -1576,7 +1521,7 @@ describe('stress testing', () => {
         for (let i = 0; i < 100; i++) {
             tx = new Tx();
             tx.chain = chain;
-            tx.version = "2";
+            tx.version = "3";
             tx.from = [wallet.address];
             tx.to = [contractAddress];
             tx.amount = ['0'];

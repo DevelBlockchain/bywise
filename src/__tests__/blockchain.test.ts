@@ -18,7 +18,7 @@ beforeAll(async () => {
     b0 = await helper.createNewBlockZero(chain, wallet, [
         ChainConfig.addAdmin(wallet.address),
         ChainConfig.addValidator(wallet.address),
-        ChainConfig.setBalance(wallet.address, ConfigProvider.MIN_BWS_VALUE),
+        ChainConfig.addBalance(wallet.address, ConfigProvider.MIN_BWS_VALUE),
         ChainConfig.setConfig('blockTime', `600`),
     ]);
     node0 = await Bywise.newBywiseInstance({
@@ -47,7 +47,7 @@ afterAll(async () => {
 describe('simple transactions', () => {
     test('send transaction', async () => {
         let tx = new Tx();
-        tx.version = '2';
+        tx.version = '3';
         tx.chain = chain;
         tx.from = [wallet.address];
         tx.to = [wallet.address];
@@ -363,7 +363,7 @@ describe('simple transactions', () => {
             expect(simulate.error).toEqual(undefined);
 
             const tx = new Tx();
-            tx.version = '2';
+            tx.version = '3';
             tx.chain = chain;
             tx.from = [wallet.address];
             tx.to = [BywiseHelper.ZERO_ADDRESS];

@@ -1,7 +1,7 @@
 import { CoreProvider } from "../services";
 import { Task } from "../types";
 
-export default class ExecuteBlocks implements Task {
+export default class KeepSyncSlices implements Task {
     public isRun = true;
     private coreProvider;
 
@@ -9,13 +9,13 @@ export default class ExecuteBlocks implements Task {
         this.coreProvider = coreProvider;
     }
 
-    async run() {
-        return await this.coreProvider.blockProvider.executeCompleteBlocks(this.coreProvider.chain);
-    }
-
     async start() {
     }
 
     async stop() {
+    }
+
+    async run() {
+        return await this.coreProvider.slicesProvider.syncSlices(this.coreProvider.chain);
     }
 }

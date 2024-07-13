@@ -1,4 +1,4 @@
-import { ApplicationContext, BlockchainStatus, BlockTree, EnvironmentContext, Task } from '../types';
+import { ApplicationContext, EnvironmentContext, Task } from '../types';
 import { BlocksProvider, SlicesProvider, TransactionsProvider } from '../services';
 import helper from '../utils/helper';
 import PipelineChain from '../core/pipeline-chain.core';
@@ -27,14 +27,13 @@ class Core implements Task {
         this.blockProvider = new BlocksProvider(applicationContext, this.slicesProvider, this.transactionsProvider);
     }
 
-    async runCore() {
+    async run() {
         for (let i = 0; i < this.applicationContext.chains.length; i++) {
             const chain = this.applicationContext.chains[i];
             let runChain = this.runChains.get(chain);
             if (runChain === undefined) {
-                const blockTree = await this.blockProvider.getBlockTree(chain);
-
-                const coreProvider = new CoreProvider(this.applicationContext, this.network, blockTree, this.blockProvider, this.slicesProvider, this.transactionsProvider);
+                const lastBlock = (await this.blockProvider.getLastMinedBlock(chain)).block;
+                const coreProvider = new CoreProvider(this.applicationContext, this.network, lastBlock, chain, this.blockProvider, this.slicesProvider, this.transactionsProvider);
                 runChain = new PipelineChain(coreProvider);
 
                 await runChain.start();
@@ -47,11 +46,12 @@ class Core implements Task {
                 }
             }
         }
+        return true;
     }
 
     private async keepRun() {
         while (this.isRun) {
-            await this.runCore();
+            await this.run();
             for (let i = 0; i < 1000 && this.isRun; i++) { // 60 seconds
                 await helper.sleep(60);
             }
@@ -84,7 +84,7 @@ class Core implements Task {
                 const findedTx = await this.network.web3.transactions.getTransactionByHash(message) as any;
                 if (findedTx) {
                     try {
-                        await this.transactionsProvider.saveNewTransaction(new Tx(findedTx));
+                        this.applicationContext.database.TransactionRepository.addMempool(findedTx);
                     } catch (err: any) {
                         this.applicationContext.logger.error(`core.find_tx: ${err.message}`, err);
                     }
@@ -120,15 +120,7 @@ class Core implements Task {
             const tx = new Tx(data.tx);
             const pipelineChain = this.runChains.get(tx.chain);
             if (pipelineChain) {
-                const txInfo = {
-                    tx: tx,
-                    isExecuted: false,
-                    slicesHash: '',
-                    blockHash: '',
-                    create: Date.now(),
-                    status: BlockchainStatus.TX_MEMPOOL
-                  }
-                return await pipelineChain.executeTransactionsTask.executeSimulation(txInfo, data.env, data.ignoreBalance);
+                return await pipelineChain.executeTransactionsTask.executeSimulation(tx, data.env, data.ignoreBalance);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
@@ -169,29 +161,8 @@ class Core implements Task {
         this.applicationContext.mq.addRequestListener(RequestKeys.get_confirmed_slices, async (data: { chain: string }) => {
             const pipelineChain = this.runChains.get(data.chain);
             if (pipelineChain) {
-                const currentBlock = pipelineChain.coreProvider.blockTree.currentMinnedBlock;
-                let from = currentBlock.from;
-                if (currentBlock.lastHash !== BlockTree.ZERO_HASH) {
-                    const lastLastBlock = await pipelineChain.coreProvider.blockProvider.getBlockInfo(currentBlock.lastHash);
-                    from = lastLastBlock.block.from;
-                }
-                const bestSlices = await pipelineChain.coreProvider.blockTree.getBestSlice(from, currentBlock.height + 1);
-                const slices: Slices[] = [];
-                let end = false;
-                for (let i = 0; i < bestSlices.length; i++) {
-                    const slice = bestSlices[i];
-                    const sliceInfo = await pipelineChain.coreProvider.slicesProvider.getSliceInfo(slice.hash);
-                    if (!sliceInfo.isExecuted) {
-                        break;
-                    }
-                    if (sliceInfo.slice.end) {
-                        end = true;
-                        slices.push(sliceInfo);
-                        break;
-                    }
-                    slices.push(sliceInfo);
-                }
-                return slices.reverse();
+                const slices = await pipelineChain.coreProvider.blockProvider.getLastSlicesBlock(data.chain);
+                return slices;
             } else {
                 throw new Error(`Node does not work with this chain`);
             }

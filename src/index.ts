@@ -108,7 +108,7 @@ const main = async () => {
             wallet = w.seed;
             console.log(`SEED: "${w.seed}"`)
             console.log(`ADDRESS: "${w.address}"`)
-            if(process.env.SEED2) {
+            if (process.env.SEED2) {
                 wallet = process.env.SEED2
             }
         }
@@ -160,6 +160,8 @@ const main = async () => {
                 keyJWT: '',
                 isLog: isLog,
                 isReset: true,
+                vmSize: 0,
+                vmIndex: 0,
                 myHost: '',
                 initialNodes: [],
                 zeroBlocks: [],
@@ -177,13 +179,13 @@ const main = async () => {
             const zeroBlock = await helper.createNewBlockZero(lastParam, deployWallet, [
                 ChainConfig.addAdmin(deployWallet.address),
                 ChainConfig.addValidator(deployWallet.address),
-                ChainConfig.setBalance(deployWallet.address, '20000'),
-                
-                ChainConfig.setConfig('blockTime', delayBlock),
-                ChainConfig.setConfig('feeBasic', '0.1'),
-                ChainConfig.setConfig('feeCoefAmount', '0.1'),
-                ChainConfig.setConfig('feeCoefSize', '0.001'),
-                ChainConfig.setConfig('feeCoefCost', '0.001'),
+                ChainConfig.addBalance(deployWallet.address, '20000'),
+
+                ChainConfig.setBlockTime(delayBlock),
+                ChainConfig.setConfigFee('feeBasic', '1'),
+                ChainConfig.setConfigFee('feeCoefAmount', '1'),
+                ChainConfig.setConfigFee('feeCoefSize', '1'),
+                ChainConfig.setConfigFee('feeCoefCost', '1'),
             ]);
             fs.writeFileSync(`${lastParam}.json`, JSON.stringify(zeroBlock), 'utf8');
             console.log(`Created new chain ${lastParam}.json`)
@@ -193,12 +195,9 @@ const main = async () => {
             const zeroBlock = await helper.createNewBlockZero('local', deployWallet, [
                 ChainConfig.addAdmin(deployWallet.address),
                 ChainConfig.addValidator(deployWallet.address),
-                ChainConfig.setBalance(deployWallet.address, '20000'),
-                ChainConfig.setConfig('blockTime', '30'),
-                ChainConfig.setConfig('feeBasic', '1'),
-                ChainConfig.setConfig('feeCoefAmount', '0'),
-                ChainConfig.setConfig('feeCoefSize', '0'),
-                ChainConfig.setConfig('feeCoefCost', '0'),
+                ChainConfig.addBalance(deployWallet.address, '1000000000000000'),
+                ChainConfig.setBlockTime('60'),
+                ChainConfig.setConfigFee('feeBasic', '1'),
             ]);
             fs.writeFileSync(`local.json`, JSON.stringify(zeroBlock, null, 4), 'utf8');
             console.log(`Created new chain local.json`)
@@ -212,6 +211,8 @@ const main = async () => {
                     keyJWT: '',
                     isLog: isLog,
                     myHost: '',
+                    vmSize: 1,
+                    vmIndex: 0,
                     initialNodes: [],
                     zeroBlocks: zeroBlocks,
                     mainWalletSeed: wallet,
@@ -223,83 +224,34 @@ const main = async () => {
             }
         }
         if (getCmd('-start')) {
+            const vmSize = 2;
             await newBywiseWorker(true, {
                 name: name,
                 port: port,
                 keyJWT: keyJWT,
                 isLog: isLog,
                 myHost: host,
-                initialNodes: initialNodes,
-                zeroBlocks: [],
-                mainWalletSeed: wallet,
-                startServices: [],
-            });
-            await newBywiseWorker(true, {
-                name: name,
-                port: port,
-                keyJWT: keyJWT,
-                isLog: isLog,
-                myHost: host,
-                initialNodes: initialNodes,
-                zeroBlocks: [],
-                mainWalletSeed: wallet,
-                startServices: ['vm'],
-            });
-            await newBywiseWorker(true, {
-                name: name,
-                port: port,
-                keyJWT: keyJWT,
-                isLog: isLog,
-                myHost: host,
-                initialNodes: initialNodes,
-                zeroBlocks: [],
-                mainWalletSeed: wallet,
-                startServices: ["vm_worker"],
-            });
-            await newBywiseWorker(true, {
-                name: name,
-                port: port,
-                keyJWT: keyJWT,
-                isLog: isLog,
-                myHost: host,
-                initialNodes: initialNodes,
-                zeroBlocks: [],
-                mainWalletSeed: wallet,
-                startServices: ["vm_worker"],
-            });
-            await newBywiseWorker(true, {
-                name: name,
-                port: port,
-                keyJWT: keyJWT,
-                isLog: isLog,
-                myHost: host,
-                initialNodes: initialNodes,
-                zeroBlocks: [],
-                mainWalletSeed: wallet,
-                startServices: ["vm_worker"],
-            });
-            await newBywiseWorker(true, {
-                name: name,
-                port: port,
-                keyJWT: keyJWT,
-                isLog: isLog,
-                myHost: host,
-                initialNodes: initialNodes,
-                zeroBlocks: [],
-                mainWalletSeed: wallet,
-                startServices: ["vm_worker"],
-            });
-            await newBywiseWorker(true, {
-                name: name,
-                port: port,
-                keyJWT: keyJWT,
-                isLog: isLog,
-                myHost: host,
+                vmSize: vmSize,
                 initialNodes: initialNodes,
                 zeroBlocks: [],
                 mainWalletSeed: wallet,
                 startServices: ['api', 'core', 'network'],
             });
+            for (let vmIndex = 0; vmIndex < vmSize; vmIndex++) {
+                await newBywiseWorker(true, {
+                    name: name,
+                    port: port,
+                    keyJWT: keyJWT,
+                    isLog: isLog,
+                    myHost: host,
+                    vmSize: vmSize,
+                    vmIndex: vmIndex,
+                    initialNodes: initialNodes,
+                    zeroBlocks: [],
+                    mainWalletSeed: wallet,
+                    startServices: ['vm'],
+                });
+            }
         }
         if (getCmd('-start-debug')) {
             await Bywise.newBywiseInstance({
@@ -308,6 +260,8 @@ const main = async () => {
                 keyJWT: keyJWT,
                 isLog: isLog,
                 myHost: host,
+                vmSize: 1,
+                vmIndex: 0,
                 initialNodes: initialNodes,
                 zeroBlocks: [],
                 mainWalletSeed: wallet,

@@ -34,89 +34,27 @@ export class VirtualMachineProvider {
     tte.envOut.values = [];
     for (let i = 0; i < tte.txs.length; i++) {
       if (!this.task.isRun) return;
-
-      const txInfo = tte.txs[i];
-      const tx = txInfo.tx;
+      const tx = tte.txs[i];
 
       let output: TxOutput = {
         feeUsed: '0',
-        fee: '0',
         cost: 0,
         size: 0,
-        fromSlice: tte.fromSlice,
+        ctx: tte.fromSlice,
         debit: '0',
         logs: [],
         events: [],
-        changes: {
-          get: [],
-          walletAddress: [],
-          walletAmount: [],
-          envOut: {
-            keys: [],
-            values: [],
-          },
+        get: [],
+        walletAddress: [],
+        walletAmount: [],
+        envs: {
+          keys: [],
+          values: [],
         },
+        output: undefined
       };
       try {
-        if (txInfo.output && txInfo.slicesHash === tte.fromSlice) {
-          output = txInfo.output;
-          let changedKey = null;
-          for (let i = 0; i < output.changes.get.length; i++) {
-            const key = output.changes.get[i];
-            if (ctx.setMainKeys.has(key)) {
-              changedKey = key;
-            }
-          }
-          if (changedKey) {
-            output.error = `Environment changed - "${changedKey}"`;
-          } else {
-            for (let i = 0; i < output.changes.envOut.keys.length; i++) {
-              const key = output.changes.envOut.keys[i];
-              const value = output.changes.envOut.values[i];
-              ctx.setStageKeys.set(key, {
-                chain: ctx.env.chain,
-                hash: ctx.env.fromContextHash,
-                key: key,
-                value: value,
-              })
-            }
-          }
-        } else {
-          await this.executeTransaction(tx, ctx, tte.ignoreBalance, output);
-        }
-        if (!output.error) {
-          for (let j = 0; j < output.changes.walletAddress.length; j++) {
-            const address = output.changes.walletAddress[j];
-            const amount = new BigNumber(output.changes.walletAmount[j]);
-
-            const walletDTO = await this.walletProvider.getWalletBalance(ctx, address);
-            walletDTO.balance = walletDTO.balance.plus(amount);
-
-            if (walletDTO.balance.isLessThan(new BigNumber(0))) {
-              output.error = `low balance`;
-            }
-
-            await this.walletProvider.setWalletBalance(ctx, walletDTO);
-          }
-          let debit = new BigNumber(output.debit);
-          for (let j = 0; j < tx.from.length; j++) {
-            const from = tx.from[j];
-
-            const walletDTO = await this.walletProvider.getWalletBalance(ctx, from);
-            if (walletDTO.balance.isGreaterThanOrEqualTo(debit)) {
-              walletDTO.balance = walletDTO.balance.minus(debit);
-              await this.walletProvider.setWalletBalance(ctx, walletDTO);
-              debit = new BigNumber(0);
-            } else {
-              debit = debit.minus(walletDTO.balance);
-              walletDTO.balance = new BigNumber(0);
-              await this.walletProvider.setWalletBalance(ctx, walletDTO);
-            }
-          }
-          if (!tte.ignoreBalance && debit.isGreaterThan(new BigNumber(0))) {
-            output.error = `Insuficient funds`;
-          }
-        }
+        await this.executeTransaction(tx, ctx, tte.ignoreBalance, output);
       } catch (err: any) {
         if (err.message && typeof err.message == 'string') {
           output.error = err.message;
@@ -126,10 +64,8 @@ export class VirtualMachineProvider {
       }
       if (output.error) {
         tte.error = output.error;
-        ctx.deleteCommit();
-      } else {
-        ctx.commit();
       }
+      ctx.deleteCommit();
       outputs.push(output);
     }
     for (let [key, valueEnv] of ctx.setMainKeys) {
@@ -142,6 +78,7 @@ export class VirtualMachineProvider {
   private async executeTransaction(tx: Tx, ctx: RuntimeContext, ignoreBalance: boolean, output: TxOutput): Promise<void> {
     ctx.tx = tx;
     ctx.cost = 0;
+    ctx.output = '';
     ctx.logs = [];
     ctx.events = [];
     ctx.balances = new Map();
@@ -233,6 +170,7 @@ export class VirtualMachineProvider {
     let feeUsed = await this.calcFee(ctx, new BigNumber(ctx.size), debit, new BigNumber(ctx.cost));
     if (ctx.tx.type === TxType.TX_COMMAND || ctx.tx.type === TxType.TX_BLOCKCHAIN_COMMAND) {
       feeUsed = "0";
+      ctx.size = 0;
     }
     if (!ignoreBalance && (new BigNumber(ctx.tx.fee).isLessThan(new BigNumber(feeUsed)))) {
       throw new Error(`Invalid fee`);
@@ -241,13 +179,12 @@ export class VirtualMachineProvider {
 
     output.cost = ctx.cost;
     output.size = ctx.size;
-    output.fee = ctx.tx.fee;
     output.feeUsed = feeUsed;
     output.debit = debit.toString();
     output.logs = ctx.logs;
     output.events = ctx.events;
     output.output = ctx.output;
-    ctx.setChanges(output.changes);
+    ctx.setChanges(output);
     return;
   }
 
@@ -384,18 +321,6 @@ export class VirtualMachineProvider {
         type: 'boolean',
       })
       await this.configsProvider.setConfig(ctx, cfg);
-
-    } else if (cmd.name == 'setBalance') {
-      if (cmd.input.length !== 2) throw new Error(`setBalance expected 2 inputs`);
-      const address = cmd.input[0];
-      const amount = cmd.input[1];
-      if (!BywiseHelper.isValidAddress(address)) throw new Error(`invalid address ${address}`);
-      if (!BywiseHelper.isValidAmount(amount)) throw new Error(`invalid amount ${amount}`);
-      const walletDTO: WalletBalanceDTO = {
-        balance: new BigNumber(amount),
-        address: address,
-      }
-      await this.walletProvider.setWalletBalance(ctx, walletDTO);
 
     } else if (cmd.name == 'addBalance') {
       if (cmd.input.length !== 2) throw new Error(`addBalance expected 2 inputs`);

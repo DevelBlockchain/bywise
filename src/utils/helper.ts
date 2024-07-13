@@ -3,7 +3,7 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 import fs from 'fs';
 import randomstring from 'randomstring';
 import { Block, Slice, Tx, TxType, Wallet, BlockPack, BywiseHelper } from '@bywise/web3';
-import { BlockTree, ZeroBlockConfig } from '../types';
+import { ZERO_HASH, ZeroBlockConfig } from '../types';
 
 const wait = async () => {
     await new Promise((resolve) => {
@@ -92,7 +92,7 @@ const createNewBlockZero = async (chain: string, wallet: Wallet = new Wallet(), 
     const slices: Slice[] = [];
 
     const tx = new Tx();
-    tx.version = '2';
+    tx.version = '3';
     tx.chain = chain;
     tx.from = [wallet.address];
     tx.to = [wallet.address];
@@ -110,15 +110,19 @@ const createNewBlockZero = async (chain: string, wallet: Wallet = new Wallet(), 
     for (let i = 0; i < configs.length; i++) {
         const cfg = configs[i];
         const tx = new Tx();
-        tx.version = '2';
+        tx.version = '3';
         tx.chain = chain;
         tx.from = [wallet.address];
         tx.to = [wallet.address];
         tx.amount = ['0'];
         tx.fee = '0';
         tx.type = TxType.TX_COMMAND;
-        tx.data = cfg;
+        tx.data = {
+            name: cfg.name,
+            input: cfg.input,
+        };
         tx.foreignKeys = [];
+        tx.output = cfg.output
         tx.created = Math.floor(Date.now() / 1000);
         tx.hash = tx.toHash();
         tx.sign = [await wallet.signHash(tx.hash)];
@@ -131,11 +135,12 @@ const createNewBlockZero = async (chain: string, wallet: Wallet = new Wallet(), 
     slice.transactionsCount = txs.length;
     slice.blockHeight = 0;
     slice.transactions = txs.map(tx => tx.hash);
-    slice.version = '2';
+    slice.version = '3';
     slice.chain = chain;
     slice.from = wallet.address;
     slice.created = Math.floor(Date.now() / 1000);
     slice.end = true;
+    slice.lastHash = ZERO_HASH;
     slice.hash = slice.toHash();
     slice.sign = await wallet.signHash(slice.hash);
     slice.isValid();
@@ -150,7 +155,7 @@ const createNewBlockZero = async (chain: string, wallet: Wallet = new Wallet(), 
     block.version = '2';
     block.from = wallet.address;
     block.created = Math.floor(Date.now() / 1000) - 2;
-    block.lastHash = BlockTree.ZERO_HASH;
+    block.lastHash = ZERO_HASH;
     block.hash = block.toHash();
     block.sign = await wallet.signHash(block.hash);
     block.externalTxID = [];

@@ -14,7 +14,7 @@ export class SliceRepository {
     async save(slice: Slices) {
         const query: SaveRequest[] = [
             { key: `${this.table}-hash-${slice.slice.hash}`, data: slice },
-            { key: `${this.table}-blockHeight-${slice.slice.chain}-${helper.numberToString(slice.slice.blockHeight)}-${slice.slice.created}-${slice.slice.hash}`, data: slice.slice.hash },
+            { key: `${this.table}-blockHeight-${slice.slice.chain}-${helper.numberToString(slice.slice.blockHeight)}-${slice.slice.hash}`, data: slice.slice.hash },
         ];
         Object.values(BlockchainStatus).forEach(status => {
             if (status === slice.status) {

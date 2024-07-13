@@ -2,7 +2,7 @@ import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
 import { Tx, TxOutput } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { BlockchainStatus, TransactionsDTO, TransactionsToExecute } from '../types';
+import { BlockchainStatus, TransactionsToExecute } from '../types';
 import { Transaction } from '../models';
 import { RequestKeys } from '../datasource/message-queue';
 import { ApiService } from '../services';
@@ -160,7 +160,8 @@ export default async function transactionsController(app: express.Express, apiPr
         } else {
             return res.status(400).send({ error: `invalid searchBy ${searchBy}` });
         }
-        return res.send(txs.map(tx => ({ ...(new Tx(tx.tx)), status: tx.status, output: tx.output })));
+        const arr = await TransactionRepository.findTxByHashs(txs.map(txInfo => txInfo.hash));
+        return res.send(arr);
     });
 
     metadataDocument.addPath({
@@ -182,9 +183,10 @@ export default async function transactionsController(app: express.Express, apiPr
     })
     router.get('/transactions/hash/:hash', async (req: express.Request, res: express.Response) => {
         const hash = req.params.hash;
-        const btx = await TransactionRepository.findByHash(hash);
-        if (!btx) return res.status(404).send({ error: "Transaction not found" });
-        return res.send({ ...btx.tx, status: btx.status, output: btx.output });
+        const txInfo = await TransactionRepository.findByHash(hash);
+        const tx = await TransactionRepository.findTxByHash(hash);
+        if (!txInfo) return res.status(404).send({ error: "Transaction not found" });
+        return res.send({ ...tx, status: txInfo.status, output: txInfo.output });
     });
 
     metadataDocument.addPath({
@@ -248,9 +250,8 @@ export default async function transactionsController(app: express.Express, apiPr
             if (!apiProvider.chains.includes(tx.chain)) {
                 return res.status(400).send({ error: `Node does not work with this chain` });
             }
-
-            const btx = await apiProvider.transactionsProvider.saveNewTransaction(tx);
-            return res.send(new TransactionsDTO(btx));
+            TransactionRepository.addMempool(tx);
+            return res.status(200).send({});
         } catch (err: any) {
             return res.status(400).send({ error: err.message });
         }
@@ -290,7 +291,7 @@ export default async function transactionsController(app: express.Express, apiPr
 
             const mainWallet = await apiProvider.applicationContext.mainWallet;
             const tx = new Tx();
-            tx.version = '2';
+            tx.version = '3';
             tx.chain = body.chain;
             tx.from = [mainWallet.address];
             tx.to = body.to;
@@ -301,19 +302,19 @@ export default async function transactionsController(app: express.Express, apiPr
             tx.foreignKeys = body.foreignKeys;
             tx.created = Math.floor(Date.now() / 1000);
 
-            let output: TxOutput = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
+            let tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, ignoreBalance: true });
+            tx.output = tte.outputs[0];
 
-            tx.fee = output.feeUsed;
+            tx.fee = tx.output.feeUsed;
             tx.hash = tx.toHash();
             tx.sign = [await mainWallet.signHash(tx.hash)];
 
-            if (output.error) {
-                throw new Error(output.error);
+            if (tx.output.error) {
+                throw new Error(tx.output.error);
             }
+            TransactionRepository.addMempool(tx);
 
-            const txInfo = await apiProvider.transactionsProvider.saveNewTransaction(tx);
-
-            return res.send({ ...txInfo.tx, status: txInfo.status, output });
+            return res.send({ ...tx });
         } catch (err: any) {
             return res.status(400).send({ error: err.message });
         }

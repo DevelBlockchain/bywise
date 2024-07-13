@@ -1,12 +1,11 @@
 import { ApplicationContext, Task, TransactionsToExecute } from '../types';
 import { VirtualMachineProvider } from '../services';
 import helper from '../utils/helper';
-import { RequestKeys, RoutingKeys } from '../datasource/message-queue';
+import { RoutingKeys } from '../datasource/message-queue';
 
 class VM implements Task {
 
     public isRun = false;
-    public isFirst = false;
     private applicationContext;
     private mq;
     private logger;
@@ -20,9 +19,9 @@ class VM implements Task {
         this.virtualMachineProvider = new VirtualMachineProvider(applicationContext, this);
     }
 
-    async running() {
+    async run() {
         while (this.isRun) {
-            const tte: TransactionsToExecute | null = await this.mq.request(RequestKeys.get_transactions_to_execute);
+            const tte = this.transactionsToExecute.pop();
 
             if (tte) {
                 let uptime = Date.now();
@@ -34,6 +33,7 @@ class VM implements Task {
                 await helper.sleep(50);
             }
         }
+        return true;
     }
 
     async start() {
@@ -41,17 +41,18 @@ class VM implements Task {
             this.applicationContext.logger.error("VM already started!");
             return;
         }
-        this.isRun = true;
-        if (this.isFirst) {
-            this.transactionsToExecute = [];
-            this.applicationContext.mq.addRequestListener(RequestKeys.get_transactions_to_execute, async () => {
-                return this.transactionsToExecute.pop();
-            });
-            this.applicationContext.mq.addMessageListener(RoutingKeys.add_transactions_to_execute, async (data: TransactionsToExecute) => {
-                this.transactionsToExecute.push(data);
-            });
+        if(this.applicationContext.vmIndex === undefined) {
+            this.applicationContext.logger.error("VM index not found");
+            return;
         }
-        this.running();
+        this.isRun = true;
+        this.transactionsToExecute = [];
+        this.applicationContext.mq.addMessageListener(RoutingKeys.add_transactions_to_execute, async (data: TransactionsToExecute) => {
+            if(data.vmIndex === this.applicationContext.vmIndex) {
+                this.transactionsToExecute.push(data);
+            }
+        });
+        this.run();
     }
 
     async stop() {

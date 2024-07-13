@@ -3,7 +3,7 @@ import winston from "winston";
 import Database from "../datasource/database";
 import MessageQueue from "../datasource/message-queue";
 
-export type BywiseStartServices = 'api' | 'core' | 'network' | 'vm' | 'vm_worker'
+export type BywiseStartServices = 'api' | 'core' | 'network' | 'vm'
 
 export type BywiseStartNodeConfig = {
     name: string;
@@ -11,6 +11,8 @@ export type BywiseStartNodeConfig = {
     https?: { cert: string, key: string };
     myHost: string;
     keyJWT: string;
+    vmSize: number;
+    vmIndex?: number;
     initialNodes: string[];
     zeroBlocks: string[];
     mainWalletSeed: string;
@@ -27,6 +29,8 @@ export type ApplicationContext = {
     name?: string;
     myHost: string;
     port: number;
+    vmSize: number;
+    vmIndex?: number;
     https?: { cert: string, key: string };
     initialNodes: string[];
     chains: string[];
@@ -38,6 +42,7 @@ export type ApplicationContext = {
 
 export interface Task {
     isRun: boolean,
+    run: () => Promise<boolean>,
     start: () => Promise<void>,
     stop: () => Promise<void>
 }

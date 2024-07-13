@@ -1,7 +1,6 @@
 import { BywiseHelper, TransactionChanges, TransactionEvent, Tx } from "@bywise/web3";
 import { Environment } from "../models";
 import { EnvironmentContext } from "../types";
-import BigNumber from "bignumber.js";
 import { EnvironmentProvider } from "../services";
 
 export class RuntimeContext {
@@ -14,7 +13,7 @@ export class RuntimeContext {
     public getMainKeys: Map<string, Environment> = new Map();
     public setStageKeys: Map<string, Environment> = new Map();
     public getStageKeys: Map<string, Environment> = new Map();
-    public balances: Map<string, BigNumber> = new Map();
+    public balances: Map<string, bigint> = new Map();
     public logs: string[] = [];
     public events: TransactionEvent[] = [];
     public virtualMachineStack: number = 0;
@@ -111,12 +110,12 @@ export class RuntimeContext {
         if (!BywiseHelper.isValidAddress(address)) throw new Error('Invalid address');
         if (!BywiseHelper.isValidAmount(amount)) throw new Error('Invalid amount');
 
-        const amoutBN = new BigNumber(amount);
+        const amoutBN = BigInt(amount);
         let balance = this.balances.get(address);
         if (!balance) {
-            balance = new BigNumber(0);
+            balance = 0n;
         }
-        balance = balance.plus(amoutBN);
+        balance = balance + amoutBN;
         this.balances.set(address, balance);
     }
 
@@ -124,12 +123,12 @@ export class RuntimeContext {
         if (!BywiseHelper.isValidAddress(address)) throw new Error('Invalid address');
         if (!BywiseHelper.isValidAmount(amount)) throw new Error('Invalid amount');
 
-        const amoutBN = new BigNumber(amount);
+        const amoutBN = BigInt(amount);
         let balance = this.balances.get(address);
         if (!balance) {
-            balance = new BigNumber(0);
+            balance = 0n;
         }
-        balance = balance.minus(amoutBN);
+        balance = balance - amoutBN;
         this.balances.set(address, balance);
     }
 
@@ -151,8 +150,8 @@ export class RuntimeContext {
 
     setChanges(changes: TransactionChanges) {
         changes.get = [];
-        changes.envOut.keys = [];
-        changes.envOut.values = [];
+        changes.envs.keys = [];
+        changes.envs.values = [];
         changes.walletAddress = [];
         changes.walletAmount = [];
         for (let [key, valueEnv] of this.getStageKeys) {
@@ -161,11 +160,11 @@ export class RuntimeContext {
             }
         }
         for (let [key, valueEnv] of this.setStageKeys) {
-            changes.envOut.keys.push(key);
-            changes.envOut.values.push(valueEnv.value);
+            changes.envs.keys.push(key);
+            changes.envs.values.push(valueEnv.value);
         }
         for (let [address, balance] of this.balances) {
-            if (!balance.isZero()) {
+            if (balance !== 0n) {
                 changes.walletAddress.push(address);
                 changes.walletAmount.push(balance.toString());
             }

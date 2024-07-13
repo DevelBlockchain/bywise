@@ -41,7 +41,7 @@ export default async function contractsController(app: express.Express, apiProvi
             const contractAddress = body.contractAddress;
 
             const tx = new Tx();
-            tx.version = '2';
+            tx.version = '3';
             tx.chain = 'local';
             tx.from = [body.from];
             tx.to = [contractAddress];

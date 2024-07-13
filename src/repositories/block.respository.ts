@@ -16,13 +16,11 @@ export class BlockRepository {
             { key: `${this.table}-hash-${block.block.hash}`, data: block },
             { key: `${this.table}-height-${block.block.chain}-${helper.numberToString(block.block.height)}-${block.block.hash}`, data: block.block.hash },
         ];
-        query.push({ key: `${this.table}-imutable-${block.block.chain}-${block.isImmutable}-${helper.numberToString(block.block.height)}-${block.block.hash}`, data: block.block.hash });
-        query.push({ delete: true, key: `${this.table}-imutable-${block.block.chain}-${!block.isImmutable}-${helper.numberToString(block.block.height)}-${block.block.hash}`, data: block.block.hash });
         Object.values(BlockchainStatus).forEach(status => {
             if (status === block.status) {
-                query.push({ key: `${this.table}-status-${status}-${block.block.chain}-${helper.numberToString(block.block.height)}-${block.block.hash}`, data: block.block.hash });
+                query.push({ key: `${this.table}-status-${block.block.chain}-${status}-${helper.numberToString(block.block.height)}-${block.block.hash}`, data: block.block.hash });
             } else {
-                query.push({ delete: true, key: `${this.table}-status-${status}-${block.block.chain}-${helper.numberToString(block.block.height)}-${block.block.hash}`, data: block.block.hash });
+                query.push({ delete: true, key: `${this.table}-status-${block.block.chain}-${status}-${helper.numberToString(block.block.height)}-${block.block.hash}`, data: block.block.hash });
             }
         })
         if(block.block.height === 0) {
@@ -41,12 +39,12 @@ export class BlockRepository {
     }
 
     async findByChainAndStatus(chain: string, status: string): Promise<Blocks[]> {
-        const values = await this.db.find(`${this.table}-status-${status}-${chain}`);
+        const values = await this.db.find(`${this.table}-status-${chain}-${status}`);
         return await this.db.getMany(values.map(hash => `${this.table}-hash-${hash}`))
     }
 
     async findByChainAndStatusAndHeight(chain: string, status: string, height: number): Promise<Blocks[]> {
-        const values = await this.db.find(`${this.table}-status-${status}-${chain}-${helper.numberToString(height)}`);
+        const values = await this.db.find(`${this.table}-status-${chain}-${status}-${helper.numberToString(height)}`);
         return await this.db.getMany(values.map(hash => `${this.table}-hash-${hash}`))
     }
 
@@ -69,12 +67,12 @@ export class BlockRepository {
         return null;
     }
 
-    async findBlocksLastsByStatus(status: string, chain: string, limit: number, offset: number, order: 'asc' | 'desc'): Promise<Blocks[]> {
-        const values = await this.db.find(`${this.table}-status-${status}-${chain}`, limit, offset, order === 'desc');
+    async findBlocksLastsByStatus(chain: string, status: string, limit: number, offset: number, order: 'asc' | 'desc'): Promise<Blocks[]> {
+        const values = await this.db.find(`${this.table}-status-${chain}-${status}`, limit, offset, order === 'desc');
         return await this.db.getMany(values.map(hash => `${this.table}-hash-${hash}`))
     }
 
-    async countBlocksByStatus(status: string, chain: string): Promise<number> {
-        return await this.db.count(`${this.table}-status-${status}-${chain}`);
+    async countBlocksByStatus(chain: string, status: string): Promise<number> {
+        return await this.db.count(`${this.table}-status-${chain}-${status}`);
     }
 }

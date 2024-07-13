@@ -1,10 +1,11 @@
 import { Block, Wallet } from "@bywise/web3";
-import { Slices } from "../models";
-import { BlockTree } from "../types";
+import { Blocks, Slices } from "../models";
+import { BlockchainStatus, ZERO_HASH } from "../types";
 import helper from "../utils/helper";
 import { CoreProvider } from "../services";
+import { Task } from "../types";
 
-export default class MintBlocks {
+export default class MintBlocks implements Task {
     public isRun = true;
     private coreProvider;
     private mainWallet;
@@ -16,12 +17,18 @@ export default class MintBlocks {
         this.BlockRepository = coreProvider.applicationContext.database.BlockRepository;
     }
 
+    async start() {
+    }
+
+    async stop() {
+    }
+
     async run() {
         if (!this.coreProvider.isValidator || !this.coreProvider.hasMinimumBWSToMine) {
-            return;
+            return false;
         }
         const now = helper.getNow()
-        const currentBlock = this.coreProvider.blockTree.currentMinnedBlock;
+        const currentBlock = this.coreProvider.currentBlock;
         const blockTime = this.coreProvider.blockTime;
         const mainWallet = this.mainWallet;
 
@@ -47,69 +54,63 @@ export default class MintBlocks {
         }
 
         if (!isLastBlockMined) {
-            await this.tryMintLastBlock(currentBlock);
+            return await this.tryMintLastBlock(currentBlock);
         } else if (!isCurrentBlockMined) {
-            await this.tryMintCurrentBlock(currentBlock);
+            return await this.tryMintCurrentBlock(currentBlock);
         } else if (!isNextBlockMined && (now >= currentBlock.created + blockTime)) {
-            await this.tryMintBlock(currentBlock);
+            return await this.tryMintBlock(currentBlock);
+        } else {
+            return false;
         }
     }
 
-    async tryMintLastBlock(currentBlock: Block) {
-        if (currentBlock.lastHash === BlockTree.ZERO_HASH) throw new Error(`Error tryMintLastBlock`);
+    async tryMintLastBlock(currentBlock: Block): Promise<boolean> {
+        if (currentBlock.lastHash === ZERO_HASH) throw new Error(`Error tryMintLastBlock`);
         const lastBlock = await this.coreProvider.blockProvider.getBlockInfo(currentBlock.lastHash);
-        if (lastBlock.block.lastHash === BlockTree.ZERO_HASH) throw new Error(`Error tryMintLastBlock`);
+        if (lastBlock.block.lastHash === ZERO_HASH) throw new Error(`Error tryMintLastBlock`);
         const lastLastBlock = await this.coreProvider.blockProvider.getBlockInfo(lastBlock.block.lastHash);
-        await this.tryMintBlock(lastLastBlock.block);
+        return await this.tryMintBlock(lastLastBlock.block);
     }
 
-    async tryMintCurrentBlock(currentBlock: Block) {
-        if (currentBlock.lastHash === BlockTree.ZERO_HASH) throw new Error(`Error tryMintCurrentBlock`);
+    async tryMintCurrentBlock(currentBlock: Block): Promise<boolean> {
+        if (currentBlock.lastHash === ZERO_HASH) throw new Error(`Error tryMintCurrentBlock`);
 
         const lastBlock = await this.coreProvider.blockProvider.getBlockInfo(currentBlock.lastHash);
-        await this.tryMintBlock(lastBlock.block);
+        return await this.tryMintBlock(lastBlock.block);
     }
 
-    async tryMintBlock(fromBlock: Block) {
+    async tryMintBlock(fromBlock: Block): Promise<boolean> {
         const now = helper.getNow()
         const blockTime = this.coreProvider.blockTime;
         const mainWallet = this.mainWallet;
 
         let from = fromBlock.from;
-        if (fromBlock.lastHash !== BlockTree.ZERO_HASH) {
+        if (fromBlock.lastHash !== ZERO_HASH) {
             const lastLastBlock = await this.coreProvider.blockProvider.getBlockInfo(fromBlock.lastHash);
             from = lastLastBlock.block.from;
         }
-
-        const bestSlices = this.coreProvider.blockTree.getBestSlice(from, fromBlock.height + 1);
-        const slices: Slices[] = [];
+        const slices = await this.coreProvider.slicesProvider.getByHeight(this.coreProvider.chain, from, fromBlock.height + 1);
         let end = false;
-        for (let i = 0; i < bestSlices.length; i++) {
-            const slice = bestSlices[i];
-            const sliceInfo = await this.coreProvider.slicesProvider.getSliceInfo(slice.hash);
-            if (!sliceInfo.isExecuted) {
-                break;
-            }
-            slices.push(sliceInfo);
+        for (let i = 0; i < slices.length; i++) {
+            const sliceInfo = slices[i];
             if (sliceInfo.slice.end) {
                 end = true;
-                break;
             }
         }
         if (!end && now < fromBlock.created + blockTime * 2) {
-            return;
+            return false;
         }
-        if(!end) {
+        if (!end) {
             this.coreProvider.applicationContext.logger.warn(`mint-blocks - end slice not found - mint by time`);
         }
-        await this.mintBlock(fromBlock, mainWallet, slices);
+        return await this.mintBlock(fromBlock, mainWallet, slices);
     }
 
-    private async mintBlock(fromBlock: Block, mainWallet: Wallet, bestSlices: Slices[]) {
+    private async mintBlock(fromBlock: Block, mainWallet: Wallet, bestSlices: Slices[]): Promise<boolean> {
         const isConnected = this.coreProvider.network.isConnected();
         if (!isConnected) {
             this.coreProvider.applicationContext.logger.error(`mint-blocks - Node has disconnected!`);
-            return;
+            return false;
         }
 
         let transactionsCount = 0;
@@ -134,13 +135,16 @@ export default class MintBlocks {
         block.hash = block.toHash();
         block.sign = await mainWallet.signHash(block.hash);
 
+        const blockInfo: Blocks = {
+            block: block,
+            status: BlockchainStatus.TX_MEMPOOL,
+            countTrys: 0,
+            isComplete: true,
+            isExecuted: false,
+            distance: '',
+        }
         this.coreProvider.applicationContext.logger.info(`mint block - height: ${block.height} - slices: ${block.slices.length} - transactions: ${block.transactionsCount} - hash: ${block.hash.substring(0, 10)}`)
-        const blockInfo = await this.coreProvider.blockProvider.saveNewBlock(block);
-        blockInfo.isComplete = true;
-        blockInfo.isExecuted = false;
-        this.coreProvider.blockTree.addBlock(block);
-        await this.coreProvider.blockProvider.updateBlock(blockInfo);
-        await this.coreProvider.blockProvider.executeCompleteBlockByHash(this.coreProvider.blockTree, blockInfo.block.hash);
-        return block;
+        await this.coreProvider.blockProvider.executeCompleteBlockByHash(blockInfo);
+        return true;
     }
 }

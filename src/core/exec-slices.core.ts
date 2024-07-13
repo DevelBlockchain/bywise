@@ -1,7 +1,8 @@
 import { CoreProvider } from "../services";
 import { BlockchainStatus } from "../types";
+import { Task } from "../types";
 
-export default class ExecuteSlices {
+export default class ExecuteSlices implements Task {
     public isRun = true;
     private coreProvider;
     private SliceRepository;
@@ -11,45 +12,35 @@ export default class ExecuteSlices {
         this.SliceRepository = coreProvider.applicationContext.database.SliceRepository;
     }
 
+    async start() {
+    }
+
+    async stop() {
+    }
+
     async run() {
+        let isExecuted = false;
         let slices = await this.SliceRepository.findByChainAndStatus(this.coreProvider.chain, BlockchainStatus.TX_MEMPOOL);
         slices = slices.filter(info => info.isComplete === true && info.isExecuted === false);
         if (slices.length == 0) {
-            return;
+            return isExecuted;
         }
-
         slices = slices.sort((s1, s2) => s1.slice.created - s2.slice.created);
 
         for (let i = 0; i < slices.length; i++) {
             const sliceInfo = slices[i];
+            const lastSlice = await this.coreProvider.slicesProvider.getSliceInfo(sliceInfo.slice.lastHash);
 
-            const sliceList = this.coreProvider.blockTree.getSliceList(sliceInfo.slice.hash);
-            let lastContextHashIsExecuted = true;
-            if(sliceList.length == 0) {
-                lastContextHashIsExecuted = false; // last slices not found
-            }
-            for (let j = 0; j < sliceList.length - 1; j++) {
-                const lastSliceInfo = await this.coreProvider.slicesProvider.getSliceInfo(sliceList[j].hash);
-                if(!lastSliceInfo.isExecuted) {
-                    lastContextHashIsExecuted = false;
+            if (lastSlice.isExecuted) {
+                let success = await this.coreProvider.slicesProvider.executeCompleteSlice(this.coreProvider.chain, sliceInfo);
+                if (success) {
+                    isExecuted = true;
                 }
-            }
-
-            const lastBlock = await this.coreProvider.blockTree.minnedBlockList.get(sliceInfo.slice.blockHeight - 1);
-            if(!lastBlock) {
-                lastContextHashIsExecuted = false;
-            } else {
-                const blockInfo = await this.coreProvider.blockProvider.getBlockInfo(lastBlock.hash);
-                if(!blockInfo.isExecuted) {
-                    lastContextHashIsExecuted = false;
-                }
-            }
-            if(lastContextHashIsExecuted) {
-                const lastContextHash = this.coreProvider.blockTree.getLastHash(sliceInfo.slice.hash);
-                await this.coreProvider.slicesProvider.executeCompleteSlice(this.coreProvider.blockTree, lastContextHash, sliceInfo.slice.blockHeight, sliceInfo);
             }
         }
-        
-        await this.coreProvider.blockProvider.processVotes(this.coreProvider.blockTree);
+        if (isExecuted) {
+            await this.coreProvider.blockProvider.processVotes(this.coreProvider.chain);
+        }
+        return isExecuted;
     }
 }

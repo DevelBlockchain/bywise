@@ -18,7 +18,7 @@
   "author": "Devel Blockchain <contact@develblockchain.com>",
   "license": "MIT",
   "dependencies": {
-    "@bywise/web3": "^1.0.13",
+    "@bywise/web3": "^1.1.2",
     "bignumber.js": "^9.1.2",
     "body-parser": "^1.20.0",
     "cors": "^2.8.5",

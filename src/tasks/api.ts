@@ -42,6 +42,10 @@ class Api implements Task {
         this.app = express();
     }
 
+    async run() {
+        return true;
+    }
+
     async start() {
         if(this.isRun) {
             this.applicationContext.logger.error("API already started!");

@@ -1,32 +1,39 @@
-import { Tx, TxType, Wallet } from '@bywise/web3';
-import { ApplicationContext, BlockchainStatus, TransactionsToExecute, Task, EnvironmentContext } from '../types';
+import { Tx, TxOutput, TxType, Wallet } from '@bywise/web3';
+import { ApplicationContext, BlockchainStatus, TransactionsToExecute, Task, EnvironmentContext, MempoolTx } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
 import { Transaction } from '../models';
 import helper from '../utils/helper';
+import { RuntimeContext } from '../vm/RuntimeContext';
 
 export class TransactionsProvider {
 
+  private applicationContext;
   private mq;
   private task;
   private TransactionRepository;
   private mainWallet;
+  private vmIndex;
   private transactionsToExecute: Map<string, TransactionsToExecute> = new Map();
 
   constructor(applicationContext: ApplicationContext, task: Task) {
+    this.applicationContext = applicationContext;
     this.task = task;
     this.TransactionRepository = applicationContext.database.TransactionRepository;
     this.mq = applicationContext.mq;
     this.mainWallet = applicationContext.mainWallet;
+    this.vmIndex = 0;
 
     this.mq.addMessageListener(RoutingKeys.set_transactions_to_execute, async (data: TransactionsToExecute) => {
-      this.transactionsToExecute.set(data.id, data);
+      if (this.transactionsToExecute.has(data.id)) {
+        this.transactionsToExecute.set(data.id, data);
+      }
     });
   }
 
   async createNewTransaction(chain: string, to: string, amount: string, fee: string, type: TxType, data: any = {}, foreignKeys?: string[]) {
     let wallet = await this.mainWallet;
     let tx = new Tx();
-    tx.version = '2';
+    tx.version = '3';
     tx.chain = chain;
     tx.from = [wallet.address];
     tx.to = [to];
@@ -43,7 +50,7 @@ export class TransactionsProvider {
 
   async createNewTransactionFromWallet(wallet: Wallet, chain: string, to: string, amount: string, fee: string, type: TxType, data: any = {}, foreignKeys?: string[]) {
     let tx = new Tx();
-    tx.version = '2';
+    tx.version = '3';
     tx.chain = chain;
     tx.from = [wallet.address];
     tx.to = [to];
@@ -58,12 +65,13 @@ export class TransactionsProvider {
     return tx;
   }
 
-  async simulateTransactions(txs: Transaction[], fromSlice: string, env: EnvironmentContext, ignoreBalance: boolean = false): Promise<TransactionsToExecute> {
+  async simulateTransactions(txs: Tx[], fromSlice: string, env: EnvironmentContext, ignoreBalance: boolean = false): Promise<TransactionsToExecute> {
     if (!this.task.isRun) throw new Error(`task not run`);
     let tte: TransactionsToExecute = {
       id: helper.getRandomHash(),
       env: env,
       txs: txs,
+      vmIndex: this.vmIndex,
       fromSlice: fromSlice,
       ignoreBalance: ignoreBalance,
       outputs: [],
@@ -71,6 +79,10 @@ export class TransactionsProvider {
         keys: [],
         values: [],
       }
+    }
+    this.vmIndex++;
+    if (this.vmIndex >= this.applicationContext.vmSize) {
+      this.vmIndex = 0;
     }
     this.transactionsToExecute.set(tte.id, tte);
     this.mq.send(RoutingKeys.add_transactions_to_execute, tte);
@@ -88,29 +100,38 @@ export class TransactionsProvider {
     return tte;
   }
 
-  async saveNewTransaction(tx: Tx) {
+  async saveMempoolTransactions(mempool: MempoolTx[]) {
+    let txsInfo: Transaction[] = [];
+    let txs: Tx[] = [];
+    for (let i = 0; i < mempool.length; i++) {
+      const mempoolTx = mempool[i];
 
-    const registeredTx = await this.TransactionRepository.findByHash(tx.hash);
-    if (!registeredTx) {
-      tx.isValid();
-
-      const newTx = {
-        tx: tx,
-        isExecuted: false,
-        slicesHash: '',
-        blockHash: '',
-        create: Date.now(),
-        status: BlockchainStatus.TX_MEMPOOL
+      const txInfo: Transaction = {
+        chain: mempoolTx.tx.chain,
+        hash: mempoolTx.tx.hash,
+        isExecuted: mempoolTx.isExecuted,
+        slicesHash: mempoolTx.slicesHash,
+        blockHash: mempoolTx.blockHash,
+        received: mempoolTx.received,
+        status: mempoolTx.status
       }
-      await this.TransactionRepository.save(newTx);
-      this.mq.send(RoutingKeys.new_tx, tx);
-      return newTx;
+      txsInfo.push(txInfo);
+      txs.push(mempoolTx.tx);
     }
-    return registeredTx;
+    await this.TransactionRepository.saveTxMany(txs);
+    await this.TransactionRepository.saveMany(txsInfo);
   }
 
   public async updateTransaction(infoTx: Transaction) {
     await this.TransactionRepository.save(infoTx);
+  }
+
+  public async updateTransactions(txs: Transaction[]) {
+    await this.TransactionRepository.saveMany(txs);
+  }
+
+  public async saveTxs(txs: Tx[]) {
+    await this.TransactionRepository.saveTxMany(txs);
   }
 
   async getTxInfo(hash: string) {
@@ -124,6 +145,71 @@ export class TransactionsProvider {
   }
 
   async getTransactions(TXHashs: string[]) {
+    return await this.TransactionRepository.findTxByHashs(TXHashs);
+  }
+  async getTransactionsInfo(TXHashs: string[]) {
     return await this.TransactionRepository.findByHashs(TXHashs);
+  }
+
+  async executeTransaction(ctx: RuntimeContext, tx: Tx, output: TxOutput) {
+    let error: string | null = null;
+    for (let i = 0; i < output.get.length && !error; i++) {
+      const key = output.get[i];
+      if (ctx.setMainKeys.has(key)) {
+        error = `changed key`;
+      }
+    }
+    for (let i = 0; i < output.envs.keys.length && !error; i++) {
+      const key = output.envs.keys[i];
+      const value = output.envs.values[i];
+      ctx.setStageKeys.set(key, {
+        chain: ctx.env.chain,
+        hash: ctx.env.fromContextHash,
+        key: key,
+        value: value,
+      })
+    }
+    for (let j = 0; j < output.walletAddress.length && !error; j++) {
+      const address = output.walletAddress[j];
+      const amount = BigInt(output.walletAmount[j]);
+
+      const walletBalance = await ctx.get(`${address}-WB`);
+      let balance = 0n;
+      if (walletBalance) {
+        balance = BigInt(walletBalance);
+      }
+      balance = balance + amount;
+      await ctx.set(`${address}-WB`, balance.toString());
+      if (balance < 0n) {
+        error = `low balance`;
+      }
+    }
+    let debit = BigInt(output.debit);
+    for (let j = 0; j < tx.from.length && !error; j++) {
+      const address = tx.from[j];
+
+      const walletBalance = await ctx.get(`${address}-WB`);
+      let balance = 0n;
+      if (walletBalance) {
+        balance = BigInt(walletBalance);
+      }
+      if (balance >= debit) {
+        balance = balance - debit;
+        debit = 0n;
+      } else {
+        debit = debit - balance;
+        balance = 0n;
+      }
+      await ctx.set(`${address}-WB`, balance.toString());
+    }
+    if (debit > 0n && !error) {
+      error = `Insuficient funds`;
+    }
+    if (!error) {
+      ctx.commit();
+    } else {
+      ctx.deleteCommit();
+    }
+    return error;
   }
 }
