@@ -1,4 +1,4 @@
-import { Slice, TxOutput } from '@bywise/web3';
+import { Slice } from '@bywise/web3';
 
 export type Slices = {
   slice: Slice,
@@ -6,5 +6,4 @@ export type Slices = {
   isExecuted: boolean,
   status: string,
   blockHash: string,
-  outputs: TxOutput[],
 };

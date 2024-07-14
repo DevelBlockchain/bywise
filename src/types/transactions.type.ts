@@ -134,13 +134,3 @@ export type TransactionsToExecute = {
   outputs: TxOutput[];
   envOut: EnvironmentChanges;
 }
-
-export type MempoolTx = {
-  tx: Tx,
-  status: string,
-  isExecuted: boolean,
-  output?: TxOutput,
-  slicesHash: string,
-  blockHash: string,
-  received: number,
-}

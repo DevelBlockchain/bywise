@@ -1,9 +1,8 @@
 import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
-import { Tx, TxOutput } from '@bywise/web3';
+import { Tx } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { BlockchainStatus, TransactionsToExecute } from '../types';
-import { Transaction } from '../models';
+import { TransactionsToExecute } from '../types';
 import { RequestKeys } from '../datasource/message-queue';
 import { ApiService } from '../services';
 
@@ -19,7 +18,7 @@ export default async function transactionsController(app: express.Express, apiPr
         securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'searchBy', in: 'query', pattern: /^address|from|to|key|status$/ },
+            { name: 'searchBy', in: 'query', pattern: /^address|from|to|key$/ },
             { name: 'value', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
         ],
         responses: [{
@@ -63,21 +62,6 @@ export default async function transactionsController(app: express.Express, apiPr
             count = await TransactionRepository.countByChainAndKey(chain, value);
         } else if (searchBy === 'address') {
             count = await TransactionRepository.countByChainAndAddress(chain, value);
-        } else if (searchBy === 'status') {
-            let status: BlockchainStatus | undefined;
-            if (value === 'mempool') {
-                status = BlockchainStatus.TX_MEMPOOL;
-            } else if (value === 'failed') {
-                status = BlockchainStatus.TX_FAILED;
-            } else if (value === 'confirmed') {
-                status = BlockchainStatus.TX_CONFIRMED;
-            } else if (value === 'mined') {
-                status = BlockchainStatus.TX_MINED;
-            }
-            if (!status) {
-                return res.status(400).send({ error: `invalid status ${value}` });
-            }
-            count = await TransactionRepository.countByChainAndStatus(chain, status);
         } else {
             return res.status(400).send({ error: `invalid searchBy ${searchBy}` });
         }
@@ -92,7 +76,7 @@ export default async function transactionsController(app: express.Express, apiPr
         securityType: ['node'],
         parameters: [
             { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'searchBy', in: 'query', pattern: /^address|from|to|key|status$/ },
+            { name: 'searchBy', in: 'query', pattern: /^address|from|to|key$/ },
             { name: 'value', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'limit', in: 'query', pattern: /^[0-9]+$/ },
             { name: 'offset', in: 'query', pattern: /^[0-9]+$/ },
@@ -124,7 +108,7 @@ export default async function transactionsController(app: express.Express, apiPr
         const chain = req.params.chain as string;
         const searchBy = req.query.searchBy as string;
         const value = req.query.value as string;
-        let txs: Transaction[] = [];
+        let txs: Tx[] = [];
 
         if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
 
@@ -142,21 +126,6 @@ export default async function transactionsController(app: express.Express, apiPr
             txs = await TransactionRepository.findByChainAndKey(chain, value, limit, offset, order);
         } else if (searchBy === 'address') {
             txs = await TransactionRepository.findByChainAndAddress(chain, value, limit, offset, order);
-        } else if (searchBy === 'status') {
-            let status: BlockchainStatus | undefined;
-            if (value === 'mempool') {
-                status = BlockchainStatus.TX_MEMPOOL;
-            } else if (value === 'failed') {
-                status = BlockchainStatus.TX_FAILED;
-            } else if (value === 'confirmed') {
-                status = BlockchainStatus.TX_CONFIRMED;
-            } else if (value === 'mined') {
-                status = BlockchainStatus.TX_MINED;
-            }
-            if (!status) {
-                return res.status(400).send({ error: `invalid status ${value}` });
-            }
-            txs = await TransactionRepository.findByChainAndStatus(chain, status, limit, offset, order);
         } else {
             return res.status(400).send({ error: `invalid searchBy ${searchBy}` });
         }
@@ -183,10 +152,9 @@ export default async function transactionsController(app: express.Express, apiPr
     })
     router.get('/transactions/hash/:hash', async (req: express.Request, res: express.Response) => {
         const hash = req.params.hash;
-        const txInfo = await TransactionRepository.findByHash(hash);
         const tx = await TransactionRepository.findTxByHash(hash);
-        if (!txInfo) return res.status(404).send({ error: "Transaction not found" });
-        return res.send({ ...tx, status: txInfo.status, output: txInfo.output });
+        if (!tx) return res.status(404).send({ error: "Transaction not found" });
+        return res.send(tx);
     });
 
     metadataDocument.addPath({

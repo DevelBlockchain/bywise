@@ -110,9 +110,9 @@ export default async function contractsController(app: express.Express, apiProvi
         const bcc = await apiProvider.applicationContext.mq.request(RequestKeys.get_contract, { chain, address: address });
         if (bcc) {
             const txHash = (JSON.parse(bcc)).txHash;
-            const btx = await TransactionRepository.findByHash(txHash);
-            if (!btx) return res.status(404).send({ error: "Transaction not found" });
-            return res.send(btx.output);
+            const tx = await TransactionRepository.findTxByHash(txHash);
+            if (!tx) return res.status(404).send({ error: "Transaction not found" });
+            return res.send(tx.output);
         }
     });
 

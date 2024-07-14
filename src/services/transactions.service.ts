@@ -1,7 +1,6 @@
 import { Tx, TxOutput, TxType, Wallet } from '@bywise/web3';
-import { ApplicationContext, BlockchainStatus, TransactionsToExecute, Task, EnvironmentContext, MempoolTx } from '../types';
+import { ApplicationContext, TransactionsToExecute, Task, EnvironmentContext } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
-import { Transaction } from '../models';
 import helper from '../utils/helper';
 import { RuntimeContext } from '../vm/RuntimeContext';
 
@@ -100,55 +99,12 @@ export class TransactionsProvider {
     return tte;
   }
 
-  async saveMempoolTransactions(mempool: MempoolTx[]) {
-    let txsInfo: Transaction[] = [];
-    let txs: Tx[] = [];
-    for (let i = 0; i < mempool.length; i++) {
-      const mempoolTx = mempool[i];
-
-      const txInfo: Transaction = {
-        chain: mempoolTx.tx.chain,
-        hash: mempoolTx.tx.hash,
-        isExecuted: mempoolTx.isExecuted,
-        slicesHash: mempoolTx.slicesHash,
-        blockHash: mempoolTx.blockHash,
-        received: mempoolTx.received,
-        status: mempoolTx.status
-      }
-      txsInfo.push(txInfo);
-      txs.push(mempoolTx.tx);
-    }
+  public async save(txs: Tx[]) {
     await this.TransactionRepository.saveTxMany(txs);
-    await this.TransactionRepository.saveMany(txsInfo);
-  }
-
-  public async updateTransaction(infoTx: Transaction) {
-    await this.TransactionRepository.save(infoTx);
-  }
-
-  public async updateTransactions(txs: Transaction[]) {
-    await this.TransactionRepository.saveMany(txs);
-  }
-
-  public async saveTxs(txs: Tx[]) {
-    await this.TransactionRepository.saveTxMany(txs);
-  }
-
-  async getTxInfo(hash: string) {
-    const txInfo = await this.TransactionRepository.findByHash(hash);
-    if (!txInfo) throw new Error(`transaction not found ${hash}`);
-    return txInfo;
-  }
-
-  async getMempool(chain: string) {
-    return await this.TransactionRepository.findByChainAndStatus(chain, BlockchainStatus.TX_MEMPOOL);
   }
 
   async getTransactions(TXHashs: string[]) {
     return await this.TransactionRepository.findTxByHashs(TXHashs);
-  }
-  async getTransactionsInfo(TXHashs: string[]) {
-    return await this.TransactionRepository.findByHashs(TXHashs);
   }
 
   async executeTransaction(ctx: RuntimeContext, tx: Tx, output: TxOutput) {

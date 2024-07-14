@@ -5,7 +5,6 @@ import ConsensusAlgorithm from "./consensus-algorithm.core";
 import ExecuteBlocks from "./exec-blocks.core";
 import ExecuteSlices from "./exec-slices.core";
 import ExecuteTransactions from "./exec-transactions.core";
-import InvalideteOldTransactions from "./invalidate-old-transactions";
 import KeepSyncBlocks from "./keep-sync-blocks.core";
 import KeepSyncNetwork from "./keep-sync-network.core";
 import KeepSyncSlices from "./keep-sync-slices.core";
@@ -110,16 +109,13 @@ export default class PipelineChain implements Task {
         try {
             const syncNetwork = new KeepSyncNetwork(this.coreProvider);
             const syncSlices = new KeepSyncSlices(this.coreProvider);
-            const invalidateTx = new InvalideteOldTransactions(this.coreProvider);
 
             await syncNetwork.start();
             await syncSlices.start();
-            await invalidateTx.start();
 
-            while (this.isRun && syncNetwork.isRun && syncSlices.isRun && invalidateTx.isRun) {
+            while (this.isRun && syncNetwork.isRun && syncSlices.isRun) {
                 let used = await syncNetwork.run();
                 used = used || await syncSlices.run();
-                used = used || await invalidateTx.run();
 
                 if(!used) {
                     await helper.sleep(DEFAULT_DELAY);

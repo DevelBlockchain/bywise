@@ -1,5 +1,5 @@
-import { Block, EnvironmentChanges, Slice, Tx, TxOutput, TxType } from "@bywise/web3";
-import { BlockchainStatus, CompiledContext, MempoolTx, ZERO_HASH } from "../types";
+import { Block, EnvironmentChanges, Slice, Tx, TxType } from "@bywise/web3";
+import { BlockchainStatus, CompiledContext, ZERO_HASH } from "../types";
 import helper from "../utils/helper";
 import { Slices } from "../models";
 import { CoreProvider } from "../services";
@@ -78,7 +78,7 @@ export default class MintSlices implements Task {
             return false;
         }
 
-        let newTransactions: MempoolTx[] = [];
+        let newTransactions: Tx[] = [];
         const env = {
             chain: this.coreProvider.chain,
             fromContextHash: CompiledContext.SLICE_MINT_CONTEXT_HASH,
@@ -113,18 +113,9 @@ export default class MintSlices implements Task {
             tx.output = output;
             tx.hash = tx.toHash();
             tx.sign = [await mainWallet.signHash(tx.hash)];
-            const mempoolTx: MempoolTx = {
-                tx: tx,
-                status: BlockchainStatus.TX_CONFIRMED,
-                isExecuted: true,
-                slicesHash: '',
-                blockHash: '',
-                output: output,
-                received: helper.getNow(),
-            }
             await this.transactionsProvider.executeTransaction(ctx, tx, output);
-            newTransactions.push(mempoolTx);
-            promises.push(this.transactionsProvider.saveMempoolTransactions([mempoolTx]));
+            newTransactions.push(tx);
+            promises.push(this.transactionsProvider.save([tx]));
         }
 
         const uptime = new Date().getTime();
@@ -132,21 +123,19 @@ export default class MintSlices implements Task {
         while ((currentTime - uptime) < TIME_LIMIT_SLICE && !end) {
             const mempool = this.TransactionRepository.getMempoolArray(1000);
             
+            const successTxs = []
             for (let i = 0; i < mempool.length; i++) {
-                const mempoolTx = mempool[i];
+                const tx = mempool[i];
 
-                if (mempoolTx.output) {
-                    const error = await this.transactionsProvider.executeTransaction(ctx, mempoolTx.tx, mempoolTx.output);
+                if (tx.output) {
+                    const error = await this.transactionsProvider.executeTransaction(ctx, tx, tx.output);
                     if (!error) {
-                        mempoolTx.status = BlockchainStatus.TX_CONFIRMED;
-                        newTransactions.push(mempoolTx);
-                    } else {
-                        mempoolTx.status = BlockchainStatus.TX_FAILED;
-                        mempoolTx.output.error = error;
+                        newTransactions.push(tx);
+                        successTxs.push(tx);
                     }
                 }
             }
-            promises.push(this.transactionsProvider.saveMempoolTransactions(mempool));
+            promises.push(this.transactionsProvider.save(successTxs));
             
             currentTime = new Date().getTime();
             if (currentTime / 1000 >= currentMinnedBlock.created + this.coreProvider.blockTime) {
@@ -170,18 +159,9 @@ export default class MintSlices implements Task {
                 tx.output = output;
                 tx.hash = tx.toHash();
                 tx.sign = [await mainWallet.signHash(tx.hash)];
-                const mempoolTx: MempoolTx = {
-                    tx: tx,
-                    status: BlockchainStatus.TX_CONFIRMED,
-                    isExecuted: true,
-                    slicesHash: '',
-                    blockHash: '',
-                    output: output,
-                    received: helper.getNow(),
-                }
                 await this.transactionsProvider.executeTransaction(ctx, tx, output);
-                newTransactions.push(mempoolTx);
-                promises.push(this.transactionsProvider.saveMempoolTransactions([mempoolTx]));
+                newTransactions.push(tx);
+                promises.push(this.transactionsProvider.save([tx]));
                 end = true;
                 this.coreProvider.applicationContext.logger.verbose(`mint slice - mint by END`);
             }
@@ -220,7 +200,7 @@ export default class MintSlices implements Task {
         return isMining;
     }
 
-    private async mintSlice(lastSliceHash: string, height: number, transactions: MempoolTx[], currentMinnedBlock: Block, end: boolean, changes: EnvironmentChanges): Promise<Slices> {
+    private async mintSlice(lastSliceHash: string, height: number, transactions: Tx[], currentMinnedBlock: Block, end: boolean, changes: EnvironmentChanges): Promise<Slices> {
         if (transactions.length === 0) throw new Error(`mint slice without transactions`);
         const mainWallet = this.mainWallet;
 
@@ -228,7 +208,7 @@ export default class MintSlices implements Task {
         slice.height = height;
         slice.transactionsCount = transactions.length;
         slice.blockHeight = currentMinnedBlock.height + 1;
-        slice.transactions = transactions.map(txInfo => txInfo.tx.hash);
+        slice.transactions = transactions.map(tx => tx.hash);
         slice.version = '3';
         slice.chain = currentMinnedBlock.chain;
         slice.from = mainWallet.address;
@@ -244,8 +224,7 @@ export default class MintSlices implements Task {
             isComplete: true,
             isExecuted: true,
             status: BlockchainStatus.TX_CONFIRMED,
-            blockHash: '',
-            outputs: transactions.map(txInfo => txInfo.output) as TxOutput[],
+            blockHash: ''
         };
         await this.environmentProvider.push(changes, bslice.slice.chain, bslice.slice.hash, bslice.slice.lastHash, bslice.slice.hash);
         await this.SliceRepository.save(bslice);

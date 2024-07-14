@@ -1,7 +1,7 @@
 import { EnvironmentChanges, Slice, Tx } from '@bywise/web3';
-import { ApplicationContext, BlockchainStatus, CompiledContext, MempoolTx } from '../types';
+import { ApplicationContext, BlockchainStatus, CompiledContext } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
-import { Slices, Transaction } from '../models';
+import { Slices } from '../models';
 import { TransactionsProvider } from './transactions.service';
 import { EnvironmentProvider } from './environment.service';
 import { RuntimeContext } from '../vm/RuntimeContext';
@@ -34,8 +34,7 @@ export class SlicesProvider {
         isComplete: false,
         isExecuted: false,
         status: BlockchainStatus.TX_MEMPOOL,
-        blockHash: '',
-        outputs: []
+        blockHash: ''
       }
       await this.SliceRepository.save(bSlice);
       this.mq.send(RoutingKeys.new_slice, slice);
@@ -60,12 +59,12 @@ export class SlicesProvider {
 
     let isComplete = true;
 
-    const mempool: MempoolTx[] = [];
+    const mempool: Tx[] = [];
     for (let z = 0; z < sliceInfo.slice.transactions.length; z++) {
       const txHash = sliceInfo.slice.transactions[z];
       const mempoolTx = await this.TransactionRepository.getFromMempool(txHash);
       if (!mempoolTx) {
-        const tx = await this.TransactionRepository.findByHash(txHash);
+        const tx = await this.TransactionRepository.findTxByHash(txHash);
         if (!tx) {
           isComplete = false;
           await this.mq.send(RoutingKeys.find_tx, txHash);
@@ -74,8 +73,10 @@ export class SlicesProvider {
         mempool.push(mempoolTx);
       }
     }
+    if(mempool.length > 0) {
+      await this.transactionsProvider.save(mempool);
+    }
     if (isComplete) {
-      await this.transactionsProvider.saveMempoolTransactions(mempool);
       sliceInfo.isComplete = true;
       this.logger.verbose(`sync-slices: complete - height: ${sliceInfo.slice.blockHeight} - hash: ${sliceInfo.slice.hash.substring(0, 10)}... - from: ${sliceInfo.slice.from.substring(0, 10)}...`)
       await this.updateSlice(sliceInfo);
@@ -87,7 +88,6 @@ export class SlicesProvider {
     let success = false;
     let error = false;
     try {
-      sliceInfo.outputs = [];
       const env = {
         chain: chain,
         fromContextHash: CompiledContext.SLICE_CONTEXT_HASH,
@@ -102,11 +102,10 @@ export class SlicesProvider {
 
       const txs = await this.TransactionRepository.findTxByHashs(sliceInfo.slice.transactions);
       const tte = await this.transactionsProvider.simulateTransactions(txs, sliceInfo.slice.lastHash, env);
-      sliceInfo.outputs = tte.outputs;
       for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
         const txHash = sliceInfo.slice.transactions[j];
         const tx = new Tx(txs[j]);
-        const output = sliceInfo.outputs[j];
+        const output = tte.outputs[j];
 
         const hash = tx.toHash();
         const received = tx.output;
@@ -143,16 +142,6 @@ export class SlicesProvider {
         sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
         await this.environmentProvider.push(envOut, chain, sliceInfo.slice.hash, sliceInfo.slice.lastHash, sliceInfo.slice.hash);
         this.logger.verbose(`exec-slices: exec slice - height: ${sliceInfo.slice.blockHeight} - txs: ${sliceInfo.slice.transactionsCount} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
-
-        const transactions = await this.transactionsProvider.getTransactionsInfo(sliceInfo.slice.transactions);
-        for (let j = 0; j < transactions.length && !error; j++) {
-          const txInfo = transactions[j];
-          if (txInfo.status === BlockchainStatus.TX_MEMPOOL) {
-            txInfo.status = BlockchainStatus.TX_CONFIRMED;
-            txInfo.output = sliceInfo.outputs[j];
-          }
-        }
-        await this.transactionsProvider.updateTransactions(transactions);
       }
     } catch (err: any) {
       this.logger.error(`Error: ${err.message}`, err);
@@ -203,7 +192,6 @@ export class SlicesProvider {
       isComplete: slice.isComplete,
       isExecuted: slice.isExecuted,
       blockHash: slice.blockHash,
-      outputs: slice.outputs,
     }
     return sliceInfo;
   }
@@ -214,7 +202,6 @@ export class SlicesProvider {
       bslice.status = infoSlice.status;
       bslice.isComplete = infoSlice.isComplete;
       bslice.isExecuted = infoSlice.isExecuted;
-      bslice.outputs = infoSlice.outputs;
       await this.SliceRepository.save(bslice);
     }
   }

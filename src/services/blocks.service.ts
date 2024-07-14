@@ -246,14 +246,6 @@ export class BlocksProvider {
     for (let j = 0; j < blockInfo.block.slices.length; j++) {
       const sliceHash = blockInfo.block.slices[j];
       const sliceInfo = await this.slicesProvider.getSliceInfo(sliceHash);
-      const transactions = await this.transactionsProvider.getTransactionsInfo(sliceInfo.slice.transactions);
-      for (let z = 0; z < transactions.length; z++) {
-        const txInfo = transactions[z];
-        txInfo.status = BlockchainStatus.TX_CONFIRMED;
-        txInfo.blockHash = '';
-        txInfo.slicesHash = '';
-      }
-      await this.transactionsProvider.updateTransactions(transactions);
       sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
       sliceInfo.blockHash = '';
       await this.slicesProvider.updateSlice(sliceInfo);
@@ -281,17 +273,6 @@ export class BlocksProvider {
     for (let j = 0; j < blockInfo.block.slices.length; j++) {
       const sliceHash = blockInfo.block.slices[j];
       const sliceInfo = await this.slicesProvider.getSliceInfo(sliceHash);
-
-      const transactions = await this.transactionsProvider.getTransactionsInfo(sliceInfo.slice.transactions);
-      for (let z = 0; z < transactions.length; z++) {
-        const txInfo = transactions[z];
-        txInfo.status = BlockchainStatus.TX_MINED;
-        txInfo.slicesHash = sliceInfo.slice.hash;
-        txInfo.blockHash = blockInfo.block.hash;
-        txInfo.output = sliceInfo.outputs[z];
-        if (!txInfo.output) throw new Error('selectMinedBlock - last tx output not found');
-      }
-      await this.transactionsProvider.updateTransactions(transactions);
       sliceInfo.status = BlockchainStatus.TX_MINED;
       sliceInfo.blockHash = blockInfo.block.hash;
       await this.slicesProvider.updateSlice(sliceInfo);
@@ -308,7 +289,7 @@ export class BlocksProvider {
 
     if (blockPack.block.height !== 0) throw new Error(`expected height = 0`);
     if (blockPack.block.lastHash !== ZERO_HASH) throw new Error(`invalid lastHash ${blockPack.block.lastHash}`);
-    this.applicationContext.logger.verbose(`select new zero block`)
+    this.applicationContext.logger.verbose(`select new zero block`);
 
     const newBlock: Blocks = {
       block: blockPack.block,
