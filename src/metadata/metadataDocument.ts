@@ -1,6 +1,6 @@
-import express from 'express';
 const pjson = require('./../../package.json');
 import { MetadataResponseType, MetadataValueWithoutNameType, MetadataValueType, MetadataPathType, MetadataParanType } from "../types";
+import { WSRequest } from '../types/network.type';
 
 export const DEFAULT_ERROR_RESPONSE: MetadataResponseType[] = [
     {
@@ -43,7 +43,7 @@ class MetadataDocument {
     paths: MetadataPathType[] = [];
     schemas: MetadataValueType[] = [];
 
-    validateInput(path: MetadataPathType, req: express.Request) {
+    validateInput(path: MetadataPathType, req: WSRequest) {
         if (path.body) {
             this.validateValueWithoutName('body', req.body, path.body)
         }

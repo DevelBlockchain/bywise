@@ -1,13 +1,11 @@
 import { Express, Request, Response, NextFunction } from 'express';
-import { AuthProvider } from '../services';
-import { ApplicationContext } from '../types';
+import { ApiService } from '../services';
+import { MetadataPathType, TokenInfo, WSNode, WSRequest } from '../types';
 
-export default function authMiddleware(app: Express, applicationContext: ApplicationContext): void {
-    const authProvider = new AuthProvider(applicationContext);
+function useAuthMiddleware(app: Express, apiProvider: ApiService): void {
 
     async function validateToken(req: Request, res: Response, next: NextFunction): Promise<void> {
         if (!req.metadataPathType) {
-            applicationContext.logger.error('findPath not found '+ req.path)
             res.status(404).send({ error: "Not found" });
             return;
         }
@@ -31,7 +29,7 @@ export default function authMiddleware(app: Express, applicationContext: Applica
             return;
         }
 
-        const decode = await authProvider.checkJWT(token);
+        const decode = await apiProvider.authProvider.checkJWT(token);
         if (!decode) {
             res.status(401).send({ error: "Token expired" });
             return;
@@ -48,3 +46,38 @@ export default function authMiddleware(app: Express, applicationContext: Applica
 
     app.use(validateToken);
 }
+
+async function wsAuthMiddleware(apiProvider: ApiService, node: WSNode, req: WSRequest, metadataPath: MetadataPathType): Promise<TokenInfo | null> {
+    if (metadataPath.security === false) {
+        return {
+            type: 'user',
+            id: node.ip,
+        };
+    }
+    const token = req.token;
+    if (!token) {
+        apiProvider.sendToNode(node, {
+            id: req.id,
+            status: 401,
+            body: { error: `No token provided` }
+        });
+        return null;
+    }
+    const decode = await apiProvider.authProvider.checkJWT(token);
+    if (!decode) {
+        apiProvider.sendToNode(node, {
+            id: req.id,
+            status: 401,
+            body: { error: `Token expired` }
+        });
+        return null;
+    }
+    return decode;
+}
+
+const authMiddleware = {
+    useAuthMiddleware,
+    wsAuthMiddleware,
+}
+
+export default authMiddleware;

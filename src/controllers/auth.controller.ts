@@ -1,16 +1,28 @@
 import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
-import { ApplicationContext } from '../types';
+import { RequestProcess } from '../types';
 import helper from '../utils/helper';
 import fs from 'fs';
+import { ApiService } from '../services';
 
 const pidusage = require('pidusage');
 const v8 = require('v8');
 
-export default async function authController(app: express.Express, applicationContext: ApplicationContext): Promise<void> {
+export default async function authController(app: express.Express, apiProvider: ApiService): Promise<void> {
 
     const router = express.Router();
 
+    let reqProcess: RequestProcess = async (req, context) => {
+        return {
+            id: req.id,
+            body: {
+                message: 'OK',
+                ...context,
+                time: helper.getNow()
+            },
+            status: 200
+        }
+    }
     metadataDocument.addPath({
         path: "/api/v2/auth/me",
         type: 'get',
@@ -24,52 +36,30 @@ export default async function authController(app: express.Express, applicationCo
                 properties: [
 
                     { name: 'message', type: 'string', example: 'OK' },
-                    { name: 'type', type: 'string', enum: ['user', 'node', 'token'], example: 'user'},
+                    { name: 'type', type: 'string', enum: ['user', 'node', 'token'], example: 'user' },
                     { name: 'id', type: 'string', example: '632c6484947ba8178426866e' },
                     { name: 'iat', type: 'string', example: '1719159113' },
                     { name: 'exp', type: 'string', example: '1719159113' },
                     { name: 'time', type: 'string', example: '1719159113' }
                 ]
             },
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/me', async (req: express.Request, res: express.Response) => {
-        return res.send({
-            message: 'OK',
-            ...req.context,
-            time: helper.getNow()
-        });
+    router.get('/me', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
-    metadataDocument.addPath({
-        path: "/api/v2/auth/statistics",
-        type: 'get',
-        security: false,
-        controller: 'AuthController',
-        description: 'Create new account',
-        parameters: [
-            { name: 'token', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
-        ],
-        responses: [{
-            code: 200,
-            description: 'Success',
-            body: {
-                type: 'object',
-                properties: [
-                    { name: 'size', type: 'number', example: '22072'},
-                    {name: 'cpu', type: 'number', example: '34.18918918918919'},
-                    {name: 'memory', type: 'number', example: '247.33203125'},
-                    {name: 'total_heap_size', type: 'number', example: '184.8828125'},
-                    {name: 'used_heap_size', type: 'number', example: '179.84854125976562'},
-                    {name: 'heap_size_limit', type: 'number', example: '179.84854125976562'},
-                    {name: 'timestamp', type: 'number', example: '1719160195723'},
-                ]
-            },
-        }]
-    })
-    router.get('/statistics', async (req: express.Request, res: express.Response) => {
+    reqProcess = async (req, context) => {
         let token = `${req.query.token}`;
-        if (token !== process.env.TOKEN) return res.status(400).send({ error: `Forbidden` });
+        if (token !== process.env.TOKEN) {
+            return {
+                id: req.id,
+                body: { error: `Forbidden` },
+                status: 400
+            }
+        }
         let done = false;
 
         const defaultResponse = {
@@ -101,7 +91,7 @@ export default async function authController(app: express.Express, applicationCo
 
         pidusage(process.pid, (err: any, stat: any) => {
             if (err) {
-                console.log(err);
+                apiProvider.applicationContext.logger.error(err.message);
                 return;
             }
             const heap = v8.getHeapStatistics();
@@ -119,7 +109,42 @@ export default async function authController(app: express.Express, applicationCo
         while (!done) {
             await helper.sleep(100);
         }
-        return res.send(defaultResponse);
+        return {
+            id: req.id,
+            body: defaultResponse,
+            status: 200
+        }
+    }
+    metadataDocument.addPath({
+        path: "/api/v2/auth/statistics",
+        type: 'get',
+        security: false,
+        controller: 'AuthController',
+        description: 'Create new account',
+        parameters: [
+            { name: 'token', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
+        ],
+        responses: [{
+            code: 200,
+            description: 'Success',
+            body: {
+                type: 'object',
+                properties: [
+                    { name: 'size', type: 'number', example: '22072' },
+                    { name: 'cpu', type: 'number', example: '34.18918918918919' },
+                    { name: 'memory', type: 'number', example: '247.33203125' },
+                    { name: 'total_heap_size', type: 'number', example: '184.8828125' },
+                    { name: 'used_heap_size', type: 'number', example: '179.84854125976562' },
+                    { name: 'heap_size_limit', type: 'number', example: '179.84854125976562' },
+                    { name: 'timestamp', type: 'number', example: '1719160195723' },
+                ]
+            },
+        }],
+        reqProcess: reqProcess
+    })
+    router.get('/statistics', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
     app.use('/api/v2/auth', router);

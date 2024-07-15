@@ -4,12 +4,70 @@ import SCHEMA_TYPES from '../metadata/metadataSchemas';
 import { RequestKeys } from '../datasource/message-queue';
 import { ApiService } from '../services';
 import { Tx, TxType } from '@bywise/web3';
-import { CompiledContext, TransactionsToExecute } from '../types';
+import { CompiledContext, RequestProcess, TransactionsToExecute } from '../types';
 
 export default async function contractsController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
     const TransactionRepository = apiProvider.applicationContext.database.TransactionRepository;
 
+    let reqProcess: RequestProcess = async (req, context) => {
+        try {
+            const body: { code?: string, method?: string, inputs?: string[], contractAddress: string, from: string, amount: number, tag: string, env: any } = req.body;
+            const runtimeContext = body.env;
+            const contractAddress = body.contractAddress;
+
+            const tx = new Tx();
+            tx.version = '3';
+            tx.chain = 'local';
+            tx.from = [body.from];
+            tx.to = [contractAddress];
+            tx.amount = [`${body.amount}`];
+            tx.fee = '50';
+            tx.created = Math.floor(Date.now() / 1000);
+            if (body.code) {
+                tx.type = TxType.TX_CONTRACT;
+                tx.data = { contractAddress, code: body.code };
+            } else {
+                tx.type = TxType.TX_CONTRACT_EXE;
+                tx.data = [{ method: body.method, inputs: body.inputs }];
+            }
+            tx.hash = tx.toHash();
+
+            const env = {
+                chain: tx.chain,
+                fromContextHash: CompiledContext.SIMULATE_CONTEXT_HASH,
+                blockHeight: runtimeContext.blockHeight,
+                changes: runtimeContext.memory
+            }
+            const tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, env });
+
+            runtimeContext.memory = tte.envOut;
+            if (body.code && !tte.error) {
+                runtimeContext.contractAddress[contractAddress] = tte.outputs[0].output;
+            }
+
+            return {
+                id: req.id,
+                body: {
+                    env: runtimeContext,
+                    ...tte.outputs[0]
+                },
+                status: 200
+            }
+        } catch (err: any) {
+            if (err.cause && err.cause.stack) {
+                err.cause.stack = err.cause.stack.replace(/eval\.js/g, 'contract.js').replace(/<eval>/g, '<contract>').replace(/<anonymous>/g, '<contract>')
+            }
+            return {
+                id: req.id,
+                body: {
+                    error: err.message,
+                    stack: err.cause
+                },
+                status: 400
+            }
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/contracts/simulate",
         type: 'post',
@@ -32,58 +90,40 @@ export default async function contractsController(app: express.Express, apiProvi
         responses: [{
             code: 200,
             description: 'Success',
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.post('/contracts/simulate', async (req: express.Request, res: express.Response) => {
-        try {
-            const body: { code?: string, method?: string, inputs?: string[], contractAddress: string, from: string, amount: number, tag: string, env: any } = req.body;
-            const runtimeContext = body.env;
-            const contractAddress = body.contractAddress;
-
-            const tx = new Tx();
-            tx.version = '3';
-            tx.chain = 'local';
-            tx.from = [body.from];
-            tx.to = [contractAddress];
-            tx.amount = [`${body.amount}`];
-            tx.fee = '50';
-            tx.created = Math.floor(Date.now() / 1000);
-            if(body.code) {
-                tx.type = TxType.TX_CONTRACT;
-                tx.data = { contractAddress, code: body.code };
-            } else {
-                tx.type = TxType.TX_CONTRACT_EXE;
-                tx.data = [{ method: body.method, inputs: body.inputs }];
-            }
-            tx.hash = tx.toHash();
-
-            const env = {
-                chain: tx.chain,
-                fromContextHash: CompiledContext.SIMULATE_CONTEXT_HASH,
-                blockHeight: runtimeContext.blockHeight,
-                changes: runtimeContext.memory
-            }
-            const tte:TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, env });
-
-            runtimeContext.memory = tte.envOut;
-            if(body.code && !tte.error) {
-                runtimeContext.contractAddress[contractAddress] = tte.outputs[0].output;
-            }
-
-            return res.send({
-                env: runtimeContext,
-                ...tte.outputs[0]
-            });
-        } catch (err: any) {
-            if (err.cause && err.cause.stack)
-                err.cause.stack = err.cause.stack.replace(/eval\.js/g, 'contract.js').replace(/<eval>/g, '<contract>').replace(/<anonymous>/g, '<contract>')
-            return res.send({
-                error: err.message,
-                stack: err.cause
-            });
-        }
+    router.post('/contracts/simulate', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
+    reqProcess = async (req, context) => {
+        const chain = req.params.chain;
+        const address = req.params.address;
+        if (!apiProvider.chains.includes(chain)) {
+            return {
+                id: req.id,
+                body: { error: "Node does not work with this chain" },
+                status: 400
+            }
+        }
+        const bcc = await apiProvider.applicationContext.mq.request(RequestKeys.get_contract, { chain, address: address });
+        const txHash = (JSON.parse(bcc)).txHash;
+        const tx = await TransactionRepository.findTxByHash(txHash);
+        if (!tx) {
+            return {
+                id: req.id,
+                body: { error: "Transaction not found" },
+                status: 400
+            }
+        }
+        return {
+            id: req.id,
+            body: tx.output,
+            status: 200
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/contracts/abi/{chain}/{address}",
         type: 'get',
@@ -91,8 +131,8 @@ export default async function contractsController(app: express.Express, apiProvi
         description: 'Get contract by address',
         securityType: ['node'],
         parameters: [
-            { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'address', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'chain', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'address', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
         ],
         responses: [{
             code: 200,
@@ -100,51 +140,26 @@ export default async function contractsController(app: express.Express, apiProvi
             body: {
                 $ref: SCHEMA_TYPES.TransactionOutputDTO
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/contracts/abi/:chain/:address', async (req: express.Request, res: express.Response) => {
-        const chain = req.params.chain;
-        const address = req.params.address;
-        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-
-        const bcc = await apiProvider.applicationContext.mq.request(RequestKeys.get_contract, { chain, address: address });
-        if (bcc) {
-            const txHash = (JSON.parse(bcc)).txHash;
-            const tx = await TransactionRepository.findTxByHash(txHash);
-            if (!tx) return res.status(404).send({ error: "Transaction not found" });
-            return res.send(tx.output);
-        }
+    router.get('/contracts/abi/:chain/:address', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
-    metadataDocument.addPath({
-        path: "/api/v2/contracts/events/{chain}/{contractAddress}/{eventName}",
-        type: 'get',
-        controller: 'ContractsController',
-        description: 'Get contract events',
-        securityType: ['node'],
-        parameters: [
-            { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'contractAddress', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'eventName', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'key', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'value', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'page', in: 'query', pattern: /^[0-9]+$/ },
-        ],
-        responses: [{
-            code: 200,
-            description: 'Success',
-            body: {
-                $ref: SCHEMA_TYPES.TransactionOutputDTO
-            }
-        }]
-    })
-    router.get('/contracts/events/:chain/:address/:event', async (req: express.Request, res: express.Response) => {
+    reqProcess = async (req, context) => {
         const chain = req.params.chain;
         const contractAddress = req.params.contractAddress;
         const eventName = req.params.eventName;
         const page = req.query.page ? parseInt(`${req.query.page}`) : 0;
-        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-
+        if (!apiProvider.chains.includes(chain)) {
+            return {
+                id: req.id,
+                body: { error: "Node does not work with this chain" },
+                status: 400
+            }
+        }
         try {
             if (req.query.key && req.query.value) {
                 const key = `${req.query.key}`;
@@ -157,7 +172,11 @@ export default async function contractsController(app: express.Express, apiProvi
                     value,
                     page,
                 });
-                return res.send(output);
+                return {
+                    id: req.id,
+                    body: output,
+                    status: 200
+                }
             } else {
                 const output = await apiProvider.applicationContext.mq.request(RequestKeys.get_events, {
                     chain,
@@ -165,11 +184,46 @@ export default async function contractsController(app: express.Express, apiProvi
                     eventName,
                     page,
                 });
-                return res.send(output);
+                return {
+                    id: req.id,
+                    body: output,
+                    status: 200
+                }
             }
         } catch (err: any) {
-            return res.status(400).send({ error: err.message });
+            return {
+                id: req.id,
+                body: { error: err.message },
+                status: 400
+            }
         }
+    };
+    metadataDocument.addPath({
+        path: "/api/v2/contracts/events/{chain}/{contractAddress}/{eventName}",
+        type: 'get',
+        controller: 'ContractsController',
+        description: 'Get contract events',
+        securityType: ['node'],
+        parameters: [
+            { name: 'chain', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'contractAddress', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'eventName', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'key', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'value', in: 'query', pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'page', in: 'query', pattern: /^[0-9]+$/ },
+        ],
+        responses: [{
+            code: 200,
+            description: 'Success',
+            body: {
+                $ref: SCHEMA_TYPES.TransactionOutputDTO
+            }
+        }],
+        reqProcess: reqProcess,
+    })
+    router.get('/contracts/events/:chain/:address/:event', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
     app.use('/api/v2', router);

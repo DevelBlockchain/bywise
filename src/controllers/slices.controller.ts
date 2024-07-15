@@ -1,8 +1,8 @@
 import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
-import { Slice, Tx } from '@bywise/web3';
+import { Slice } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { BlockchainStatus } from '../types';
+import { BlockchainStatus, RequestProcess } from '../types';
 import { Slices } from '../models';
 import { RequestKeys } from '../datasource/message-queue';
 import { ApiService } from '../services';
@@ -10,7 +10,35 @@ import { ApiService } from '../services';
 export default async function slicesController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
     const SliceRepository = apiProvider.applicationContext.database.SliceRepository;
+    
+    let reqProcess: RequestProcess = async (req, context) => {
+        let status: BlockchainStatus = BlockchainStatus.TX_MINED;
+        if (req.query.status === 'mempool') {
+            status = BlockchainStatus.TX_MEMPOOL;
+        } else if (req.query.status === 'failed') {
+            status = BlockchainStatus.TX_FAILED;
+        }
 
+        const chain = req.params.chain;
+        if (!apiProvider.chains.includes(chain)) {
+            return {
+                id: req.id,
+                body: { error: "Node does not work with this chain" },
+                status: 400
+            }
+        }
+        
+        let count = await SliceRepository.count(chain, status);
+        if (status === BlockchainStatus.TX_MINED) {
+            const confimedSlices: Slices[] = await apiProvider.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: chain });
+            count += confimedSlices.length;
+        }
+        return {
+            id: req.id,
+            body: { count },
+            status: 200
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/slices/count/{chain}",
         type: 'get',
@@ -18,7 +46,7 @@ export default async function slicesController(app: express.Express, apiProvider
         description: 'Count slices',
         securityType: ['node'],
         parameters: [
-            { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'chain', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'status', in: 'query', pattern: /^mined|mempool|invalidated$/ },
         ],
         responses: [{
@@ -30,52 +58,15 @@ export default async function slicesController(app: express.Express, apiProvider
                     { name: 'count', type: 'number' },
                 ]
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/slices/count/:chain', async (req: express.Request, res: express.Response) => {
-        let status: BlockchainStatus = BlockchainStatus.TX_MINED;
-        if (req.query.status === 'mempool') {
-            status = BlockchainStatus.TX_MEMPOOL;
-        } else if (req.query.status === 'failed') {
-            status = BlockchainStatus.TX_FAILED;
-        }
-
-        const chain = req.params.chain;
-        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-        
-        let count = await SliceRepository.count(chain, status);
-        if (status === BlockchainStatus.TX_MINED) {
-            const confimedSlices: Slices[] = await apiProvider.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: chain });
-            count += confimedSlices.length;
-        }
-        return res.send({ count });
+    router.get('/slices/count/:chain', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
-    metadataDocument.addPath({
-        path: "/api/v2/slices/last/{chain}",
-        type: 'get',
-        controller: 'SlicesController',
-        description: 'Get slices list',
-        securityType: ['node'],
-        parameters: [
-            { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'limit', in: 'query', pattern: /^[0-9]+$/ },
-            { name: 'offset', in: 'query', pattern: /^[0-9]+$/ },
-            { name: 'order', in: 'query', pattern: /^asc|desc$/ },
-            { name: 'status', in: 'query', pattern: /^mined|mempool|invalidated$/ },
-        ],
-        responses: [{
-            code: 200,
-            description: 'Success',
-            body: {
-                type: 'array',
-                items: {
-                    $ref: SCHEMA_TYPES.SliceDTO
-                }
-            }
-        }]
-    })
-    router.get('/slices/last/:chain', async (req: express.Request, res: express.Response) => {
+    reqProcess = async (req, context) => {
         let offset = 0;
         let limit = 100;
         let status: BlockchainStatus = BlockchainStatus.TX_MINED;
@@ -91,11 +82,22 @@ export default async function slicesController(app: express.Express, apiProvider
         if (typeof req.query.limit === 'string') {
             limit = parseInt(req.query.limit);
         }
-        if (limit > 200) return res.status(400).send({ error: "invalid limit" });
+        if (limit > 200) {
+            return {
+                id: req.id,
+                body: { error: "invalid limit" },
+                status: 400
+            }
+        }
 
         const chain = req.params.chain;
-        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-
+        if (!apiProvider.chains.includes(chain)) {
+            return {
+                id: req.id,
+                body: { error: "Node does not work with this chain" },
+                status: 400
+            }
+        }
         const slices: Slice[] = [];
         if (status === BlockchainStatus.TX_MINED) {
             const confimedSlices: Slices[] = await apiProvider.applicationContext.mq.request(RequestKeys.get_confirmed_slices, { chain: chain });
@@ -103,9 +105,57 @@ export default async function slicesController(app: express.Express, apiProvider
         }
         const findSlices = await SliceRepository.find(req.params.chain, status, limit, offset, order);
         findSlices.forEach(sliceInfo => slices.push(sliceInfo.slice));
-        return res.send(slices);
+        return {
+            id: req.id,
+            body: slices,
+            status: 200
+        }
+    };
+    metadataDocument.addPath({
+        path: "/api/v2/slices/last/{chain}",
+        type: 'get',
+        controller: 'SlicesController',
+        description: 'Get slices list',
+        securityType: ['node'],
+        parameters: [
+            { name: 'chain', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'limit', in: 'query', pattern: /^[0-9]+$/ },
+            { name: 'offset', in: 'query', pattern: /^[0-9]+$/ },
+            { name: 'order', in: 'query', pattern: /^asc|desc$/ },
+            { name: 'status', in: 'query', pattern: /^mined|mempool|invalidated$/ },
+        ],
+        responses: [{
+            code: 200,
+            description: 'Success',
+            body: {
+                type: 'array',
+                items: {
+                    $ref: SCHEMA_TYPES.SliceDTO
+                }
+            }
+        }],
+        reqProcess: reqProcess,
+    })
+    router.get('/slices/last/:chain', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
+    reqProcess = async (req, context) => {
+        const sliceInfo = await SliceRepository.findByHash(req.params.hash);
+        if (!sliceInfo) {
+            return {
+                id: req.id,
+                body: { error: "Slice not found" },
+                status: 404
+            }
+        }
+        return {
+            id: req.id,
+            body: sliceInfo.slice,
+            status: 200
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/slices/hash/{hash}",
         type: 'get',
@@ -113,7 +163,7 @@ export default async function slicesController(app: express.Express, apiProvider
         description: 'Get slice by hash',
         securityType: ['node'],
         parameters: [
-            { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
+            { name: 'hash', in: 'path', required: true, pattern: /^[a-f0-9]{64}$/ },
         ],
         responses: [{
             code: 200,
@@ -121,14 +171,30 @@ export default async function slicesController(app: express.Express, apiProvider
             body: {
                 $ref: SCHEMA_TYPES.SliceDTO
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/slices/hash/:hash', async (req: express.Request, res: express.Response) => {
-        const slice = await SliceRepository.findByHash(req.params.hash);
-        if (!slice) return res.status(404).send({ error: "Slice not found" });
-        return res.send(slice.slice);
+    router.get('/slices/hash/:hash', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
+    reqProcess = async (req, context) => {
+        const sliceInfo = await SliceRepository.findByHash(req.params.hash);
+        if (!sliceInfo) {
+            return {
+                id: req.id,
+                body: { error: "Slice not found" },
+                status: 404
+            }
+        }
+        const txs = await apiProvider.transactionsProvider.getTransactions(sliceInfo.slice.transactions);
+        return {
+            id: req.id,
+            body: txs,
+            status: 200
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/slices/transactions/{hash}",
         type: 'get',
@@ -136,7 +202,7 @@ export default async function slicesController(app: express.Express, apiProvider
         description: 'Get slice by hash',
         securityType: ['node'],
         parameters: [
-            { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
+            { name: 'hash', in: 'path', required: true, pattern: /^[a-f0-9]{64}$/ },
         ],
         responses: [{
             code: 200,
@@ -147,15 +213,40 @@ export default async function slicesController(app: express.Express, apiProvider
                     $ref: SCHEMA_TYPES.TransactionDTO
                 }
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/slices/transactions/:hash', async (req: express.Request, res: express.Response) => {
-        const bslice = await SliceRepository.findByHash(req.params.hash);
-        if (!bslice) return res.status(404).send({ error: "Slice not found" });
-        const txs = await apiProvider.transactionsProvider.getTransactions(bslice.slice.transactions);
-        return res.send(txs);
+    router.get('/slices/transactions/:hash', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
+    reqProcess = async (req, context) => {
+        const slice = new Slice(req.body);
+        try {
+            if (!apiProvider.chains.includes(slice.chain)) {
+                return {
+                    id: req.id,
+                    body: { error: "Node does not work with this chain" },
+                    status: 400
+                }
+            }
+            await apiProvider.slicesProvider.saveNewSlice(slice);
+            return {
+                id: req.id,
+                body: {
+                    message: 'OK'
+                },
+                status: 200
+            }
+        } catch (err: any) {
+            return {
+                id: req.id,
+                body: { error: err.message },
+                status: 400
+            }
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/slices",
         type: 'post',
@@ -171,19 +262,12 @@ export default async function slicesController(app: express.Express, apiProvider
             body: {
                 $ref: SCHEMA_TYPES.SuccessResponse
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.post('/slices', async (req: express.Request, res: express.Response) => {
-        const slice = new Slice(req.body);
-        try {
-            if (!apiProvider.chains.includes(slice.chain)) {
-                return res.status(400).send({ error: `Node does not work with this chain` });
-            }
-            await apiProvider.slicesProvider.saveNewSlice(slice);
-            return res.send({ message: 'OK' });
-        } catch (err: any) {
-            return res.status(400).send({ error: err.message });
-        }
+    router.post('/slices', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
     app.use('/api/v2', router);

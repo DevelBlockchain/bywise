@@ -1,14 +1,36 @@
 import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
-import { Block, Slice } from '@bywise/web3';
+import { Block } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
-import { BlockchainStatus } from '../types';
+import { BlockchainStatus, RequestProcess } from '../types';
 import { ApiService } from '../services';
 
 export default async function blocksController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
     const BlockRepository = apiProvider.applicationContext.database.BlockRepository;
 
+    let reqProcess: RequestProcess = async (req, context) => {
+        let status: BlockchainStatus = BlockchainStatus.TX_MINED;
+        if (req.query.status === 'mempool') {
+            status = BlockchainStatus.TX_MEMPOOL;
+        } else if (req.query.status === 'failed') {
+            status = BlockchainStatus.TX_FAILED;
+        }
+        const chain = req.params.chain;
+        if (!apiProvider.chains.includes(chain)) {
+            return {
+                id: req.id,
+                body: { error: "Node does not work with this chain" },
+                status: 400
+            }
+        }
+        const count = await BlockRepository.countBlocksByStatus(chain, status);
+        return {
+            id: req.id,
+            body: { count },
+            status: 200
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/blocks/count/{chain}",
         type: 'get',
@@ -16,7 +38,7 @@ export default async function blocksController(app: express.Express, apiProvider
         description: 'Count blocks',
         securityType: ['node'],
         parameters: [
-            { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'chain', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
             { name: 'status', in: 'query', pattern: /^mined|mempool|invalidated$/ },
         ],
         responses: [{
@@ -28,46 +50,15 @@ export default async function blocksController(app: express.Express, apiProvider
                     { name: 'count', type: 'number' },
                 ]
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/blocks/count/:chain', async (req: express.Request, res: express.Response) => {
-        let status: BlockchainStatus = BlockchainStatus.TX_MINED;
-        if (req.query.status === 'mempool') {
-            status = BlockchainStatus.TX_MEMPOOL;
-        } else if (req.query.status === 'failed') {
-            status = BlockchainStatus.TX_FAILED;
-        }
-        const chain = req.params.chain;
-        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-        const count = await BlockRepository.countBlocksByStatus(chain, status);
-        return res.send({ count });
+    router.get('/blocks/count/:chain', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
-    metadataDocument.addPath({
-        path: "/api/v2/blocks/last/{chain}",
-        type: 'get',
-        controller: 'BlocksController',
-        description: 'Get blocks list',
-        securityType: ['node'],
-        parameters: [
-            { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'limit', in: 'query', pattern: /^[0-9]+$/ },
-            { name: 'offset', in: 'query', pattern: /^[0-9]+$/ },
-            { name: 'order', in: 'query', pattern: /^asc|desc$/ },
-            { name: 'status', in: 'query', pattern: /^mined|mempool|invalidated$/ },
-        ],
-        responses: [{
-            code: 200,
-            description: 'Success',
-            body: {
-                type: 'array',
-                items: {
-                    $ref: SCHEMA_TYPES.BlockWithStatusDTO
-                }
-            }
-        }]
-    })
-    router.get('/blocks/last/:chain', async (req: express.Request, res: express.Response) => {
+    reqProcess = async (req, context) => {
         let offset = 0;
         let limit = 100;
         let order: 'asc' | 'desc' = req.query.order === 'asc' ? 'asc' : 'desc';
@@ -83,15 +74,86 @@ export default async function blocksController(app: express.Express, apiProvider
         if (typeof req.query.limit === 'string') {
             limit = parseInt(req.query.limit);
         }
-        if (limit > 200) return res.status(400).send({ error: "invalid limit" });
+        if (limit > 200) {
+            return {
+                id: req.id,
+                body: { error: "invalid limit" },
+                status: 400
+            }
+        }
 
         const chain = req.params.chain;
-        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
+        if (!apiProvider.chains.includes(chain)) {
+            return {
+                id: req.id,
+                body: { error: "Node does not work with this chain" },
+                status: 400
+            }
+        }
         const blocks = await BlockRepository.findBlocksLastsByStatus(chain, status, limit, offset, order);
-
-        return res.send(blocks.map(block => ({ ...(new Block(block.block)), status: block.status })));
+        return {
+            id: req.id,
+            body: blocks.map(block => ({ ...block.block, status: block.status })),
+            status: 200
+        }
+    };
+    metadataDocument.addPath({
+        path: "/api/v2/blocks/last/{chain}",
+        type: 'get',
+        controller: 'BlocksController',
+        description: 'Get blocks list',
+        securityType: ['node'],
+        parameters: [
+            { name: 'chain', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'limit', in: 'query', pattern: /^[0-9]+$/ },
+            { name: 'offset', in: 'query', pattern: /^[0-9]+$/ },
+            { name: 'order', in: 'query', pattern: /^asc|desc$/ },
+            { name: 'status', in: 'query', pattern: /^mined|mempool|invalidated$/ },
+        ],
+        responses: [{
+            code: 200,
+            description: 'Success',
+            body: {
+                type: 'array',
+                items: {
+                    $ref: SCHEMA_TYPES.BlockWithStatusDTO
+                }
+            }
+        }],
+        reqProcess: reqProcess,
+    })
+    router.get('/blocks/last/:chain', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
+    reqProcess = async (req, context) => {
+        const chain = req.params.chain;
+        if (!apiProvider.chains.includes(chain)) {
+            return {
+                id: req.id,
+                body: { error: "Node does not work with this chain" },
+                status: 400
+            }
+        }
+
+        const blocks = await BlockRepository.findByChainAndHeight(chain, parseInt(req.params.height));
+        for (let i = 0; i < blocks.length; i++) {
+            const block = blocks[i];
+            if (block.status === BlockchainStatus.TX_MINED) {
+                return {
+                    id: req.id,
+                    body: block.block,
+                    status: 200
+                }
+            }
+        }
+        return {
+            id: req.id,
+            body: { error: "not found" },
+            status: 400
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/blocks/height/{chain}/{height}",
         type: 'get',
@@ -99,8 +161,8 @@ export default async function blocksController(app: express.Express, apiProvider
         description: 'Get blocks list',
         securityType: ['node'],
         parameters: [
-            { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'height', in: 'path', pattern: /^[0-9]+$/ },
+            { name: 'chain', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'height', in: 'path', required: true, pattern: /^[0-9]+$/ },
         ],
         responses: [{
             code: 200,
@@ -111,22 +173,29 @@ export default async function blocksController(app: express.Express, apiProvider
                     $ref: SCHEMA_TYPES.BlockDTO
                 }
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/blocks/height/:chain/:height', async (req: express.Request, res: express.Response) => {
-        const chain = req.params.chain;
-        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-
-        const blocks = await BlockRepository.findByChainAndHeight(chain, parseInt(req.params.height));
-        for (let i = 0; i < blocks.length; i++) {
-            const block = blocks[i];
-            if(block.status === BlockchainStatus.TX_MINED) {
-                return res.send(new Block(block.block));
-            }
-        }
-        return res.status(400).send({ error: "not found" });
+    router.get('/blocks/height/:chain/:height', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
+    reqProcess = async (req, context) => {
+        const block = await BlockRepository.findByHash(req.params.hash);
+        if (!block) {
+            return {
+                id: req.id,
+                body: { error: "Block not found" },
+                status: 400
+            }
+        }
+        return {
+            id: req.id,
+            body: { ...block.block, status: block.status },
+            status: 200
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/blocks/hash/{hash}",
         type: 'get',
@@ -134,7 +203,7 @@ export default async function blocksController(app: express.Express, apiProvider
         description: 'Get block by hash',
         securityType: ['node'],
         parameters: [
-            { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
+            { name: 'hash', in: 'path', required: true, pattern: /^[a-f0-9]{64}$/ },
         ],
         responses: [{
             code: 200,
@@ -142,14 +211,30 @@ export default async function blocksController(app: express.Express, apiProvider
             body: {
                 $ref: SCHEMA_TYPES.BlockWithStatusDTO
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/blocks/hash/:hash', async (req: express.Request, res: express.Response) => {
-        const block = await BlockRepository.findByHash(req.params.hash);
-        if (!block) return res.status(404).send({ error: "Block not found" });
-        return res.send({ ...new Block(block.block), status: block.status });
+    router.get('/blocks/hash/:hash', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
+    reqProcess = async (req, context) => {
+        const block = await BlockRepository.findByHash(req.params.hash);
+        if (!block) {
+            return {
+                id: req.id,
+                body: { error: "Block not found" },
+                status: 400
+            }
+        }
+        const slices = await apiProvider.slicesProvider.getSlices(block.block.slices);
+        return {
+            id: req.id,
+            body: slices,
+            status: 200
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/blocks/slices/{hash}",
         type: 'get',
@@ -157,7 +242,7 @@ export default async function blocksController(app: express.Express, apiProvider
         description: 'Get slice by block hash',
         securityType: ['node'],
         parameters: [
-            { name: 'hash', in: 'path', pattern: /^[a-f0-9]{64}$/ },
+            { name: 'hash', in: 'path', required: true, pattern: /^[a-f0-9]{64}$/ },
         ],
         responses: [{
             code: 200,
@@ -168,20 +253,38 @@ export default async function blocksController(app: express.Express, apiProvider
                     $ref: SCHEMA_TYPES.SliceDTO
                 }
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/blocks/slices/:hash', async (req: express.Request, res: express.Response) => {
-        const block = await BlockRepository.findByHash(req.params.hash);
-        if (!block) return res.status(404).send({ error: "Block not found" });
-        const bslices = await apiProvider.slicesProvider.getSlices(block.block.slices);
-        const slices: Slice[] = [];
-        for (let i = 0; i < bslices.length; i++) {
-            const bslice = bslices[i];
-            slices.push(new Slice(bslice.slice));
-        }
-        return res.send(slices);
+    router.get('/blocks/slices/:hash', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
+    reqProcess = async (req, context) => {
+        const chain = req.params.chain;
+        if (!apiProvider.chains.includes(chain)) {
+            return {
+                id: req.id,
+                body: { error: "Node does not work with this chain" },
+                status: 400
+            }
+        }
+        const blockPack = await apiProvider.blockProvider.getBlockPack(chain, parseInt(req.params.height));
+        if (blockPack) {
+            return {
+                id: req.id,
+                body: blockPack,
+                status: 200
+            }
+        } else {
+            return {
+                id: req.id,
+                body: { error: "Block Pack not found" },
+                status: 400
+            }
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/blocks/pack/{chain}/{height}",
         type: 'get',
@@ -189,8 +292,8 @@ export default async function blocksController(app: express.Express, apiProvider
         description: 'Get mined block with all slices and transactions by height',
         securityType: ['node'],
         parameters: [
-            { name: 'chain', in: 'path', pattern: /^[a-zA-Z0-9_]+$/ },
-            { name: 'height', in: 'path', pattern: /^[0-9]{1,10}$/ },
+            { name: 'chain', in: 'path', required: true, pattern: /^[a-zA-Z0-9_]+$/ },
+            { name: 'height', in: 'path', required: true, pattern: /^[0-9]{1,10}$/ },
         ],
         responses: [{
             code: 200,
@@ -211,19 +314,38 @@ export default async function blocksController(app: express.Express, apiProvider
                     },
                 ]
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.get('/blocks/pack/:chain/:height', async (req: express.Request, res: express.Response) => {
-        const chain = req.params.chain;
-        if (!apiProvider.chains.includes(chain)) return res.status(400).send({ error: "Node does not work with this chain" });
-        const blockPack = await apiProvider.blockProvider.getBlockPack(chain, parseInt(req.params.height));
-        if (blockPack) {
-            res.send(blockPack);
-        } else {
-            return res.status(400).send({ error: `Block Pack not found` });
-        }
+    router.get('/blocks/pack/:chain/:height', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
+    reqProcess = async (req, context) => {
+        const block = new Block(req.body);
+        try {
+            if (!apiProvider.chains.includes(block.chain)) {
+                return {
+                    id: req.id,
+                    body: { error: "Node does not work with this chain" },
+                    status: 400
+                }
+            }
+            await apiProvider.blockProvider.saveNewBlock(block);
+            return {
+                id: req.id,
+                body: { message: 'OK' },
+                status: 200
+            }
+        } catch (err: any) {
+            return {
+                id: req.id,
+                body: { error: err.message },
+                status: 400
+            }
+        }
+    };
     metadataDocument.addPath({
         path: "/api/v2/blocks",
         type: 'post',
@@ -239,19 +361,12 @@ export default async function blocksController(app: express.Express, apiProvider
             body: {
                 $ref: SCHEMA_TYPES.SuccessResponse
             }
-        }]
+        }],
+        reqProcess: reqProcess,
     })
-    router.post('/blocks', async (req: express.Request, res: express.Response) => {
-        const block = new Block(req.body);
-        try {
-            if (!apiProvider.chains.includes(block.chain)) {
-                return res.status(400).send({ error: `Node does not work with this chain` });
-            }
-            await apiProvider.blockProvider.saveNewBlock(block);
-            return res.send({ message: 'OK' });
-        } catch (err: any) {
-            return res.status(400).send({ error: err.message });
-        }
+    router.post('/blocks', async (req: any, res: express.Response) => {
+        const response = await reqProcess(req, req.context);
+        return res.status(response.status).send(response.body);
     });
 
     app.use('/api/v2', router);

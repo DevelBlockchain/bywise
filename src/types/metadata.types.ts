@@ -1,3 +1,5 @@
+import { WSRequest, WSResponse } from "./network.type"
+
 export type MetadataValueWithoutNameType = {
     type?: 'string' | 'number' | 'boolean' | 'object' | 'array',
     enum?: string[],
@@ -39,6 +41,8 @@ export type MetadataResponseType = {
 
 type SecurityType = 'user' | 'node' | 'token';
 
+export type RequestProcess = (req: WSRequest, context: any) => Promise<WSResponse>
+
 export type MetadataPathType = {
     path: string,
     security?: boolean,
@@ -48,5 +52,6 @@ export type MetadataPathType = {
     description: string,
     body?: MetadataValueWithoutNameType,
     parameters?: MetadataParanType[],
-    responses: MetadataResponseType[]
+    responses: MetadataResponseType[],
+    reqProcess: RequestProcess
 }
