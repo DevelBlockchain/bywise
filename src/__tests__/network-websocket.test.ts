@@ -1,5 +1,4 @@
 import { BywiseNode, Wallet, Web3 } from '@bywise/web3';
-import request from 'supertest';
 import Bywise from '../bywise';
 import { AuthProvider } from '../services';
 import helper from '../utils/helper';
@@ -20,11 +19,11 @@ beforeAll(async () => {
         keyJWT: keyJWT,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
-        myHost: `http://localhost:${port0}`,
+        myHost: `ws://localhost:${port0}`,
         initialNodes: [],
         zeroBlocks: [],
         mainWalletSeed: (new Wallet()).seed,
-        startServices: ['api', 'vm'],
+        startServices: ['api', 'vm', 'network'],
         vmSize: 1,
         vmIndex: 0
     });
@@ -33,14 +32,14 @@ beforeAll(async () => {
     node1 = await Bywise.newBywiseInstance({
         name: `test${port1}`,
         port: port1,
-        keyJWT: helper.getRandomString(),
+        keyJWT: keyJWT,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
-        myHost: `http://localhost:${port1}`,
-        initialNodes: [`http://localhost:${port0}`],
+        myHost: `ws://localhost:${port1}`,
+        initialNodes: [],
         zeroBlocks: [],
         mainWalletSeed: (new Wallet()).seed,
-        startServices: ['api', 'vm'],
+        startServices: ['api', 'vm', 'network'],
         vmSize: 1,
         vmIndex: 0
     });
@@ -50,11 +49,11 @@ beforeAll(async () => {
         keyJWT: helper.getRandomString(),
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
-        myHost: `http://localhost:${port2}`,
-        initialNodes: [`http://localhost:${port0}`],
+        myHost: `ws://localhost:${port2}`,
+        initialNodes: [],
         zeroBlocks: [],
         mainWalletSeed: (new Wallet()).seed,
-        startServices: ['api', 'vm'],
+        startServices: ['api', 'vm', 'network'],
         vmSize: 1,
         vmIndex: 0
     });
@@ -92,7 +91,7 @@ describe('node connect', () => {
         expect(node1.core.network.web3.network.isConnected).toEqual(false);
         expect(node2.core.network.web3.network.isConnected).toEqual(false);
 
-        await node1.core.network.start();
+        await node1.core.network.start([`ws://localhost:${port0}`]);
 
         expect(node0.core.network.connectedNodesSize()).toEqual(1);
         expect(node1.core.network.connectedNodesSize()).toEqual(1);
@@ -101,7 +100,16 @@ describe('node connect', () => {
         expect(node1.core.network.web3.network.isConnected).toEqual(true);
         expect(node2.core.network.web3.network.isConnected).toEqual(false);
 
-        await node2.core.network.start();
+        await node2.core.network.start([`ws://localhost:${port0}`]);
+
+        expect(node0.core.network.connectedNodesSize()).toEqual(2);
+        expect(node1.core.network.connectedNodesSize()).toEqual(1);
+        expect(node2.core.network.connectedNodesSize()).toEqual(2);
+        expect(node0.core.network.web3.network.isConnected).toEqual(true);
+        expect(node1.core.network.web3.network.isConnected).toEqual(true);
+        expect(node2.core.network.web3.network.isConnected).toEqual(true);
+
+        await node1.core.network.web3.network.connect();
 
         expect(node0.core.network.connectedNodesSize()).toEqual(2);
         expect(node1.core.network.connectedNodesSize()).toEqual(2);
@@ -111,133 +119,118 @@ describe('node connect', () => {
         expect(node2.core.network.web3.network.isConnected).toEqual(true);
     });
 
-    test('discovery nodes', async () => {
-        expect(node0.core.network.connectedNodesSize()).toEqual(0);
-        expect(node1.core.network.connectedNodesSize()).toEqual(0);
-        expect(node2.core.network.connectedNodesSize()).toEqual(0);
+    test('Web3.tryToken - invalid token', async () => {
+        await node0.core.network.start();
 
-        await node0.core.network.start([]);
-        await node2.core.network.start([]);
-
-        expect(node0.core.network.connectedNodesSize()).toEqual(0);
-        expect(node1.core.network.connectedNodesSize()).toEqual(0);
-        expect(node2.core.network.connectedNodesSize()).toEqual(0);
-
-        await node1.core.network.start([`http://localhost:${port0}`, `http://localhost:${port2}`]);
-
-        expect(node0.core.network.connectedNodesSize()).toEqual(1);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(1);
-
-        await node0.core.network.web3.network.connect(); // node0 discovery node2
-
-        expect(node0.core.network.connectedNodesSize()).toEqual(2);
-        expect(node1.core.network.connectedNodesSize()).toEqual(2);
-        expect(node2.core.network.connectedNodesSize()).toEqual(2);
-    });
-
-    test('tryHandshake invalid token', async () => {
-        const bywiseNode = new BywiseNode({
+        const bywiseNode0 = new BywiseNode({
             chains: ['local'],
-            address: node1.applicationContext.mainWallet.address,
-            host: `http://localhost:${port0}`,
+            address: node0.applicationContext.mainWallet.address,
+            host: `ws://localhost:${port0}`,
             version: '2',
             expire: Math.floor((new Date().getTime() + 10 * 60 * 1000) / 1000),
             token: 'asdfasdfasdfasdfasdf',
         });
-        const res = await request(node0.api.server)
-            .post('/api/v2/nodes/handshake')
-            .send(bywiseNode);
-        expect(res.status).toEqual(400);
+        const req = await Web3.tryToken(bywiseNode0);
+
+        expect(req.error).toEqual("Token expired");
+    });
+
+    test('Web3.tryToken - valid', async () => {
+        await node0.core.network.start();
+
+        const bywiseNode0 = new BywiseNode({
+            chains: ['local'],
+            address: node0.applicationContext.mainWallet.address,
+            host: `ws://localhost:${port0}`,
+            version: '2',
+            expire: Math.floor((new Date().getTime() + 10 * 60 * 1000) / 1000),
+            token: await authProvide.createNodeToken(60),
+        });
+        const req = await Web3.tryToken(bywiseNode0);
+
+        expect(req.error).toEqual(undefined);
+    });
+
+    test('tryHandshake invalid token', async () => {
+        await node0.core.network.start();
+
+        const bywiseNode = new BywiseNode({
+            chains: ['local'],
+            address: node1.applicationContext.mainWallet.address,
+            host: `ws://localhost:${port0}`,
+            version: '2',
+            expire: Math.floor((new Date().getTime() + 10 * 60 * 1000) / 1000),
+            token: 'asdfasdfasdfasdfasdf',
+        });
+        const web3 = new Web3()
+        const res = await web3.network.getAPI(bywiseNode).tryHandshake(`ws://localhost:${port1}`, bywiseNode);
+        expect(res.error).toEqual("could not connect to node - Token expired");
+
+        await helper.sleep(100);
 
         const nodesSize = node0.core.network.connectedNodesSize();
         expect(nodesSize).toEqual(0);
     });
 
     test('tryHandshake valid token', async () => {
+        await node0.core.network.start();
+
         const bywiseNode = new BywiseNode({
             chains: ['local'],
             address: node1.applicationContext.mainWallet.address,
-            host: `http://127.0.0.1:${port0}`,
+            host: `ws://127.0.0.1:${port1}`,
             version: '2',
             expire: Math.floor((new Date().getTime() + 60 * 1000) / 1000),
             token: await authProvide.createNodeToken(60),
         });
-        const res = await request(node0.api.server)
-            .post('/api/v2/nodes/handshake')
-            .send(bywiseNode);
-        expect(res.status).toEqual(200);
 
-        await helper.sleep(1000);
+        const web3 = new Web3()
+        const res = await web3.network.getAPI(bywiseNode).tryHandshake(bywiseNode.host, bywiseNode);
+        expect(res.error).toEqual(undefined);
+
+        await helper.sleep(100);
 
         const nodesSize = node0.core.network.connectedNodesSize();
         expect(nodesSize).toEqual(1);
     });
 })
 
-describe('client connect', () => {
-
-    test('tryHandshake', async () => {
-        const res = await request(node0.api.server)
-            .post('/api/v2/nodes/handshake');
-        expect(res.status).toEqual(200);
-        expect(typeof res.body).toEqual('object');
-        expect(typeof res.body.token).toEqual('string');
-
-        await helper.sleep(1000);
-
-        const nodesSize = node0.core.network.connectedNodesSize();
-        expect(nodesSize).toEqual(0);
-    });
-
-    test('tryToken valid token', async () => {
-        let res = await request(node0.api.server)
-            .post('/api/v2/nodes/handshake');
-
-        let token = res.body.token;
-
-        res = await request(node0.api.server)
-            .get('/api/v2/nodes/try-token')
-            .set('authorization', `Node ${token}`);
-        expect(res.status).toEqual(200);
-    });
-
-    test('tryToken invalid token', async () => {
-        let res = await request(node0.api.server)
-            .get('/api/v2/nodes/try-token')
-            .set('authorization', `Node ${helper.getRandomString()}`);
-        expect(res.status).toEqual(401);
-    });
-
-    test('tryToken default token', async () => {
-        let res = await request(node0.api.server)
-            .get('/api/v2/nodes/try-token')
-            .set('authorization', `Node ${keyJWT}`);
-        expect(res.status).toEqual(200);
-    });
-})
-
 describe('client network discovery', () => {
 
     beforeEach(async () => {
-        await node0.core.network.start();
+        await node0.core.network.start([`ws://localhost:${port1}`]);
+        await node1.core.network.start([`ws://localhost:${port0}`]);
 
         const nodesSize = node0.core.network.connectedNodesSize();
-        expect(nodesSize).toEqual(0);
+        expect(nodesSize).toEqual(1);
     })
+
+    test('tryHandshake', async () => {
+        const web3 = new Web3({
+            initialNodes: [`ws://localhost:${port0}`]
+        })
+        const connected = await web3.network.connect();
+        expect(connected).toEqual(true);
+
+        const nodesSize = node0.core.network.connectedNodesSize();
+        expect(nodesSize).toEqual(1);
+    });
 
     test('create client', async () => {
         const web3 = new Web3({
-            initialNodes: [`http://localhost:${port0}`]
+            initialNodes: [`ws://localhost:${port0}`]
         });
         expect(web3.network.connectedNodes.length).toEqual(0);
     });
 
     test('try connect client', async () => {
         const web3 = new Web3({
-            initialNodes: [`http://localhost:${port0}`]
+            initialNodes: [`ws://localhost:${port0}`]
         });
         await web3.network.connect();
-        expect(web3.network.connectedNodes.length).toEqual(1);
+        expect(web3.network.connectedNodes.length).toEqual(2);
+
+        const nodesSize = node0.core.network.connectedNodesSize();
+        expect(nodesSize).toEqual(1);
     });
 })
