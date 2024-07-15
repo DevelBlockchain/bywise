@@ -135,7 +135,12 @@ export default class MintSlices implements Task {
                     }
                 }
             }
-            promises.push(this.transactionsProvider.save(successTxs));
+            if(successTxs.length > 0) {
+                promises.push(this.transactionsProvider.save(successTxs));
+            }
+            if(mempool.length == 0) {
+                await helper.sleep(100);
+            }
             
             currentTime = new Date().getTime();
             if (currentTime / 1000 >= currentMinnedBlock.created + this.coreProvider.blockTime) {
