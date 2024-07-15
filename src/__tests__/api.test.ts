@@ -17,10 +17,12 @@ beforeAll(async () => {
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port0}`,
+        vmSize: 1,
+        vmIndex: 0,
         initialNodes: [],
         zeroBlocks: [],
         mainWalletSeed: wallet.seed,
-        startServices: ['api'],
+        startServices: ['api', 'vm'],
     });
 }, 30000)
 

@@ -10,7 +10,7 @@ export default async function contractsController(app: express.Express, apiProvi
     const router = express.Router();
     const TransactionRepository = apiProvider.applicationContext.database.TransactionRepository;
 
-    let reqProcess: RequestProcess = async (req, context) => {
+    const reqProcessSimulate: RequestProcess = async (req, context) => {
         try {
             const body: { code?: string, method?: string, inputs?: string[], contractAddress: string, from: string, amount: number, tag: string, env: any } = req.body;
             const runtimeContext = body.env;
@@ -91,14 +91,14 @@ export default async function contractsController(app: express.Express, apiProvi
             code: 200,
             description: 'Success',
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessSimulate,
     })
     router.post('/contracts/simulate', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessSimulate(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessABI: RequestProcess = async (req, context) => {
         const chain = req.params.chain;
         const address = req.params.address;
         if (!apiProvider.chains.includes(chain)) {
@@ -141,14 +141,14 @@ export default async function contractsController(app: express.Express, apiProvi
                 $ref: SCHEMA_TYPES.TransactionOutputDTO
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessABI,
     })
     router.get('/contracts/abi/:chain/:address', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessABI(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessEvents: RequestProcess = async (req, context) => {
         const chain = req.params.chain;
         const contractAddress = req.params.contractAddress;
         const eventName = req.params.eventName;
@@ -219,10 +219,10 @@ export default async function contractsController(app: express.Express, apiProvi
                 $ref: SCHEMA_TYPES.TransactionOutputDTO
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessEvents,
     })
     router.get('/contracts/events/:chain/:address/:event', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessEvents(req, req.context);
         return res.status(response.status).send(response.body);
     });
 

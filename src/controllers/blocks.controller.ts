@@ -9,7 +9,7 @@ export default async function blocksController(app: express.Express, apiProvider
     const router = express.Router();
     const BlockRepository = apiProvider.applicationContext.database.BlockRepository;
 
-    let reqProcess: RequestProcess = async (req, context) => {
+    const reqProcessCount: RequestProcess = async (req, context) => {
         let status: BlockchainStatus = BlockchainStatus.TX_MINED;
         if (req.query.status === 'mempool') {
             status = BlockchainStatus.TX_MEMPOOL;
@@ -51,14 +51,14 @@ export default async function blocksController(app: express.Express, apiProvider
                 ]
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessCount,
     })
     router.get('/blocks/count/:chain', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessCount(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessLast: RequestProcess = async (req, context) => {
         let offset = 0;
         let limit = 100;
         let order: 'asc' | 'desc' = req.query.order === 'asc' ? 'asc' : 'desc';
@@ -120,14 +120,14 @@ export default async function blocksController(app: express.Express, apiProvider
                 }
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessLast,
     })
     router.get('/blocks/last/:chain', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessLast(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessHeight: RequestProcess = async (req, context) => {
         const chain = req.params.chain;
         if (!apiProvider.chains.includes(chain)) {
             return {
@@ -174,14 +174,14 @@ export default async function blocksController(app: express.Express, apiProvider
                 }
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessHeight,
     })
     router.get('/blocks/height/:chain/:height', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessHeight(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessHash: RequestProcess = async (req, context) => {
         const block = await BlockRepository.findByHash(req.params.hash);
         if (!block) {
             return {
@@ -212,14 +212,14 @@ export default async function blocksController(app: express.Express, apiProvider
                 $ref: SCHEMA_TYPES.BlockWithStatusDTO
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessHash,
     })
     router.get('/blocks/hash/:hash', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessHash(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessSlices: RequestProcess = async (req, context) => {
         const block = await BlockRepository.findByHash(req.params.hash);
         if (!block) {
             return {
@@ -254,14 +254,14 @@ export default async function blocksController(app: express.Express, apiProvider
                 }
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessSlices,
     })
     router.get('/blocks/slices/:hash', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessSlices(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessPack: RequestProcess = async (req, context) => {
         const chain = req.params.chain;
         if (!apiProvider.chains.includes(chain)) {
             return {
@@ -315,14 +315,14 @@ export default async function blocksController(app: express.Express, apiProvider
                 ]
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessPack,
     })
     router.get('/blocks/pack/:chain/:height', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessPack(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessBlock: RequestProcess = async (req, context) => {
         const block = new Block(req.body);
         try {
             if (!apiProvider.chains.includes(block.chain)) {
@@ -362,10 +362,10 @@ export default async function blocksController(app: express.Express, apiProvider
                 $ref: SCHEMA_TYPES.SuccessResponse
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessBlock,
     })
     router.post('/blocks', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessBlock(req, req.context);
         return res.status(response.status).send(response.body);
     });
 

@@ -8,7 +8,7 @@ import { RequestProcess } from '../types';
 export default async function walletsController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
 
-    let reqProcess: RequestProcess = async (req) => {
+    const reqProcessWallets: RequestProcess = async (req) => {
         const chain = req.params.chain;
         if (!apiProvider.chains.includes(chain)) return {
             id: req.id,
@@ -41,10 +41,10 @@ export default async function walletsController(app: express.Express, apiProvide
                 $ref: SCHEMA_TYPES.TransactionDTO
             }
         }],
-        reqProcess: reqProcess
+        reqProcess: reqProcessWallets
     });
     router.get('/wallets/:address/:chain', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessWallets(req, req.context);
         return res.status(response.status).send(response.body);
     });
 

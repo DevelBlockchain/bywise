@@ -10,7 +10,7 @@ export default async function transactionsController(app: express.Express, apiPr
     const router = express.Router();
     const TransactionRepository = apiProvider.applicationContext.database.TransactionRepository;
 
-    let reqProcess: RequestProcess = async (req, context) => {
+    const reqProcessCount: RequestProcess = async (req, context) => {
         const chain = req.query.chain as string;
         const searchBy = req.query.searchBy as string;
         const value = req.query.value as string;
@@ -100,14 +100,14 @@ export default async function transactionsController(app: express.Express, apiPr
                 ]
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessCount,
     })
     router.get('/transactions/count', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessCount(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessLast: RequestProcess = async (req, context) => {
         let offset = 0;
         let limit = 100;
         let order: 'asc' | 'desc' = req.query.order === 'asc' ? 'asc' : 'desc';
@@ -198,14 +198,14 @@ export default async function transactionsController(app: express.Express, apiPr
                 }
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessLast,
     })
     router.get('/transactions/last/:chain', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessLast(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessHash: RequestProcess = async (req, context) => {
         const hash = req.params.hash;
         const tx = await TransactionRepository.findTxByHash(hash);
         if (!tx) {
@@ -237,14 +237,14 @@ export default async function transactionsController(app: express.Express, apiPr
                 $ref: SCHEMA_TYPES.TransactionWithStatusDTO
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessHash,
     })
     router.get('/transactions/hash/:hash', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessHash(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessFee: RequestProcess = async (req, context) => {
         const tx = new Tx(req.body);
         try {
             if (!apiProvider.chains.includes(tx.chain)) {
@@ -294,14 +294,14 @@ export default async function transactionsController(app: express.Express, apiPr
                 $ref: SCHEMA_TYPES.TransactionOutputDTO
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessFee,
     })
     router.post('/transactions/fee', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessFee(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessTransactions: RequestProcess = async (req, context) => {
         const tx = new Tx(req.body);
         try {
             if (!apiProvider.chains.includes(tx.chain)) {
@@ -346,14 +346,14 @@ export default async function transactionsController(app: express.Express, apiPr
                 $ref: SCHEMA_TYPES.TransactionDTO
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessTransactions,
     })
     router.post('/transactions', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessTransactions(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessPub: RequestProcess = async (req, context) => {
         const body: { token: string, chain: string, to: string[], amount: string[], type: string, foreignKeys: string[], data: any } = req.body;
         try {
             if (body.token !== process.env.TOKEN) {
@@ -433,10 +433,10 @@ export default async function transactionsController(app: express.Express, apiPr
                 $ref: SCHEMA_TYPES.TransactionDTO
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessPub,
     })
     router.post('/transactions/publish', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessPub(req, req.context);
         return res.status(response.status).send(response.body);
     });
 

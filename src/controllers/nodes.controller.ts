@@ -11,7 +11,7 @@ export default async function nodesController(app: express.Express, apiProvider:
 
     const nodeProvider = new NodesProvider(apiProvider.applicationContext);
 
-    let reqProcess: RequestProcess = async (req, context) => {
+    const reqProcessInfo: RequestProcess = async (req, context) => {
         const connectedNodes = await apiProvider.applicationContext.mq.request(RequestKeys.get_connected_nodes);
         return {
             id: req.id,
@@ -32,14 +32,14 @@ export default async function nodesController(app: express.Express, apiProvider:
                 $ref: SCHEMA_TYPES.NodeInfoDTO
             }
         }],
-        reqProcess: reqProcess
+        reqProcess: reqProcessInfo
     })
     router.get('/info', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessInfo(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessTryToken: RequestProcess = async (req, context) => {
         const connectedNodes = await apiProvider.applicationContext.mq.request(RequestKeys.get_connected_nodes);
         return {
             id: req.id,
@@ -60,14 +60,14 @@ export default async function nodesController(app: express.Express, apiProvider:
                 $ref: SCHEMA_TYPES.NodeInfoDTO
             }
         }],
-        reqProcess: reqProcess
+        reqProcess: reqProcessTryToken
     })
     router.get('/try-token', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessTryToken(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessHandshake: RequestProcess = async (req, context) => {
         const node = new BywiseNode(req.body);
         if (node.token) {
             let remoteInfo = await Web3.tryToken(node);
@@ -102,10 +102,10 @@ export default async function nodesController(app: express.Express, apiProvider:
                 $ref: SCHEMA_TYPES.NodeDTO
             }
         }],
-        reqProcess: reqProcess
+        reqProcess: reqProcessHandshake
     })
     router.post('/handshake', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessHandshake(req, req.context);
         return res.status(response.status).send(response.body);
     });
 

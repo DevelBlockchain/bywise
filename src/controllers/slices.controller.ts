@@ -11,7 +11,7 @@ export default async function slicesController(app: express.Express, apiProvider
     const router = express.Router();
     const SliceRepository = apiProvider.applicationContext.database.SliceRepository;
     
-    let reqProcess: RequestProcess = async (req, context) => {
+    const reqProcessCount: RequestProcess = async (req, context) => {
         let status: BlockchainStatus = BlockchainStatus.TX_MINED;
         if (req.query.status === 'mempool') {
             status = BlockchainStatus.TX_MEMPOOL;
@@ -59,14 +59,14 @@ export default async function slicesController(app: express.Express, apiProvider
                 ]
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessCount,
     })
     router.get('/slices/count/:chain', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessCount(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessLast: RequestProcess = async (req, context) => {
         let offset = 0;
         let limit = 100;
         let status: BlockchainStatus = BlockchainStatus.TX_MINED;
@@ -134,14 +134,14 @@ export default async function slicesController(app: express.Express, apiProvider
                 }
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessLast,
     })
     router.get('/slices/last/:chain', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessLast(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessHash: RequestProcess = async (req, context) => {
         const sliceInfo = await SliceRepository.findByHash(req.params.hash);
         if (!sliceInfo) {
             return {
@@ -172,14 +172,14 @@ export default async function slicesController(app: express.Express, apiProvider
                 $ref: SCHEMA_TYPES.SliceDTO
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessHash,
     })
     router.get('/slices/hash/:hash', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessHash(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessSliceTxHash: RequestProcess = async (req, context) => {
         const sliceInfo = await SliceRepository.findByHash(req.params.hash);
         if (!sliceInfo) {
             return {
@@ -214,14 +214,14 @@ export default async function slicesController(app: express.Express, apiProvider
                 }
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessSliceTxHash,
     })
     router.get('/slices/transactions/:hash', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessSliceTxHash(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessSlices: RequestProcess = async (req, context) => {
         const slice = new Slice(req.body);
         try {
             if (!apiProvider.chains.includes(slice.chain)) {
@@ -263,10 +263,10 @@ export default async function slicesController(app: express.Express, apiProvider
                 $ref: SCHEMA_TYPES.SuccessResponse
             }
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessSlices,
     })
     router.post('/slices', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessSlices(req, req.context);
         return res.status(response.status).send(response.body);
     });
 

@@ -12,7 +12,7 @@ export default async function authController(app: express.Express, apiProvider: 
 
     const router = express.Router();
 
-    let reqProcess: RequestProcess = async (req, context) => {
+    const reqProcessMe: RequestProcess = async (req, context) => {
         return {
             id: req.id,
             body: {
@@ -44,14 +44,14 @@ export default async function authController(app: express.Express, apiProvider: 
                 ]
             },
         }],
-        reqProcess: reqProcess,
+        reqProcess: reqProcessMe,
     })
     router.get('/me', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessMe(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
-    reqProcess = async (req, context) => {
+    const reqProcessStatistics: RequestProcess = async (req, context) => {
         let token = `${req.query.token}`;
         if (token !== process.env.TOKEN) {
             return {
@@ -140,10 +140,10 @@ export default async function authController(app: express.Express, apiProvider: 
                 ]
             },
         }],
-        reqProcess: reqProcess
+        reqProcess: reqProcessStatistics
     })
     router.get('/statistics', async (req: any, res: express.Response) => {
-        const response = await reqProcess(req, req.context);
+        const response = await reqProcessStatistics(req, req.context);
         return res.status(response.status).send(response.body);
     });
 
