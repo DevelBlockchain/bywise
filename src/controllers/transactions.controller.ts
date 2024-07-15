@@ -167,10 +167,9 @@ export default async function transactionsController(app: express.Express, apiPr
                 status: 400
             }
         }
-        const arr = await TransactionRepository.findTxByHashs(txs.map(txInfo => txInfo.hash));
         return {
             id: req.id,
-            body: arr,
+            body: txs,
             status: 200
         }
     };

@@ -39,7 +39,7 @@ export class TransactionRepository {
         for (let i = 0; i < txs.length; i++) {
             const tx = txs[i];
 
-            query.push({ key: `${this.table}-tx-${tx.hash}`, data: tx });
+            query.push({ key: `${this.table}-hash-${tx.hash}`, data: tx });
             query.push({ key: `${this.table}-chain-${tx.chain}-${tx.created}-${tx.hash}`, data: tx.hash });
 
             const addresses: string[] = []
@@ -78,11 +78,11 @@ export class TransactionRepository {
     }
 
     async findTxByHash(hash: string): Promise<Tx | null> {
-        return await this.db.get(`${this.table}-tx-${hash}`);
+        return await this.db.get(`${this.table}-hash-${hash}`);
     }
 
     async findTxByHashs(hashs: string[]): Promise<Tx[]> {
-        return await this.db.getMany(hashs.map(hash => `${this.table}-tx-${hash}`))
+        return await this.db.getMany(hashs.map(hash => `${this.table}-hash-${hash}`))
     }
 
     async findByChain(chain: string, limit?: number, offset?: number, order: 'asc' | 'desc' = 'asc'): Promise<Tx[]> {
