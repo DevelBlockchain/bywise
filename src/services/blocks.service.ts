@@ -4,7 +4,6 @@ import { RoutingKeys } from "../datasource/message-queue";
 import { Blocks, Slices } from "../models";
 import { ApplicationContext, BlockchainStatus, ZERO_HASH } from '../types';
 import { MinnerProvider } from './minner.service';
-import { EnvironmentProvider } from "./environment.service";
 import { SlicesProvider } from "./slices.service";
 import { TransactionsProvider } from "./transactions.service";
 
@@ -12,7 +11,6 @@ export class BlocksProvider {
 
   private applicationContext;
   private mq;
-  private environmentProvider;
   private minnerProvider;
   private slicesProvider;
   private transactionsProvider;
@@ -24,7 +22,6 @@ export class BlocksProvider {
   constructor(applicationContext: ApplicationContext, slicesProvider: SlicesProvider, transactionsProvider: TransactionsProvider) {
     this.applicationContext = applicationContext;
     this.mq = applicationContext.mq;
-    this.environmentProvider = new EnvironmentProvider(applicationContext);
     this.minnerProvider = new MinnerProvider();
     this.slicesProvider = slicesProvider;
     this.transactionsProvider = transactionsProvider;
