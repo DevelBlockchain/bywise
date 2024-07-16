@@ -1,4 +1,4 @@
-import BigNumber from "bignumber.js";
+import { BywiseHelper } from "@bywise/web3";
 
 export class ConfigDTO {
   chain: string;
@@ -18,7 +18,7 @@ export class ConfigDTO {
   setValue(value: string) {
     this.value = value;
     if (this.type === 'number') {
-      if (new BigNumber(this.value).isNaN()) throw new Error('invalid config value ' + this.value);
+      if (!BywiseHelper.isValidAmount(this.value)) throw new Error('invalid config value ' + this.value);
     } else if (this.type === 'boolean') {
       if (this.value !== 'true' && this.value !== 'false') throw new Error('invalid config value ' + this.value);
     } else {
@@ -31,7 +31,7 @@ export class ConfigDTO {
   }
 
   toNumber() {
-    return new BigNumber(this.value);
+    return BigInt(this.value);
   }
 }
 

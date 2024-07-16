@@ -1,9 +1,10 @@
 import fs from 'fs';
-import { BlockPack, BywiseHelper, Tx, TxType, Wallet } from '@bywise/web3';
+import { BlockPack, BywiseHelper, EnvironmentChanges, Tx, TxType, Wallet } from '@bywise/web3';
 import Bywise from '../bywise';
 import { ConfigProvider, EnvironmentProvider } from '../services';
 import helper from '../utils/helper';
-import { CompiledContext, ChainConfig, EnvironmentContext, BlockchainStatus } from '../types';
+import { CompiledContext, ChainConfig, EnvironmentContext, TransactionsToExecute, ZERO_HASH } from '../types';
+import { RuntimeContext } from '../vm/RuntimeContext';
 
 var bywise: Bywise;
 var environmentProvider: EnvironmentProvider;
@@ -13,8 +14,7 @@ const chain = 'local';
 var fromSlice = '';
 const port0 = Math.floor(Math.random() * 7000 + 3000);
 const wallet = new Wallet();
-
-const DEAFAUT_MAIN_ENV: EnvironmentContext = {
+var DEAFAUT_MAIN_ENV: EnvironmentContext = {
     chain,
     fromContextHash: CompiledContext.MAIN_CONTEXT_HASH,
     blockHeight: 1,
@@ -24,24 +24,15 @@ const DEAFAUT_MAIN_ENV: EnvironmentContext = {
     }
 }
 
-const ERCCode = fs.readFileSync('./assets/ERC20.js', 'utf8');
 const ERCCodeV2 = fs.readFileSync('./assets/ERC20_v2.js', 'utf8');
+const ERCCodeCustom = fs.readFileSync('./assets/ERC20_custom.js', 'utf8');
 const ERCCodeTestContract = fs.readFileSync('./assets/test_contract.js', 'utf8');
-
-const convertoToTxInfo = (txs: Tx[]) => txs.map(tx => ({
-    tx: tx,
-    isExecuted: false,
-    slicesHash: '',
-    blockHash: '',
-    received: Date.now(),
-    status: BlockchainStatus.TX_MEMPOOL
-}))
 
 beforeAll(async () => {
     const nodeWallet = new Wallet();
     b0 = await helper.createNewBlockZero(chain, nodeWallet, [
-        ChainConfig.setConfig('blockTime', `30`),
-        ChainConfig.setConfig('feeCostType', `1`),
+        ChainConfig.setBlockTime(`30`),
+        ChainConfig.setConfigFee('feeCostType', `1`),
         ChainConfig.addAdmin(wallet.address),
         ChainConfig.addAdmin(nodeWallet.address),
         ChainConfig.addValidator(nodeWallet.address),
@@ -59,6 +50,8 @@ beforeAll(async () => {
         zeroBlocks: [],
         mainWalletSeed: wallet.seed,
         startServices: ['vm'],
+        vmSize: 1,
+        vmIndex: 0
     });
 
     environmentProvider = new EnvironmentProvider(bywise.applicationContext);
@@ -67,6 +60,16 @@ beforeAll(async () => {
 beforeEach(async () => {
     await bywise.applicationContext.database.drop();
     await bywise.blockProvider.setNewZeroBlock(b0);
+    await environmentProvider.compile(chain, fromSlice, CompiledContext.MAIN_CONTEXT_HASH);
+    DEAFAUT_MAIN_ENV = {
+        chain,
+        fromContextHash: CompiledContext.MAIN_CONTEXT_HASH,
+        blockHeight: 1,
+        changes: {
+            keys: [],
+            values: [],
+        }
+    }
 }, 2000)
 
 afterAll(async () => {
@@ -86,26 +89,27 @@ describe('basic tests', () => {
         );
         tx.isValid();
 
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx]), fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
-        expect(tte.outputs[0].changes).toEqual({
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 2,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [],
             walletAmount: [],
-            envOut: { keys: [], values: [] }
+            envs: { keys: [], values: [] },
+            output: ''
         });
     }, 1000);
 
     test('add balance', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -123,7 +127,28 @@ describe('basic tests', () => {
         );
         tx1.isValid();
 
-        const tx2 = await bywise.transactionsProvider.createNewTransactionFromWallet(
+        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.txs.length).toEqual(1);
+        expect(tte.outputs.length).toEqual(1);
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [wallet.address],
+            walletAmount: ['15'],
+            envs: { keys: [], values: [] },
+            output: ''
+        });
+    }), 1000;
+
+    test('sub balance', async () => {
+        const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
             wallet.address,
@@ -131,49 +156,36 @@ describe('basic tests', () => {
             '0',
             TxType.TX_COMMAND,
             {
-                name: "addBalance",
+                name: "subBalance",
                 input: [
                     wallet.address,
-                    "20"
+                    "7"
                 ]
             }
         );
-        tx2.isValid();
+        tx1.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
-        expect(tte.txs.length).toEqual(2);
-        expect(tte.outputs.length).toEqual(2);
-        expect(tte.outputs[0].changes).toEqual({
+        expect(tte.txs.length).toEqual(1);
+        expect(tte.outputs.length).toEqual(1);
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [wallet.address],
-            walletAmount: ['15'],
-            envOut: {
-                keys: [], values: []
-            }
-        });
-        expect(tte.outputs[1].changes).toEqual({
-            get: [],
-            walletAddress: [wallet.address],
-            walletAmount: ['20'],
-            envOut: {
-                keys: [], values: []
-            }
-        });
-        expect(tte.envOut).toEqual({
-            keys: [
-                `${wallet.address}-WB`,
-            ], values: [
-                `35`,
-            ]
+            walletAmount: ['-7'],
+            envs: { keys: [], values: [] },
+            output: ''
         });
     }), 1000;
 
-    test('sub balance', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
+    test('add and sub balance', async () => {
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -208,27 +220,48 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
-        expect(tte.outputs[0].changes).toEqual({
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [wallet.address],
             walletAmount: ['15'],
-            envOut: {
-                keys: [], values: []
-            }
+            envs: { keys: [], values: [] },
+            output: ''
         });
-        expect(tte.outputs[1].changes).toEqual({
+        expect(tte.outputs[1]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [wallet.address],
             walletAmount: ['-7'],
-            envOut: {
-                keys: [], values: []
-            }
+            envs: { keys: [], values: [] },
+            output: ''
         });
-        expect(tte.envOut).toEqual({
+
+        const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        for (let i = 0; i < tte.outputs.length; i++) {
+            const tx = tte.txs[i];
+            const output = tte.outputs[i];
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            expect(error).toEqual(null);
+        }
+        const envOut: EnvironmentChanges = ctx.getEnvOut();
+        expect(envOut).toEqual({
             keys: [
                 `${wallet.address}-WB`,
             ], values: [
@@ -237,11 +270,7 @@ describe('basic tests', () => {
         });
     }), 1000;
 
-    test('sub balance - Insuficient Funds', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
+    test('add and sub balance - Insuficient Funds', async () => {
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -253,7 +282,7 @@ describe('basic tests', () => {
                 name: "addBalance",
                 input: [
                     wallet.address,
-                    "10"
+                    "7"
                 ]
             }
         );
@@ -270,74 +299,61 @@ describe('basic tests', () => {
                 name: "subBalance",
                 input: [
                     wallet.address,
-                    "7"
+                    "15"
                 ]
             }
         );
         tx2.isValid();
 
-        const tx3 = await bywise.transactionsProvider.createNewTransactionFromWallet(
-            wallet,
-            chain,
-            wallet.address,
-            '0',
-            '0',
-            TxType.TX_COMMAND,
-            {
-                name: "subBalance",
-                input: [
-                    wallet.address,
-                    "5"
-                ]
-            }
-        );
-        tx3.isValid();
+        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.txs.length).toEqual(2);
+        expect(tte.outputs.length).toEqual(2);
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [wallet.address],
+            walletAmount: ['7'],
+            envs: { keys: [], values: [] },
+            output: ''
+        });
+        expect(tte.outputs[1]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [wallet.address],
+            walletAmount: ['-15'],
+            envs: { keys: [], values: [] },
+            output: ''
+        });
 
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.error).toEqual("Insuficient funds");
-        expect(tte.txs.length).toEqual(3);
-        expect(tte.outputs.length).toEqual(3);
-        expect(tte.outputs[0].changes).toEqual({
-            get: [],
-            walletAddress: [wallet.address],
-            walletAmount: ['10'],
-            envOut: {
-                keys: [], values: []
-            }
-        });
-        expect(tte.outputs[0].error).toEqual(undefined);
-        expect(tte.outputs[1].changes).toEqual({
-            get: [],
-            walletAddress: [wallet.address],
-            walletAmount: ['-7'],
-            envOut: {
-                keys: [], values: []
-            }
-        });
-        expect(tte.outputs[1].error).toEqual(undefined);
-        expect(tte.outputs[2].changes).toEqual({
-            get: [],
-            walletAddress: [wallet.address],
-            walletAmount: ['-5'],
-            envOut: {
-                keys: [], values: []
-            }
-        });
-        expect(tte.outputs[2].error).toEqual("Insuficient funds");
-        expect(tte.envOut).toEqual({
+        const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        let error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[0], tte.outputs[0]);
+        expect(error).toEqual(null);
+        error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[1], tte.outputs[1]);
+        expect(error).toEqual("low balance");
+        const envOut: EnvironmentChanges = ctx.getEnvOut();
+        expect(envOut).toEqual({
             keys: [
                 `${wallet.address}-WB`,
             ], values: [
-                `3`,
+                `7`,
             ]
         });
     }), 1000;
 
     test('make transfer', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -366,29 +382,48 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
-        expect(tte.outputs[0].debit).toEqual('0');
-        expect(tte.outputs[0].changes).toEqual({
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [wallet.address],
             walletAmount: ['100'],
-            envOut: {
-                keys: [], values: []
-            }
+            envs: { keys: [], values: [] },
+            output: ''
         });
-        expect(tte.outputs[1].debit).toEqual('70');
-        expect(tte.outputs[1].changes).toEqual({
+        expect(tte.outputs[1]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 2,
+            ctx: fromSlice,
+            debit: '70',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [wallet2.address],
             walletAmount: ['70'],
-            envOut: {
-                keys: [], values: []
-            }
+            envs: { keys: [], values: [] },
+            output: ''
         });
-        expect(tte.envOut).toEqual({
+
+        const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        for (let i = 0; i < tte.outputs.length; i++) {
+            const tx = tte.txs[i];
+            const output = tte.outputs[i];
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            expect(error).toEqual(null);
+        }
+        const envOut: EnvironmentChanges = ctx.getEnvOut();
+        expect(envOut).toEqual({
             keys: [
                 `${wallet.address}-WB`,
                 `${wallet2.address}-WB`,
@@ -400,10 +435,6 @@ describe('basic tests', () => {
     }), 1000;
 
     test('make transfer - Insuficient Funds', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -432,35 +463,50 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.error).toEqual("Insuficient funds");
+        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
-        expect(tte.outputs[0].error).toEqual(undefined);
-        expect(tte.outputs[0].debit).toEqual('0');
-        expect(tte.outputs[0].changes).toEqual({
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [wallet.address],
             walletAmount: ['50'],
-            envOut: {
-                keys: [], values: []
-            }
+            envs: { keys: [], values: [] },
+            output: ''
         });
-        expect(tte.outputs[1].error).toEqual("Insuficient funds");
-        expect(tte.outputs[1].debit).toEqual('70');
-        expect(tte.outputs[1].changes).toEqual({
+        expect(tte.outputs[1]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 2,
+            ctx: fromSlice,
+            debit: '70',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [wallet2.address],
             walletAmount: ['70'],
-            envOut: {
-                keys: [], values: []
-            }
+            envs: { keys: [], values: [] },
+            output: ''
         });
-        expect(tte.envOut).toEqual({
+
+        const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        let error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[0], tte.outputs[0]);
+        expect(error).toEqual(null);
+        error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[1], tte.outputs[1]);
+        expect(error).toEqual("Insuficient funds");
+        const envOut: EnvironmentChanges = ctx.getEnvOut();
+        expect(envOut).toEqual({
             keys: [
-                `${wallet.address}-WB`
+                `${wallet.address}-WB`,
             ], values: [
-                `50`
+                `50`,
             ]
         });
     }), 1000;
@@ -468,11 +514,7 @@ describe('basic tests', () => {
 
 describe('set configs', () => {
     test('set basic fee', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
-        let blockHeight = currentMinnedBlock.height + 1;
+        DEAFAUT_MAIN_ENV.blockHeight += 1;
 
         let tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -502,7 +544,7 @@ describe('set configs', () => {
                 name: "setConfig",
                 input: [
                     "feeBasic",
-                    "0.1"
+                    "1"
                 ]
             }
         );
@@ -518,59 +560,77 @@ describe('set configs', () => {
         );
         tx3.isValid();
 
-        let tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        let tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(3);
         expect(tte.outputs.length).toEqual(3);
-        expect(tte.outputs[0].fee).toEqual("0");
-        expect(tte.outputs[0].feeUsed).toEqual("0");
-        expect(tte.outputs[0].changes).toEqual({
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [wallet.address],
+            walletAmount: ['100'],
+            envs: { keys: [], values: [] },
+            output: ''
+        });
+        expect(tte.outputs[1]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [],
             walletAmount: [],
-            envOut: {
+            envs: {
                 keys: [
-                    `${wallet.address}-WB`,
+                    "config-feeBasic",
                 ], values: [
-                    `100`,
+                    "{\"lastValue\":\"0\",\"value\":\"1\",\"lastUpdate\":2,\"type\":\"number\"}",
                 ]
-            }
+            },
+            output: ''
         });
-        expect(tte.outputs[1].fee).toEqual("1");
-        expect(tte.outputs[1].feeUsed).toEqual("0");
-        expect(tte.outputs[1].changes).toEqual({
+        expect(tte.outputs[2]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 2,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
             get: [],
             walletAddress: [],
             walletAmount: [],
-            envOut: {
-                keys: [
-                    `config-feeBasic`,
-                ], values: [
-                    `{\"lastValue\":\"0\",\"value\":\"0.1\",\"lastUpdate\":1,\"type\":\"number\"}`,
-                ]
-            }
-        });
-        expect(tte.outputs[2].fee).toEqual("1");
-        expect(tte.outputs[2].feeUsed).toEqual("0");
-        expect(tte.outputs[2].changes).toEqual({
-            get: [],
-            walletAddress: [],
-            walletAmount: [],
-            envOut: {
-                keys: [], values: []
-            }
-        });
-        expect(tte.envOut).toEqual({
-            keys: [
-                `${wallet.address}-WB`,
-                `config-feeBasic`,
-            ], values: [
-                `100`,
-                `{\"lastValue\":\"0\",\"value\":\"0.1\",\"lastUpdate\":1,\"type\":\"number\"}`,
-            ]
+            envs: { keys: [], values: [] },
+            output: ''
         });
 
-        await environmentProvider.push(tte.envOut, chain, CompiledContext.MAIN_CONTEXT_HASH);
+        const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        for (let i = 0; i < tte.outputs.length; i++) {
+            const tx = tte.txs[i];
+            const output = tte.outputs[i];
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            expect(error).toEqual(null);
+        }
+        const envOut: EnvironmentChanges = ctx.getEnvOut();
+        expect(envOut).toEqual({
+            keys: [
+                `${wallet.address}-WB`,
+                "config-feeBasic",
+            ], values: [
+                `100`,
+                "{\"lastValue\":\"0\",\"value\":\"1\",\"lastUpdate\":2,\"type\":\"number\"}",
+            ]
+        });
+        await environmentProvider.push(envOut, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -582,59 +642,69 @@ describe('set configs', () => {
         );
         tx1.isValid();
 
-        blockHeight++; // next block
-        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        DEAFAUT_MAIN_ENV.blockHeight += 1; // next block
+        tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
-        expect(tte.outputs[0].debit).toEqual("0");
-        expect(tte.outputs[0].fee).toEqual("1");
-        expect(tte.outputs[0].feeUsed).toEqual("0");
-        expect(tte.envOut).toEqual({
-            keys: [
-                `${wallet.address}-WB`
-            ], values: [
-                `100`
-            ]
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 2,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [],
+            walletAmount: [],
+            envs: { keys: [], values: [] },
+            output: ''
         });
 
-        blockHeight += 10; // wait 10 blocks
-        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        DEAFAUT_MAIN_ENV.blockHeight += 10; // wait 10 blocks
+        tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
-        expect(tte.outputs[0].debit).toEqual("0");
-        expect(tte.outputs[0].fee).toEqual("1");
-        expect(tte.outputs[0].feeUsed).toEqual("0");
-        expect(tte.envOut).toEqual({
-            keys: [
-                `${wallet.address}-WB`
-            ], values: [
-                `100`
-            ]
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 2,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [],
+            walletAmount: [],
+            envs: { keys: [], values: [] },
+            output: ''
         });
 
-        blockHeight += 100; // wait 100 blocks
-        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        DEAFAUT_MAIN_ENV.blockHeight += 100; // wait 100 blocks
+        tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
-        expect(tte.outputs[0].debit).toEqual("0.1");
-        expect(tte.outputs[0].fee).toEqual("1");
-        expect(tte.outputs[0].feeUsed).toEqual("0.1");
-        expect(tte.envOut).toEqual({
-            keys: [
-                `${wallet.address}-WB`
-            ], values: [
-                `99.9`
-            ]
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '1',
+            cost: 0,
+            size: 2,
+            ctx: fromSlice,
+            debit: '1',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [],
+            walletAmount: [],
+            envs: { keys: [], values: [] },
+            output: ''
         });
     }, 1000);
-});
 
-describe('contracts', () => {
-    test('deploy contract', async () => {
-        const contractAddress = BywiseHelper.getBWSAddressContract();
+    test('set basic fee - zero block', async () => {
+        DEAFAUT_MAIN_ENV.blockHeight = 0;
 
         let tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -642,16 +712,304 @@ describe('contracts', () => {
             wallet.address,
             '0',
             '0',
-            TxType.TX_CONTRACT,
-            { contractAddress, code: ERCCode }
+            TxType.TX_COMMAND,
+            {
+                name: "addBalance",
+                input: [
+                    wallet.address,
+                    "100"
+                ]
+            }
         );
         tx1.isValid();
 
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
         let tx2 = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '1',
+            TxType.TX_COMMAND,
+            {
+                name: "setConfig",
+                input: [
+                    "feeBasic",
+                    "1"
+                ]
+            }
+        );
+        tx2.isValid();
+
+        let tx3 = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '1',
+            TxType.TX_NONE
+        );
+        tx3.isValid();
+
+        let tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.txs.length).toEqual(3);
+        expect(tte.outputs.length).toEqual(3);
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [wallet.address],
+            walletAmount: ['100'],
+            envs: { keys: [], values: [] },
+            output: ''
+        });
+        expect(tte.outputs[1]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 0,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [],
+            walletAmount: [],
+            envs: {
+                keys: [
+                    "config-feeBasic",
+                ], values: [
+                    "{\"lastValue\":\"0\",\"value\":\"1\",\"lastUpdate\":0,\"type\":\"number\"}",
+                ]
+            },
+            output: ''
+        });
+        expect(tte.outputs[2]).toEqual({
+            feeUsed: '0',
+            cost: 0,
+            size: 2,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [],
+            walletAmount: [],
+            envs: { keys: [], values: [] },
+            output: ''
+        });
+
+        const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        for (let i = 0; i < tte.outputs.length; i++) {
+            const tx = tte.txs[i];
+            const output = tte.outputs[i];
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            expect(error).toEqual(null);
+        }
+        const envOut: EnvironmentChanges = ctx.getEnvOut();
+        expect(envOut).toEqual({
+            keys: [
+                `${wallet.address}-WB`,
+                "config-feeBasic",
+            ], values: [
+                `100`,
+                "{\"lastValue\":\"0\",\"value\":\"1\",\"lastUpdate\":0,\"type\":\"number\"}",
+            ]
+        });
+        await environmentProvider.push(envOut, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+
+        tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '1',
+            TxType.TX_NONE
+        );
+        tx1.isValid();
+
+        DEAFAUT_MAIN_ENV.blockHeight += 1; // next block
+        tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.txs.length).toEqual(1);
+        expect(tte.outputs.length).toEqual(1);
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '1',
+            cost: 0,
+            size: 2,
+            ctx: fromSlice,
+            debit: '1',
+            logs: [],
+            events: [],
+            get: [],
+            walletAddress: [],
+            walletAmount: [],
+            envs: { keys: [], values: [] },
+            output: ''
+        });
+    }, 1000);
+});
+
+describe('contracts', () => {
+    test('deploy token', async () => {
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+
+        let tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCodeV2 }
+        );
+        tx.isValid();
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+
+        const expectedABI = [
+            {
+                name: 'name',
+                view: true,
+                payable: false,
+                parameters: [],
+                returns: ['string']
+            },
+            {
+                name: 'symbol',
+                view: true,
+                payable: false,
+                parameters: [],
+                returns: ['string']
+            },
+            {
+                name: 'totalSupply',
+                view: true,
+                payable: false,
+                parameters: [],
+                returns: ['string']
+            },
+            {
+                name: 'decimals',
+                view: true,
+                payable: false,
+                parameters: [],
+                returns: ['string']
+            },
+            {
+                name: 'balanceOf',
+                view: true,
+                payable: false,
+                parameters: [
+                    { name: 'account', type: ['string'] }
+                ],
+                returns: ['string']
+            },
+            {
+                name: 'allowance',
+                view: true,
+                payable: false,
+                parameters: [
+                    { name: 'owner', type: ['string'] },
+                    { name: 'spender', type: ['string'] }
+                ],
+                returns: ['string']
+            },
+            {
+                name: 'transfer',
+                view: false,
+                payable: false,
+                parameters: [
+                    { name: 'recipient', type: ['string'] },
+                    { name: 'amount', type: ['string'] }
+                ],
+                returns: ['string']
+            },
+            {
+                name: 'transferFrom',
+                view: false,
+                payable: false,
+                parameters: [
+                    { name: 'from', type: ['string'] },
+                    { name: 'to', type: ['string'] },
+                    { name: 'amount', type: ['string'] }
+                ],
+                returns: ['string']
+            },
+            {
+                name: 'approve',
+                view: false,
+                payable: false,
+                parameters: [
+                    { name: 'spender', type: ['string'] },
+                    { name: 'amount', type: ['string'] }
+                ],
+                returns: ['string']
+            }
+        ]
+        expect(tte.error).toEqual(undefined);
+        expect(tte.txs.length).toEqual(1);
+        expect(tte.outputs.length).toEqual(1);
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 30,
+            size: 4554,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [
+                `${contractAddress}-WC`,
+                `${contractAddress}-CI`,
+                `${contractAddress}-MD-2`,
+                `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
+                `${contractAddress}-V-1`,
+            ],
+            walletAddress: [],
+            walletAmount: [],
+            envs: {
+                keys: [
+                    `${contractAddress}-CI`,
+                    `${contractAddress}-V-1`,
+                    `${contractAddress}-MD-2`,
+                    `${contractAddress}-MD-3`,
+                    `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
+                    `${contractAddress}-WC`,
+                ], values: [
+                    '3',
+                    '"5000000000000000000000"',
+                    '"0"',
+                    '""',
+                    '"5000000000000000000000"',
+                    JSON.stringify({
+                        status: 'locked',
+                        abi: expectedABI,
+                        code: ERCCodeV2,
+                        calls: [
+                            '1',
+                            '"0"',
+                            '',
+                            '"0"',
+                            wallet.address,
+                            '3',
+                            '2',
+                            '1',
+                        ],
+                    }),
+                ]
+            },
+            output: {
+                abi: expectedABI,
+                contractAddress: contractAddress,
+            }
+        });
+
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+
+        tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
             contractAddress,
@@ -660,18 +1018,180 @@ describe('contracts', () => {
             TxType.TX_CONTRACT_EXE,
             [{ method: "name", inputs: [] }]
         );
-        tx2.isValid();
-
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
+        tx.isValid();
+        tte = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
-        expect(tte.outputs[1].output).toEqual("SimpleToken");
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 7,
+            size: 31,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [],
+            get: [`${contractAddress}-WC`],
+            walletAddress: [],
+            walletAmount: [],
+            envs: { keys: [], values: [] },
+            output: 'SimpleToken'
+        });
+    }, 3000);
+
+    test('token make transfer', async () => {
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+        const stealthAddress = wallet.getStealthAddress(0, 0);
+
+        let tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCodeV2 }
+        );
+        tx.isValid();
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+
+        tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "transfer", inputs: [stealthAddress, '1000'] }]
+        );
+        tx.isValid();
+        tte = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.outputs[0]).toEqual({
+            feeUsed: '0',
+            cost: 13,
+            size: 93,
+            ctx: fromSlice,
+            debit: '0',
+            logs: [],
+            events: [
+                {
+                    contractAddress: contractAddress,
+                    eventName: 'transfer',
+                    entries: [
+                        { key: "from", value: wallet.address },
+                        { key: "to", value: stealthAddress },
+                        { key: "amount", value: "1000" },
+                    ],
+                    hash: tx.hash
+                }
+            ],
+            get: [
+                `${contractAddress}-WC`,
+                `${contractAddress}-MD-2`,
+                `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
+                `${contractAddress}-MV-2-${helper.stringToHash(stealthAddress)}`,
+            ],
+            walletAddress: [],
+            walletAmount: [],
+            envs: {
+                keys: [
+                    `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
+                    `${contractAddress}-MV-2-${helper.stringToHash(stealthAddress)}`,
+                ], values: [
+                    '"4999999999999999999000"',
+                    '"1000"'
+                ]
+            },
+            output: 'true'
+        });
+    }, 3000);
+
+    test('token make transfer - throw insuficient funds', async () => {
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+        const stealthAddress = wallet.getStealthAddress(0, 0);
+
+        let tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCodeV2 }
+        );
+        tx.isValid();
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+
+        tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "transfer", inputs: [stealthAddress, '10000000000000000000000000000'] }]
+        );
+        tx.isValid();
+        tte = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual("insuficient funds");
+    }, 3000);
+
+    test('token make transfer - throw changed key', async () => {
+        const contractAddress = BywiseHelper.getBWSAddressContract();
+        const stealthAddress0 = wallet.getStealthAddress(0, 0);
+        const stealthAddress1 = wallet.getStealthAddress(0, 1);
+
+        let tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            wallet.address,
+            '0',
+            '0',
+            TxType.TX_CONTRACT,
+            { contractAddress, code: ERCCodeV2 }
+        );
+        tx.isValid();
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+
+        let tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "transfer", inputs: [stealthAddress0, '1000'] }]
+        );
+        tx1.isValid();
+
+        let tx2 = await bywise.transactionsProvider.createNewTransactionFromWallet(
+            wallet,
+            chain,
+            contractAddress,
+            '0',
+            '0',
+            TxType.TX_CONTRACT_EXE,
+            [{ method: "transfer", inputs: [stealthAddress1, '1000'] }]
+        );
+        tx2.isValid();
+        tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+
+        const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        let error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[0], tte.outputs[0]);
+        expect(error).toEqual(null);
+        error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[1], tte.outputs[1]);
+        expect(error).toEqual("changed key");
     }, 3000);
 
     test('contract call other contracs', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
         const saveValueContract = BywiseHelper.getBWSAddressContract();
         const otherContract = BywiseHelper.getBWSAddressContract();
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
@@ -683,17 +1203,17 @@ describe('contracts', () => {
             TxType.TX_CONTRACT,
             {
                 contractAddress: saveValueContract, code: `
-                import BywiseUtils, { StorageValue } from 'bywise-utils.js';
-                class StorageContract {
-                    value = new StorageValue('');
-                    setValue(newValue) {
-                        this.value.set(newValue);
-                    }
-                    getValue() { // @view
-                        return this.value.get();
-                    }
-                }
-                BywiseUtils.exportContract(new StorageContract());`
+                        import BywiseUtils, { StorageValue } from 'bywise-utils.js';
+                        class StorageContract {
+                            value = new StorageValue('');
+                            setValue(newValue) {
+                                this.value.set(newValue);
+                            }
+                            getValue() { // @view
+                                return this.value.get();
+                            }
+                        }
+                        BywiseUtils.exportContract(new StorageContract());`
             }
         );
         tx1.isValid();
@@ -707,15 +1227,15 @@ describe('contracts', () => {
             TxType.TX_CONTRACT,
             {
                 contractAddress: otherContract, code: `
-                import BywiseUtils, { StorageValue } from 'bywise-utils.js';
-                class OtherContract {
-                    setNewValue(contractAddress, value) {
-                        const SC = BywiseUtils.getContract(contractAddress, ['setValue', 'getValue']);
-                        SC.setValue(value);
-                        return SC.getValue();
-                    }
-                }
-                BywiseUtils.exportContract(new OtherContract());`
+                        import BywiseUtils, { StorageValue } from 'bywise-utils.js';
+                        class OtherContract {
+                            setNewValue(contractAddress, value) {
+                                const SC = BywiseUtils.getContract(contractAddress, ['setValue', 'getValue']);
+                                SC.setValue(value);
+                                return SC.getValue();
+                            }
+                        }
+                        BywiseUtils.exportContract(new OtherContract());`
             }
         );
         tx2.isValid();
@@ -753,23 +1273,41 @@ describe('contracts', () => {
         );
         tx5.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3, tx4, tx5]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.outputs.length).toEqual(5);
-        expect(tte.outputs[0].error).toEqual(undefined);
-        expect(tte.outputs[1].error).toEqual(undefined);
-        expect(tte.outputs[2].error).toEqual(undefined);
-        expect(tte.outputs[3].error).toEqual(undefined);
-        expect(tte.outputs[4].error).toEqual(undefined);
-        expect(tte.outputs[2].output).toEqual("");
-        expect(tte.outputs[3].output).toEqual("Banana");
-        expect(tte.outputs[4].output).toEqual("Banana");
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.outputs.length).toEqual(2);
+        expect(tte.error).toEqual(undefined);
+
+        let ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        for (let i = 0; i < tte.outputs.length; i++) {
+            const tx = tte.txs[i];
+            const output = tte.outputs[i];
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            expect(error).toEqual(null);
+        }
+        await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+
+        tte = await bywise.transactionsProvider.simulateTransactions([tx3, tx4], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.outputs.length).toEqual(2);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.outputs[0].output).toEqual("");
+        expect(tte.outputs[1].output).toEqual("Banana");
+
+        ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        for (let i = 0; i < tte.outputs.length; i++) {
+            const tx = tte.txs[i];
+            const output = tte.outputs[i];
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            expect(error).toEqual(null);
+        }
+        await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+
+        tte = await bywise.transactionsProvider.simulateTransactions([tx5], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.outputs.length).toEqual(1);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.outputs[0].output).toEqual("Banana");
     }, 1000);
 
     test('contract events', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
         const contractAddress = BywiseHelper.getBWSAddressContract();
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -780,17 +1318,17 @@ describe('contracts', () => {
             TxType.TX_CONTRACT,
             {
                 contractAddress: contractAddress, code: `
-                import BywiseUtils from 'bywise-utils';
-                class TestContract {
-                    setValue(newValue) {
-                        const sender = BywiseUtils.getTxSender();
-                        BywiseUtils.emit("setValue", {
-                            sender: sender,
-                            new_value: newValue
-                        });
-                    }
-                }
-                BywiseUtils.exportContract(new TestContract());`
+                        import BywiseUtils from 'bywise-utils';
+                        class TestContract {
+                            setValue(newValue) {
+                                const sender = BywiseUtils.getTxSender();
+                                BywiseUtils.emit("setValue", {
+                                    sender: sender,
+                                    new_value: newValue
+                                });
+                            }
+                        }
+                        BywiseUtils.exportContract(new TestContract());`
             }
         );
         tx1.isValid();
@@ -806,25 +1344,27 @@ describe('contracts', () => {
         );
         tx2.isValid();
 
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
-        expect(tte.outputs.length).toEqual(2);
-        expect(tte.outputs[1].events).toEqual([{
+        expect(tte.outputs.length).toEqual(1);
+
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+
+        tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.outputs.length).toEqual(1);
+        expect(tte.outputs[0].events).toEqual([{
             contractAddress: contractAddress,
             eventName: 'setValue',
             entries: [
-                { "key": "sender", "value": wallet.address },
-                { "key": "new_value", "value": "Banana" }
+                { key: "sender", value: wallet.address },
+                { key: "new_value", value: "Banana" },
             ],
             hash: tx2.hash
         }]);
     }, 3000);
 
     test('cost - hardwork', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
         const contractAddress = BywiseHelper.getBWSAddressContract();
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -836,6 +1376,10 @@ describe('contracts', () => {
             { contractAddress: contractAddress, code: ERCCodeTestContract }
         );
         tx1.isValid();
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.outputs.length).toEqual(1);
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         let tx2 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -847,13 +1391,11 @@ describe('contracts', () => {
             [{ method: "hardwork", inputs: ['100'] }]
         );
         tx2.isValid();
-        let tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.outputs.length).toEqual(2);
+        tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.outputs.length).toEqual(1);
         expect(tte.outputs[0].error).toEqual(undefined);
-        expect(tte.outputs[0].cost).toEqual(30);
-        expect(tte.outputs[1].error).toEqual(undefined);
-        expect(tte.outputs[1].output).toEqual("495000");
-        expect(tte.outputs[1].cost).toEqual(9);
+        expect(tte.outputs[0].output).toEqual("495000");
+        expect(tte.outputs[0].cost).toEqual(9);
 
         tx2 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -865,13 +1407,11 @@ describe('contracts', () => {
             [{ method: "hardwork", inputs: ['1000'] }]
         );
         tx2.isValid();
-        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.outputs.length).toEqual(2);
+        tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.outputs.length).toEqual(1);
         expect(tte.outputs[0].error).toEqual(undefined);
-        expect(tte.outputs[0].cost).toEqual(30);
-        expect(tte.outputs[1].error).toEqual(undefined);
-        expect(tte.outputs[1].output).toEqual("499500000");
-        expect(tte.outputs[1].cost).toEqual(207);
+        expect(tte.outputs[0].output).toEqual("499500000");
+        expect(tte.outputs[0].cost).toEqual(207);
 
         tx2 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -883,21 +1423,14 @@ describe('contracts', () => {
             [{ method: "infinty", inputs: [] }]
         );
         tx2.isValid();
-        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.outputs.length).toEqual(2);
-        expect(tte.outputs[0].error).toEqual(undefined);
-        expect(tte.outputs[0].cost).toEqual(30);
-        expect(typeof tte.outputs[1].error).toEqual("string");
-        expect(tte.outputs[1].error).toEqual("interrupted");
-        expect(tte.outputs[1].output).toEqual(undefined);
-        expect(tte.outputs[1].cost).toEqual(1026);
+        tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.outputs.length).toEqual(1);
+        expect(tte.outputs[0].error).toEqual("interrupted");
+        expect(tte.outputs[0].output).toEqual(undefined);
+        expect(tte.outputs[0].cost).toEqual(1026);
     }, 3000);
 
     test('cost - multiple calls', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
         const contractAddress = BywiseHelper.getBWSAddressContract();
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
@@ -906,11 +1439,13 @@ describe('contracts', () => {
             '0',
             '0',
             TxType.TX_CONTRACT,
-            {
-                contractAddress: contractAddress, code: ERCCodeTestContract
-            }
+            { contractAddress: contractAddress, code: ERCCodeTestContract }
         );
         tx1.isValid();
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.outputs.length).toEqual(1);
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         const tx2 = new Tx();
         tx2.chain = chain;
@@ -959,26 +1494,18 @@ describe('contracts', () => {
         tx4.hash = tx2.toHash();
         tx4.sign.push(await wallet.signHash(tx2.hash));
 
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3, tx4]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.outputs.length).toEqual(4);
-        expect(tte.outputs[0].error).toEqual(undefined);
-        expect(tte.outputs[1].error).toEqual(undefined);
-        expect(tte.outputs[2].error).toEqual(undefined);
-        expect(tte.outputs[3].error).toEqual(undefined);
-        expect(tte.outputs[0].cost).toEqual(30);
-        expect(tte.outputs[1].output).toEqual("1");
-        expect(tte.outputs[1].cost).toEqual(9);
-        expect(tte.outputs[2].output).toEqual("11");
-        expect(tte.outputs[2].cost).toEqual(90);
-        expect(tte.outputs[3].output).toEqual("12");
-        expect(tte.outputs[3].cost).toEqual(9);
+        tte = await bywise.transactionsProvider.simulateTransactions([tx2, tx3, tx4], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.outputs.length).toEqual(3);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.outputs[0].output).toEqual("1");
+        expect(tte.outputs[0].cost).toEqual(9);
+        expect(tte.outputs[1].output).toEqual("10");
+        expect(tte.outputs[1].cost).toEqual(90);
+        expect(tte.outputs[2].output).toEqual("1");
+        expect(tte.outputs[2].cost).toEqual(9);
     }, 3000);
 
     test('cost - call other contracs', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
         const contractAddress = BywiseHelper.getBWSAddressContract();
         const contractAddress2 = BywiseHelper.getBWSAddressContract();
         const tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
@@ -993,7 +1520,6 @@ describe('contracts', () => {
             }
         );
         tx1.isValid();
-
         const tx2 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -1006,6 +1532,12 @@ describe('contracts', () => {
             }
         );
         tx2.isValid();
+
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.outputs.length).toEqual(2);
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+        await environmentProvider.push(tte.outputs[1].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         const tx3 = new Tx();
         tx3.chain = chain;
@@ -1069,33 +1601,48 @@ describe('contracts', () => {
         tx6.hash = tx2.toHash();
         tx6.sign.push(await wallet.signHash(tx2.hash));
 
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3, tx4, tx5, tx6]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.outputs.length).toEqual(6);
-        expect(tte.outputs[0].error).toEqual(undefined);
-        expect(tte.outputs[1].error).toEqual(undefined);
-        expect(tte.outputs[2].error).toEqual(undefined);
-        expect(tte.outputs[3].error).toEqual(undefined);
-        expect(tte.outputs[4].error).toEqual(undefined);
-        expect(tte.outputs[5].error).toEqual(undefined);
-        expect(tte.outputs[0].cost).toEqual(30);
-        expect(tte.outputs[1].cost).toEqual(30);
-        expect(tte.outputs[2].output).toEqual("1");
-        expect(tte.outputs[2].cost).toEqual(34);
-        expect(tte.outputs[3].output).toEqual("1");
-        expect(tte.outputs[3].cost).toEqual(34);
-        expect(tte.outputs[4].output).toEqual("11");
-        expect(tte.outputs[4].cost).toEqual(340);
-        expect(tte.outputs[5].output).toEqual("21");
-        expect(tte.outputs[5].cost).toEqual(196);
+        tte = await bywise.transactionsProvider.simulateTransactions([tx3, tx4, tx5, tx6], fromSlice, DEAFAUT_MAIN_ENV);
+        expect(tte.outputs.length).toEqual(4);
+        expect(tte.error).toEqual(undefined);
+        expect(tte.outputs[0].output).toEqual("1");
+        expect(tte.outputs[0].cost).toEqual(34);
+        expect(tte.outputs[0].envs).toEqual({
+            keys: [
+                `${contractAddress2}-V-1`,
+            ], values: [
+                '"1"',
+            ]
+        });
+        expect(tte.outputs[1].output).toEqual("1");
+        expect(tte.outputs[1].cost).toEqual(34);
+        expect(tte.outputs[1].envs).toEqual({
+            keys: [
+                `${contractAddress}-V-1`,
+            ], values: [
+                '"1"',
+            ]
+        });
+        expect(tte.outputs[2].output).toEqual("10");
+        expect(tte.outputs[2].cost).toEqual(340);
+        expect(tte.outputs[2].envs).toEqual({
+            keys: [
+                `${contractAddress2}-V-1`,
+            ], values: [
+                '"10"',
+            ]
+        });
+        expect(tte.outputs[3].output).toEqual("10");
+        expect(tte.outputs[3].cost).toEqual(196);
+        expect(tte.outputs[3].envs).toEqual({
+            keys: [
+                `${contractAddress2}-V-1`,
+            ], values: [
+                '"10"',
+            ]
+        });
     }, 3000);
 
     test('cost - set fee by cost', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
-        let blockHeight = currentMinnedBlock.height + 1;
-
         let tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -1124,29 +1671,20 @@ describe('contracts', () => {
                 name: "setConfig",
                 input: [
                     "feeCoefCost",
-                    "0.1"
+                    "1"
                 ]
             }
         );
         tx2.isValid();
 
-        let tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, {
-            chain,
-            fromContextHash: CompiledContext.MAIN_CONTEXT_HASH,
-            blockHeight: blockHeight,
-            changes: {
-                keys: [],
-                values: [],
-            }
-        });
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(2);
-        expect(tte.outputs[0].fee).toEqual("0");
         expect(tte.outputs[0].feeUsed).toEqual("0");
-        expect(tte.outputs[1].fee).toEqual("1");
         expect(tte.outputs[1].feeUsed).toEqual("0");
 
-        await environmentProvider.push(tte.envOut, chain, CompiledContext.MAIN_CONTEXT_HASH);
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+        await environmentProvider.push(tte.outputs[1].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         const contractAddress = BywiseHelper.getBWSAddressContract();
         tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
@@ -1173,262 +1711,45 @@ describe('contracts', () => {
         );
         tx2.isValid();
 
-        blockHeight++; // next block
-        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+
+        tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
-        expect(tte.outputs.length).toEqual(2);
+        expect(tte.txs[0].fee).toEqual("30");
         expect(tte.outputs[0].cost).toEqual(30);
         expect(tte.outputs[0].debit).toEqual("0");
-        expect(tte.outputs[0].fee).toEqual("30");
         expect(tte.outputs[0].feeUsed).toEqual("0");
-        expect(tte.outputs[1].cost).toEqual(9);
-        expect(tte.outputs[1].debit).toEqual("0");
-        expect(tte.outputs[1].fee).toEqual("30");
-        expect(tte.outputs[1].feeUsed).toEqual("0");
 
-        blockHeight += 10; // wait 10 blocks
-        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        DEAFAUT_MAIN_ENV.blockHeight = 100;
+        tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
-        expect(tte.outputs.length).toEqual(2);
+        expect(tte.txs[0].fee).toEqual("30");
         expect(tte.outputs[0].cost).toEqual(30);
-        expect(tte.outputs[0].debit).toEqual("0");
-        expect(tte.outputs[0].fee).toEqual("30");
-        expect(tte.outputs[0].feeUsed).toEqual("0");
-        expect(tte.outputs[1].cost).toEqual(9);
-        expect(tte.outputs[1].debit).toEqual("0");
-        expect(tte.outputs[1].fee).toEqual("30");
-        expect(tte.outputs[1].feeUsed).toEqual("0");
+        expect(tte.outputs[0].debit).toEqual("30");
+        expect(tte.outputs[0].feeUsed).toEqual("30");
 
-        blockHeight += 100; // wait 100 blocks
-        tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2]), fromSlice, { chain, fromContextHash: CompiledContext.MAIN_CONTEXT_HASH, blockHeight: blockHeight, changes: { keys: [], values: [] } });
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+
+        tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
-        expect(tte.outputs.length).toEqual(2);
-        expect(tte.outputs[0].cost).toEqual(30);
-        expect(tte.outputs[0].debit).toEqual("3");
-        expect(tte.outputs[0].fee).toEqual("30");
-        expect(tte.outputs[0].feeUsed).toEqual("3");
-        expect(tte.outputs[1].cost).toEqual(9);
-        expect(tte.outputs[1].debit).toEqual("0.9");
-        expect(tte.outputs[1].fee).toEqual("30");
-        expect(tte.outputs[1].feeUsed).toEqual("0.9");
+        expect(tte.txs[0].fee).toEqual("30");
+        expect(tte.outputs[0].cost).toEqual(9);
+        expect(tte.outputs[0].debit).toEqual("9");
+        expect(tte.outputs[0].feeUsed).toEqual("9");
     }, 1000);
-
-    test('change state', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const stealthAddress = wallet.getStealthAddress(0, 0);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        const contractAddress = BywiseHelper.getBWSAddressContract();
-        await environmentProvider.consolide(blockTree, currentMinnedBlock.hash, CompiledContext.MAIN_CONTEXT_HASH);
-
-        let tx1 = await bywise.transactionsProvider.createNewTransactionFromWallet(
-            wallet,
-            chain,
-            wallet.address,
-            '0',
-            '0',
-            TxType.TX_COMMAND,
-            {
-                name: "addBalance",
-                input: [
-                    wallet.address,
-                    "100"
-                ]
-            }
-        );
-        tx1.isValid();
-
-        let tx2 = await bywise.transactionsProvider.createNewTransactionFromWallet(
-            wallet,
-            chain,
-            wallet.address,
-            '0',
-            '0',
-            TxType.TX_CONTRACT,
-            { contractAddress, code: ERCCodeV2 }
-        );
-        tx2.isValid();
-
-        let tx3 = await bywise.transactionsProvider.createNewTransactionFromWallet(
-            wallet,
-            chain,
-            contractAddress,
-            '0',
-            '0',
-            TxType.TX_CONTRACT_EXE,
-            [{ method: "transfer", inputs: [stealthAddress, '1000'] }]
-        );
-        tx3.isValid();
-
-        let tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo([tx1, tx2, tx3]), fromSlice, DEAFAUT_MAIN_ENV);
-        expect(tte.error).toEqual(undefined);
-        expect(tte.outputs.length).toEqual(3);
-        expect(tte.outputs[0].changes).toEqual({
-            get: [],
-            walletAddress: [],
-            walletAmount: [],
-            envOut: {
-                keys: [
-                    `${wallet.address}-WB`,
-                ], values: [
-                    `100`,
-                ]
-            }
-        });
-        expect(tte.outputs[1].changes.get).toEqual([
-            `${contractAddress}-WC`,
-            `${contractAddress}-CI`,
-            `${contractAddress}-MD-2`,
-            `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
-            `${contractAddress}-V-1`
-        ]);
-        expect(tte.outputs[1].changes.walletAddress).toEqual([]);
-        expect(tte.outputs[1].changes.walletAmount).toEqual([]);
-        expect(tte.outputs[1].changes.envOut.keys).toEqual([
-            `${contractAddress}-CI`,
-            `${contractAddress}-V-1`,
-            `${contractAddress}-MD-2`,
-            `${contractAddress}-MD-3`,
-            `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
-            `${contractAddress}-WC`
-        ]);
-        expect(tte.outputs[1].changes.envOut.values.length).toEqual(tte.outputs[1].changes.envOut.keys.length);
-        expect(tte.outputs[1].changes.envOut.values[0]).toEqual('3');
-        expect(tte.outputs[1].changes.envOut.values[1]).toEqual('"5000000000000000000000"');
-        expect(tte.outputs[1].changes.envOut.values[2]).toEqual('"0"');
-        expect(tte.outputs[1].changes.envOut.values[3]).toEqual('""');
-        expect(tte.outputs[1].changes.envOut.values[4]).toEqual('"5000000000000000000000"');
-        const wc = tte.outputs[1].changes.envOut.values[5];
-        expect(wc ? true : false).toEqual(true);
-        if (wc) {
-            expect(JSON.parse(wc)).toEqual({
-                status: 'locked',
-                abi: [
-                    {
-                        name: 'name',
-                        view: true,
-                        payable: false,
-                        parameters: [],
-                        returns: ['string']
-                    },
-                    {
-                        name: 'symbol',
-                        view: true,
-                        payable: false,
-                        parameters: [],
-                        returns: ['string']
-                    },
-                    {
-                        name: 'totalSupply',
-                        view: true,
-                        payable: false,
-                        parameters: [],
-                        returns: ['string']
-                    },
-                    {
-                        name: 'decimals',
-                        view: true,
-                        payable: false,
-                        parameters: [],
-                        returns: ['string']
-                    },
-                    {
-                        name: 'balanceOf',
-                        view: true,
-                        payable: false,
-                        parameters: [
-                            { name: 'account', type: ['string'] }
-                        ],
-                        returns: ['string']
-                    },
-                    {
-                        name: 'allowance',
-                        view: true,
-                        payable: false,
-                        parameters: [
-                            { name: 'owner', type: ['string'] },
-                            { name: 'spender', type: ['string'] }
-                        ],
-                        returns: ['string']
-                    },
-                    {
-                        name: 'transfer',
-                        view: false,
-                        payable: false,
-                        parameters: [
-                            { name: 'recipient', type: ['string'] },
-                            { name: 'amount', type: ['string'] }
-                        ],
-                        returns: ['string']
-                    },
-                    {
-                        name: 'transferFrom',
-                        view: false,
-                        payable: false,
-                        parameters: [
-                            { name: 'from', type: ['string'] },
-                            { name: 'to', type: ['string'] },
-                            { name: 'amount', type: ['string'] }
-                        ],
-                        returns: ['string']
-                    },
-                    {
-                        name: 'approve',
-                        view: false,
-                        payable: false,
-                        parameters: [
-                            { name: 'spender', type: ['string'] },
-                            { name: 'amount', type: ['string'] }
-                        ],
-                        returns: ['string']
-                    }
-                ],
-                code: ERCCodeV2,
-                calls: [
-                    '1',
-                    '"0"',
-                    '',
-                    '"0"',
-                    wallet.address,
-                    '3',
-                    '2',
-                    '1',
-                ],
-            });
-        }
-        expect(tte.outputs[2].changes).toEqual({
-            get: [
-                `${contractAddress}-WC`,
-                `${contractAddress}-MD-2`,
-                `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
-                `${contractAddress}-MV-2-${helper.stringToHash(stealthAddress)}`
-            ],
-            walletAddress: [],
-            walletAmount: [],
-            envOut: {
-                keys: [
-                    `${contractAddress}-MV-2-${helper.stringToHash(wallet.address)}`,
-                    `${contractAddress}-MV-2-${helper.stringToHash(stealthAddress)}`,
-                ], values: [
-                    '"4999999999999999999000"',
-                    '"1000"',
-                ]
-            }
-        });
-    }, 3000);
 });
 
 describe('stress testing', () => {
     test('simple transactions', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-
         const txs: Tx[] = [];
         for (let i = 0; i < 100; i++) {
+            const stealthAddress0 = wallet.getStealthAddress(i, 0);
+            const stealthAddress1 = wallet.getStealthAddress(i, 1);
+
             let tx = new Tx();
             tx.chain = chain;
             tx.version = "3";
-            tx.from = [wallet.address];
-            tx.to = [wallet.address];
+            tx.from = [stealthAddress0];
+            tx.to = [stealthAddress1];
             tx.amount = ['0'];
             tx.type = TxType.TX_NONE;
             tx.data = {};
@@ -1441,20 +1762,29 @@ describe('stress testing', () => {
         }
 
         let uptime = new Date().getTime();
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo(txs), fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions(txs, fromSlice, DEAFAUT_MAIN_ENV);
         uptime = (new Date().getTime() - uptime) / 1000;
 
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(100);
         expect(uptime).toBeLessThan(1);
-    }, 3000);
+
+        uptime = new Date().getTime();
+        const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        for (let i = 0; i < tte.outputs.length; i++) {
+            const tx = tte.txs[i];
+            const output = tte.outputs[i];
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            expect(error).toEqual(null);
+        }
+        await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+        uptime = (new Date().getTime() - uptime) / 1000;
+        expect(uptime).toBeLessThan(0.1);
+    }, 10000);
 
     test('contract transactions', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
         const contractAddress = BywiseHelper.getBWSAddressContract();
 
-        const txs: Tx[] = [];
         let tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
             wallet,
             chain,
@@ -1462,71 +1792,25 @@ describe('stress testing', () => {
             '0',
             '0',
             TxType.TX_CONTRACT,
-            { contractAddress, code: ERCCode }
+            { contractAddress, code: ERCCodeCustom }
         );
-        txs.push(tx);
-        for (let i = 0; i < 100; i++) {
-            tx = new Tx();
-            tx.chain = chain;
-            tx.version = "3";
-            tx.from = [wallet.address];
-            tx.to = [contractAddress];
-            tx.amount = ['0'];
-            tx.type = TxType.TX_CONTRACT_EXE;
-            tx.data = [{ method: 'transfer', inputs: [BywiseHelper.ZERO_ADDRESS, `1`] }];
-            tx.foreignKeys = [];
-            tx.created = helper.getNow();
-            tx.fee = '0';
-            tx.hash = tx.toHash();
-            tx.sign = [''];
-            txs.push(tx);
-        }
-        tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
-            wallet,
-            chain,
-            contractAddress,
-            '0',
-            '0',
-            TxType.TX_CONTRACT_EXE,
-            [{ method: "balanceOf", inputs: [wallet.address] }]
-        );
-        txs.push(tx);
-
-        let uptime = new Date().getTime();
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo(txs), fromSlice, DEAFAUT_MAIN_ENV);
-        uptime = (new Date().getTime() - uptime) / 1000;
-
+        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
         expect(tte.error).toEqual(undefined);
-        expect(tte.outputs.length).toEqual(txs.length);
-        expect(tte.outputs[txs.length - 1].output).toEqual("4999999999999999999900");
-        expect(uptime).toBeLessThan(3);
-    }, 5000);
-
-    test('contract transactions - BigInt', async () => {
-        const blockTree = await bywise.blockProvider.getBlockTree(chain);
-        const currentMinnedBlock = blockTree.currentMinnedBlock;
-        const contractAddress = BywiseHelper.getBWSAddressContract();
+        await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         const txs: Tx[] = [];
-        let tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
-            wallet,
-            chain,
-            wallet.address,
-            '0',
-            '0',
-            TxType.TX_CONTRACT,
-            { contractAddress, code: ERCCodeV2 }
-        );
-        txs.push(tx);
         for (let i = 0; i < 100; i++) {
+            const stealthAddress0 = wallet.getStealthAddress(i, 0);
+            const stealthAddress1 = wallet.getStealthAddress(i, 1);
+
             tx = new Tx();
             tx.chain = chain;
             tx.version = "3";
-            tx.from = [wallet.address];
+            tx.from = [stealthAddress0];
             tx.to = [contractAddress];
             tx.amount = ['0'];
             tx.type = TxType.TX_CONTRACT_EXE;
-            tx.data = [{ method: 'transfer', inputs: [BywiseHelper.ZERO_ADDRESS, `1`] }];
+            tx.data = [{ method: 'transfer', inputs: [stealthAddress1, `1`] }];
             tx.foreignKeys = [];
             tx.created = helper.getNow();
             tx.fee = '0';
@@ -1534,24 +1818,25 @@ describe('stress testing', () => {
             tx.sign = [''];
             txs.push(tx);
         }
-        tx = await bywise.transactionsProvider.createNewTransactionFromWallet(
-            wallet,
-            chain,
-            contractAddress,
-            '0',
-            '0',
-            TxType.TX_CONTRACT_EXE,
-            [{ method: "balanceOf", inputs: [wallet.address] }]
-        );
-        txs.push(tx);
 
         let uptime = new Date().getTime();
-        const tte = await bywise.transactionsProvider.simulateTransactions(convertoToTxInfo(txs), fromSlice, DEAFAUT_MAIN_ENV);
+        tte = await bywise.transactionsProvider.simulateTransactions(txs, fromSlice, DEAFAUT_MAIN_ENV);
         uptime = (new Date().getTime() - uptime) / 1000;
 
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(txs.length);
-        expect(tte.outputs[txs.length - 1].output).toEqual("4999999999999999999900");
-        expect(uptime).toBeLessThan(2);
-    }, 3000);
+        expect(uptime).toBeLessThan(1);
+
+        uptime = new Date().getTime();
+        const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
+        for (let i = 0; i < tte.outputs.length; i++) {
+            const tx = tte.txs[i];
+            const output = tte.outputs[i];
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            expect(error).toEqual(null);
+        }
+        await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
+        uptime = (new Date().getTime() - uptime) / 1000;
+        expect(uptime).toBeLessThan(0.1);
+    }, 10000);
 });

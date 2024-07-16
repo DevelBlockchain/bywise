@@ -132,5 +132,4 @@ export type TransactionsToExecute = {
   env: EnvironmentContext;
   txs: Tx[];
   outputs: TxOutput[];
-  envOut: EnvironmentChanges;
 }

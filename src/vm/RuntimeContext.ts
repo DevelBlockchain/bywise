@@ -1,4 +1,4 @@
-import { BywiseHelper, TransactionChanges, TransactionEvent, Tx } from "@bywise/web3";
+import { BywiseHelper, EnvironmentChanges, TransactionChanges, TransactionEvent, Tx } from "@bywise/web3";
 import { Environment } from "../models";
 import { EnvironmentContext } from "../types";
 import { EnvironmentProvider } from "../services";
@@ -169,5 +169,17 @@ export class RuntimeContext {
                 changes.walletAmount.push(balance.toString());
             }
         }
+    }
+
+    getEnvOut() {
+        const envOut: EnvironmentChanges = {
+            keys: [],
+            values: [],
+        };
+        for (let [key, valueEnv] of this.setMainKeys) {
+            envOut.keys.push(key);
+            envOut.values.push(valueEnv.value);
+        }
+        return envOut;
     }
 }

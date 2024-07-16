@@ -1,4 +1,3 @@
-import BigNumber from "bignumber.js";
 import { ApplicationContext, CommandDTO, ConfigDTO, Task, TransactionsToExecute, WalletBalanceDTO } from '../types';
 import { TxType, BywiseHelper, Tx, TxOutput } from '@bywise/web3';
 import { ConfigProvider } from "./configs.service";
@@ -30,8 +29,6 @@ export class VirtualMachineProvider {
     const ctx = new RuntimeContext(this.environmentProvider, tte.env);
 
     const outputs = [];
-    tte.envOut.keys = [];
-    tte.envOut.values = [];
     for (let i = 0; i < tte.txs.length; i++) {
       if (!this.task.isRun) return;
       const tx = tte.txs[i];
@@ -68,10 +65,6 @@ export class VirtualMachineProvider {
       ctx.deleteCommit();
       outputs.push(output);
     }
-    for (let [key, valueEnv] of ctx.setMainKeys) {
-      tte.envOut.keys.push(key);
-      tte.envOut.values.push(valueEnv.value);
-    }
     tte.outputs = outputs;
   }
 
@@ -98,10 +91,10 @@ export class VirtualMachineProvider {
       let walletCodeDTO = await this.walletProvider.getWalletCode(ctx, contractAddress);
       if (walletCodeDTO) throw new Error(`Cant update contract`);
 
-      let contractAmount = new BigNumber(0);
+      let contractAmount = 0n;
       for (let i = 0; i < ctx.tx.to.length; i++) {
         if (ctx.tx.to[i] === contractAddress) {
-          contractAmount = contractAmount.plus(new BigNumber(ctx.tx.amount[i]));
+          contractAmount = contractAmount + BigInt(ctx.tx.amount[i]);
         }
       }
 
@@ -157,25 +150,25 @@ export class VirtualMachineProvider {
       await this.setInfo(ctx, cmd);
     }
 
-    let debit = new BigNumber(0);
+    let debit = 0n;
     for (let i = 0; i < ctx.tx.to.length; i++) {
       const to = ctx.tx.to[i];
       const amount = ctx.tx.amount[i];
-      debit = debit.plus(new BigNumber(amount));
+      debit = debit + BigInt(amount);
       ctx.balanceAdd(to, amount);
     }
     if (feeCostType == 0) {
       ctx.cost = 0;
     }
-    let feeUsed = await this.calcFee(ctx, new BigNumber(ctx.size), debit, new BigNumber(ctx.cost));
+    let feeUsed = await this.calcFee(ctx, BigInt(ctx.size), debit, BigInt(ctx.cost));
     if (ctx.tx.type === TxType.TX_COMMAND || ctx.tx.type === TxType.TX_BLOCKCHAIN_COMMAND) {
       feeUsed = "0";
       ctx.size = 0;
     }
-    if (!ignoreBalance && (new BigNumber(ctx.tx.fee).isLessThan(new BigNumber(feeUsed)))) {
+    if (!ignoreBalance && (BigInt(ctx.tx.fee) < BigInt(feeUsed))) {
       throw new Error(`Invalid fee`);
     }
-    debit = debit.plus(new BigNumber(feeUsed));
+    debit = debit + BigInt(feeUsed);
 
     output.cost = ctx.cost;
     output.size = ctx.size;
@@ -188,17 +181,17 @@ export class VirtualMachineProvider {
     return;
   }
 
-  private async calcFee(ctx: RuntimeContext, size: BigNumber, amount: BigNumber, cost: BigNumber): Promise<string> {
+  private async calcFee(ctx: RuntimeContext, size: bigint, amount: bigint, cost: bigint): Promise<string> {
     let feeBasic = (await this.configsProvider.getByName(ctx, 'feeBasic')).toNumber();
     let feeCoefSize = (await this.configsProvider.getByName(ctx, 'feeCoefSize')).toNumber();
     let feeCoefAmount = (await this.configsProvider.getByName(ctx, 'feeCoefAmount')).toNumber();
     let feeCoefCost = (await this.configsProvider.getByName(ctx, 'feeCoefCost')).toNumber();
 
     let fee = feeBasic;
-    fee = fee.plus(feeCoefSize.multipliedBy(size));
-    fee = fee.plus(feeCoefAmount.multipliedBy(amount));
-    fee = fee.plus(feeCoefCost.multipliedBy(cost));
-    return new BigNumber(fee.toPrecision(5)).toString();
+    fee = fee + (feeCoefSize * size);
+    fee = fee + (feeCoefAmount * amount);
+    fee = fee + (feeCoefCost * cost);
+    return fee.toString();
   }
 
   private async checkAdminAddress(ctx: RuntimeContext) {

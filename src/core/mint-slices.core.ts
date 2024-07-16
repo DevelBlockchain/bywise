@@ -172,14 +172,7 @@ export default class MintSlices implements Task {
             }
         }
         if (newTransactions.length > 0) {
-            const envOut: EnvironmentChanges = {
-                keys: [],
-                values: [],
-            };
-            for (let [key, valueEnv] of ctx.setMainKeys) {
-                envOut.keys.push(key);
-                envOut.values.push(valueEnv.value);
-            }
+            const envOut = ctx.getEnvOut();
             lastSliceHeight++;
             await Promise.all(promises);
             this.coreProvider.applicationContext.logger.debug(`process mempool ${newTransactions.length}/${this.TransactionRepository.mempool.size}`);

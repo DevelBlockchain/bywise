@@ -47,7 +47,7 @@ export class ConfigProvider {
     configs.push(new ConfigDTO({
       chain: '',
       name: "poi",
-      value: "-1",
+      value: "0",
       type: "number"
     }))
     configs.push(new ConfigDTO({

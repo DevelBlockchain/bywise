@@ -74,10 +74,6 @@ export class TransactionsProvider {
       fromSlice: fromSlice,
       ignoreBalance: ignoreBalance,
       outputs: [],
-      envOut: {
-        keys: [],
-        values: [],
-      }
     }
     this.vmIndex++;
     if (this.vmIndex >= this.applicationContext.vmSize) {

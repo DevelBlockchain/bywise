@@ -73,7 +73,7 @@ export class SlicesProvider {
         mempool.push(mempoolTx);
       }
     }
-    if(mempool.length > 0) {
+    if (mempool.length > 0) {
       await this.transactionsProvider.save(mempool);
     }
     if (isComplete) {
@@ -122,21 +122,18 @@ export class SlicesProvider {
           console.log("received", received)
           error = true;
         } else {
-          await this.transactionsProvider.executeTransaction(ctx, tx, output);
+          const errorMessage = await this.transactionsProvider.executeTransaction(ctx, tx, output);
+          if (errorMessage) {
+            this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "${errorMessage}"`)
+            error = true;
+          }
         }
       }
       if (error) {
         this.logger.error(`Slice has invalid transactions - slice.hash: ${sliceInfo.slice.hash}`)
         sliceInfo.status = BlockchainStatus.TX_FAILED;
       } else {
-        const envOut: EnvironmentChanges = {
-          keys: [],
-          values: [],
-        };
-        for (let [key, valueEnv] of ctx.setMainKeys) {
-          envOut.keys.push(key);
-          envOut.values.push(valueEnv.value);
-        }
+        const envOut = ctx.getEnvOut();
         sliceInfo.isExecuted = true;
         success = true;
         sliceInfo.status = BlockchainStatus.TX_CONFIRMED;

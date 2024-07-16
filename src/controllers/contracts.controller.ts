@@ -41,7 +41,9 @@ export default async function contractsController(app: express.Express, apiProvi
             }
             const tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, env });
 
-            runtimeContext.memory = tte.envOut;
+            if(!tte.error) {
+                runtimeContext.memory = tte.outputs[0];
+            }
             if (body.code && !tte.error) {
                 runtimeContext.contractAddress[contractAddress] = tte.outputs[0].output;
             }
