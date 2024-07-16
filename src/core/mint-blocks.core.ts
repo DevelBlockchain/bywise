@@ -4,6 +4,7 @@ import { BlockchainStatus, ZERO_HASH } from "../types";
 import helper from "../utils/helper";
 import { CoreProvider } from "../services";
 import { Task } from "../types";
+import { RoutingKeys } from "../datasource/message-queue";
 
 export default class MintBlocks implements Task {
     public isRun = true;
@@ -42,15 +43,22 @@ export default class MintBlocks implements Task {
         }
         myBlocks = await this.BlockRepository.findByChainAndGreaterHeight(this.coreProvider.chain, height);
         myBlocks = myBlocks.filter(info => info.block.from === mainWallet.address);
+        let executed = true;
         for (let i = 0; i < myBlocks.length; i++) {
-            const block = myBlocks[i];
-            if (block.block.height == currentBlock.height - 1) {
+            const blockInfo = myBlocks[i];
+            if(blockInfo.status !== BlockchainStatus.TX_CONFIRMED && blockInfo.status !== BlockchainStatus.TX_MINED) {
+                executed = false;
+            }
+            if (blockInfo.block.height == currentBlock.height - 1) {
                 isLastBlockMined = true;
-            } else if (block.block.height == currentBlock.height) {
+            } else if (blockInfo.block.height == currentBlock.height) {
                 isCurrentBlockMined = true;
-            } else if (block.block.height == currentBlock.height + 1) {
+            } else if (blockInfo.block.height == currentBlock.height + 1) {
                 isNextBlockMined = true;
             }
+        }
+        if (!executed) {
+            return false; // wait execute block
         }
 
         if (!isLastBlockMined) {
@@ -135,16 +143,18 @@ export default class MintBlocks implements Task {
         block.hash = block.toHash();
         block.sign = await mainWallet.signHash(block.hash);
 
-        const blockInfo: Blocks = {
-            block: block,
-            status: BlockchainStatus.TX_MEMPOOL,
-            countTrys: 0,
-            isComplete: true,
-            isExecuted: false,
-            distance: '',
-        }
         this.coreProvider.applicationContext.logger.info(`mint block - height: ${block.height} - slices: ${block.slices.length} - transactions: ${block.transactionsCount} - hash: ${block.hash.substring(0, 10)}`)
-        await this.coreProvider.blockProvider.executeCompleteBlockByHash(blockInfo);
+        await this.coreProvider.blockProvider.saveNewBlock(block);
+        //const blockInfo: Blocks = {
+        //    block: block,
+        //    status: BlockchainStatus.TX_MEMPOOL,
+        //    countTrys: 0,
+        //    isComplete: true,
+        //    isExecuted: false,
+        //    distance: '',
+        //}
+        //await this.coreProvider.blockProvider.executeCompleteBlockByHash(blockInfo);
+        //this.coreProvider.applicationContext.mq.send(RoutingKeys.new_block, block);
         return true;
     }
 }

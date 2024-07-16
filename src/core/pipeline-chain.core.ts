@@ -44,30 +44,35 @@ export default class PipelineChain implements Task {
         }
         this.runWorkersCount--;
     }
-    
+
     private async blocksFlow() {
         this.runWorkersCount++;
         try {
+            const syncNetwork = new KeepSyncNetwork(this.coreProvider);
+            const mint = new MintBlocks(this.coreProvider);
             const sync = new KeepSyncBlocks(this.coreProvider);
             const exec = new ExecuteBlocks(this.coreProvider);
-            const mint = new MintBlocks(this.coreProvider);
-            const ca = new ConsensusAlgorithm(this.coreProvider);
             const vb = new VoteBlocks(this.coreProvider);
+            const ca = new ConsensusAlgorithm(this.coreProvider);
 
+            await syncNetwork.start();
+            await mint.start();
             await sync.start();
             await exec.start();
-            await mint.start();
             await ca.start();
             await vb.start();
+            await this.executeTransactionsTask.start();
 
-            while (this.isRun && sync.isRun && exec.isRun && mint.isRun && ca.isRun && vb.isRun) {
-                let used = await sync.run();
+            while (this.isRun) {
+                let used = await mint.run();
+                used = used || await syncNetwork.run();
+                used = used || await sync.run();
                 used = used || await exec.run();
-                used = used || await mint.run();
                 used = used || await ca.run();
+                used = used || await this.executeTransactionsTask.run();
                 used = used || await vb.run();
-
-                if(!used) {
+                
+                if (!used) {
                     await helper.sleep(DEFAULT_DELAY);
                 }
             }
@@ -77,23 +82,19 @@ export default class PipelineChain implements Task {
         }
         this.runWorkersCount--;
     }
-    
-    private async slicesExec() {
+
+    private async slicesFlow() {
         this.runWorkersCount++;
         try {
+            const sync = new KeepSyncSlices(this.coreProvider);
             const exec = new ExecuteSlices(this.coreProvider);
-            const mint = new MintSlices(this.coreProvider);
-
+            await sync.start();
             await exec.start();
-            await mint.start();
-            await this.executeTransactionsTask.start();
-
-            while (this.isRun && exec.isRun && mint.isRun && this.executeTransactionsTask.isRun) {
-                let used = await exec.run();
-                used = used || await mint.run();
-                used = used || await this.executeTransactionsTask.run();
-
-                if(!used) {
+            while (this.isRun) {
+                let used = await sync.run();
+                used = used || await exec.run();
+                
+                if (!used) {
                     await helper.sleep(DEFAULT_DELAY);
                 }
             }
@@ -104,20 +105,15 @@ export default class PipelineChain implements Task {
         this.runWorkersCount--;
     }
     
-    private async slicesFlow() {
+    private async mintSlices() {
         this.runWorkersCount++;
         try {
-            const syncNetwork = new KeepSyncNetwork(this.coreProvider);
-            const syncSlices = new KeepSyncSlices(this.coreProvider);
-
-            await syncNetwork.start();
-            await syncSlices.start();
-
-            while (this.isRun && syncNetwork.isRun && syncSlices.isRun) {
-                let used = await syncNetwork.run();
-                used = used || await syncSlices.run();
-
-                if(!used) {
+            const mint = new MintSlices(this.coreProvider);
+            await mint.start();
+            while (this.isRun) {
+                let used = await mint.run();
+                
+                if (!used) {
                     await helper.sleep(DEFAULT_DELAY);
                 }
             }
@@ -134,8 +130,8 @@ export default class PipelineChain implements Task {
         await this.runSyncChain();
 
         this.blocksFlow();
-        this.slicesExec();
         this.slicesFlow();
+        this.mintSlices();
 
         this.runWorkersCount--;
         return true;

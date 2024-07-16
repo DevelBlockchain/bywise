@@ -5,7 +5,5 @@ export type Blocks = {
   block: Block,
   status: BlockchainStatus,
   distance: string,
-  countTrys: number,
-  isComplete: boolean,
-  isExecuted: boolean
+  attempts: number,
 };

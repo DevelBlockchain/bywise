@@ -27,7 +27,7 @@ class VM implements Task {
                 let uptime = Date.now();
                 await this.virtualMachineProvider.executeTransactions(tte);
                 uptime = Date.now() - uptime;
-                this.logger.debug(`VM ${this.mq.getThreadId()} - executed ${tte.txs.length} in ${uptime} ms - TPS ${(tte.txs.length/(uptime/1000)).toFixed(2)}`);
+                this.logger.verbose(`VM ${this.mq.getThreadId()} - executed ${tte.txs.length} in ${uptime} ms - TPS ${(tte.txs.length/(uptime/1000)).toFixed(2)}`);
                 await this.mq.send(RoutingKeys.set_transactions_to_execute, tte);
             } else {
                 await helper.sleep(50);

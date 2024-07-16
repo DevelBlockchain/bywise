@@ -20,8 +20,7 @@ export default class ExecuteSlices implements Task {
 
     async run() {
         let isExecuted = false;
-        let slices = await this.SliceRepository.findByChainAndStatus(this.coreProvider.chain, BlockchainStatus.TX_MEMPOOL);
-        slices = slices.filter(info => info.isComplete === true && info.isExecuted === false);
+        let slices = await this.SliceRepository.findByChainAndStatus(this.coreProvider.chain, BlockchainStatus.TX_COMPLETE);
         if (slices.length == 0) {
             return isExecuted;
         }
@@ -29,13 +28,10 @@ export default class ExecuteSlices implements Task {
 
         for (let i = 0; i < slices.length; i++) {
             const sliceInfo = slices[i];
-            const lastSlice = await this.coreProvider.slicesProvider.getSliceInfo(sliceInfo.slice.lastHash);
-
-            if (lastSlice.isExecuted) {
-                let success = await this.coreProvider.slicesProvider.executeCompleteSlice(this.coreProvider.chain, sliceInfo);
-                if (success) {
-                    isExecuted = true;
-                }
+            
+            const success = await this.coreProvider.slicesProvider.executeCompleteSlice(sliceInfo);
+            if (success) {
+                isExecuted = true;
             }
         }
         if (isExecuted) {

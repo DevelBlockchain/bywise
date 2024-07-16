@@ -54,12 +54,13 @@ export default class VoteBlocks implements Task {
         tx.created = Math.floor(Date.now() / 1000);
         
         let tte: TransactionsToExecute = await this.coreProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
+        if (!tte) throw new Error(`failed VM`);
         if (tte.error) throw new Error(`Failed create vote transaction`);
         tx.output = tte.outputs[0];
         tx.hash = tx.toHash();
         tx.sign = [await mainWallet.signHash(tx.hash)];
         this.coreProvider.applicationContext.database.TransactionRepository.addMempool(tx);
-        this.coreProvider.applicationContext.logger.info(`create vote in ${currentBlock.height}`);
+        this.coreProvider.applicationContext.logger.info(`create vote in ${currentBlock.height} - context: ${tx.output.ctx.substring(0, 10)}...`);
         return true;
     }
 }

@@ -64,8 +64,7 @@ export class TransactionsProvider {
     return tx;
   }
 
-  async simulateTransactions(txs: Tx[], fromSlice: string, env: EnvironmentContext, ignoreBalance: boolean = false): Promise<TransactionsToExecute> {
-    if (!this.task.isRun) throw new Error(`task not run`);
+  async simulateTransactions(txs: Tx[], fromSlice: string, env: EnvironmentContext, ignoreBalance: boolean = false): Promise<TransactionsToExecute | null> {
     let tte: TransactionsToExecute = {
       id: helper.getRandomHash(),
       env: env,
@@ -82,17 +81,17 @@ export class TransactionsProvider {
     this.transactionsToExecute.set(tte.id, tte);
     this.mq.send(RoutingKeys.add_transactions_to_execute, tte);
 
-    do {
+    for (let i = 0; i < 100; i++) {
+      await helper.sleep(50);
       const tteOutput = this.transactionsToExecute.get(tte.id);
       if (tteOutput && tteOutput.outputs.length > 0) {
         tte = tteOutput;
         this.transactionsToExecute.delete(tte.id);
-      } else {
-        await helper.sleep(50);
+        return tte;
       }
-    } while (tte.outputs.length == 0 && this.task.isRun);
-
-    return tte;
+      if(!this.task.isRun) return null;
+    }
+    return null;
   }
 
   public async save(txs: Tx[]) {

@@ -40,6 +40,7 @@ export default async function contractsController(app: express.Express, apiProvi
                 changes: runtimeContext.memory
             }
             const tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, env });
+            if (!tte) throw new Error(`failed VM`);
 
             if(!tte.error) {
                 runtimeContext.memory = tte.outputs[0];

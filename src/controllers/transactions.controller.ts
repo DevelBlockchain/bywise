@@ -254,6 +254,13 @@ export default async function transactionsController(app: express.Express, apiPr
                 }
             }
             const tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, ignoreBalance: true });
+            if (!tte) {
+                return {
+                    id: req.id,
+                    body: { error: `failed VM` },
+                    status: 400
+                }
+            }
             return {
                 id: req.id,
                 body: tte.outputs[0],
@@ -384,6 +391,7 @@ export default async function transactionsController(app: express.Express, apiPr
             tx.created = Math.floor(Date.now() / 1000);
 
             let tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, ignoreBalance: true });
+            if (!tte) throw new Error(`failed VM`);
             tx.output = tte.outputs[0];
 
             tx.fee = tx.output.feeUsed;

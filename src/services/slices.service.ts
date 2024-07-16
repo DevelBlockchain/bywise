@@ -1,5 +1,5 @@
-import { EnvironmentChanges, Slice, Tx } from '@bywise/web3';
-import { ApplicationContext, BlockchainStatus, CompiledContext } from '../types';
+import { Slice, Tx } from '@bywise/web3';
+import { ApplicationContext, BlockchainStatus, CompiledContext, ZERO_HASH } from '../types';
 import { RoutingKeys } from '../datasource/message-queue';
 import { Slices } from '../models';
 import { TransactionsProvider } from './transactions.service';
@@ -31,8 +31,7 @@ export class SlicesProvider {
 
       bSlice = {
         slice: slice,
-        isComplete: false,
-        isExecuted: false,
+        attempts: 0,
         status: BlockchainStatus.TX_MEMPOOL,
         blockHash: ''
       }
@@ -44,21 +43,32 @@ export class SlicesProvider {
 
   async syncSlices(chain: string) {
     let slices = await this.SliceRepository.findByChainAndStatus(chain, BlockchainStatus.TX_MEMPOOL);
-    slices = slices.filter(info => info.isComplete === false);
 
     for (let i = 0; i < slices.length; i++) {
       const sliceInfo = slices[i];
 
-      await this.syncSliceByHash(sliceInfo.slice.hash)
+      await this.syncSliceByHash(sliceInfo);
     }
     return slices.length > 0;
   }
 
-  async syncSliceByHash(hash: string) {
-    const sliceInfo = await this.getSliceInfo(hash);
-
+  async syncSliceByHash(sliceInfo: Slices): Promise<boolean> {
     let isComplete = true;
 
+    if (sliceInfo.slice.lastHash !== ZERO_HASH) {
+      const lastSlice = await this.SliceRepository.findByHash(sliceInfo.slice.lastHash);
+      if (!lastSlice) {
+        isComplete = false;
+        await this.mq.send(RoutingKeys.find_slice, sliceInfo.slice.lastHash);
+      } else if (lastSlice.status == BlockchainStatus.TX_FAILED) {
+        sliceInfo.status = BlockchainStatus.TX_FAILED;
+        this.logger.error(`sync-slices: Last slice is failed - slice.hash: ${sliceInfo.slice.hash}`);
+        await this.updateSlice(sliceInfo);
+        return false;
+      } else if (lastSlice.status == BlockchainStatus.TX_MEMPOOL) {
+        return false; // wait
+      }
+    }
     const mempool: Tx[] = [];
     for (let z = 0; z < sliceInfo.slice.transactions.length; z++) {
       const txHash = sliceInfo.slice.transactions[z];
@@ -77,19 +87,40 @@ export class SlicesProvider {
       await this.transactionsProvider.save(mempool);
     }
     if (isComplete) {
-      sliceInfo.isComplete = true;
-      this.logger.verbose(`sync-slices: complete - height: ${sliceInfo.slice.blockHeight} - hash: ${sliceInfo.slice.hash.substring(0, 10)}... - from: ${sliceInfo.slice.from.substring(0, 10)}...`)
-      await this.updateSlice(sliceInfo);
+      sliceInfo.attempts = 0;
+      sliceInfo.status = BlockchainStatus.TX_COMPLETE;
+      this.logger.verbose(`sync-slices: height: ${sliceInfo.slice.blockHeight} - hash: ${sliceInfo.slice.hash.substring(0, 10)}... - from: ${sliceInfo.slice.from.substring(0, 10)}...`)
+    } else {
+      sliceInfo.attempts++;
+      if (sliceInfo.attempts >= 100) {
+        this.logger.error(`sync-slices: Not found some transactions - slice.hash: ${sliceInfo.slice.hash}`);
+        sliceInfo.status = BlockchainStatus.TX_FAILED;
+      }
     }
-    return sliceInfo;
+    await this.updateSlice(sliceInfo);
+    return isComplete;
   }
 
-  async executeCompleteSlice(chain: string, sliceInfo: Slices) {
+  async executeCompleteSlice(sliceInfo: Slices) {
     let success = false;
     let error = false;
     try {
+      if (sliceInfo.slice.lastHash !== ZERO_HASH) {
+        const lastSlice = await this.getSliceInfo(sliceInfo.slice.lastHash);
+
+        if (lastSlice.status == BlockchainStatus.TX_FAILED) {
+          sliceInfo.status = BlockchainStatus.TX_FAILED;
+          await this.updateSlice(sliceInfo);
+          return false;
+        } else if (lastSlice.status == BlockchainStatus.TX_MEMPOOL) {
+          throw new Error(`error execute slice - last slice status mempool`);
+        } else if (lastSlice.status == BlockchainStatus.TX_COMPLETE) {
+          return false; // wait execute last slice
+        }
+      }
+
       const env = {
-        chain: chain,
+        chain: sliceInfo.slice.chain,
         fromContextHash: CompiledContext.SLICE_CONTEXT_HASH,
         blockHeight: sliceInfo.slice.blockHeight,
         changes: {
@@ -98,47 +129,49 @@ export class SlicesProvider {
         }
       }
       const ctx = new RuntimeContext(this.environmentProvider, env);
-      await this.environmentProvider.compile(chain, sliceInfo.slice.lastHash, CompiledContext.SLICE_CONTEXT_HASH);
+      await this.environmentProvider.compile(sliceInfo.slice.chain, sliceInfo.slice.lastHash, CompiledContext.SLICE_CONTEXT_HASH);
 
       const txs = await this.TransactionRepository.findTxByHashs(sliceInfo.slice.transactions);
       const tte = await this.transactionsProvider.simulateTransactions(txs, sliceInfo.slice.lastHash, env);
+      if (!tte) return false;
       for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
         const txHash = sliceInfo.slice.transactions[j];
         const tx = new Tx(txs[j]);
         const output = tte.outputs[j];
-
-        const hash = tx.toHash();
-        const received = tx.output;
+        const txOutput = tx.output;
         tx.output = output;
+
         if (!output) {
           this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "Transaction Output Not Found"`)
           error = true;
         } else if (output.error) {
           this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "${output.error}"`)
           error = true;
-        } else if (hash !== tx.toHash()) {
+        } else if (tx.hash !== tx.toHash()) {
           this.logger.error(`Invalid output - tx.hash: ${txHash}`);
+          console.log("tx", tx)
           console.log("expected", output)
-          console.log("received", received)
+          console.log("received", txOutput)
           error = true;
         } else {
           const errorMessage = await this.transactionsProvider.executeTransaction(ctx, tx, output);
           if (errorMessage) {
             this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "${errorMessage}"`)
             error = true;
+          } else {
+            this.mq.send(RoutingKeys.new_tx, tx);
           }
         }
       }
       if (error) {
-        this.logger.error(`Slice has invalid transactions - slice.hash: ${sliceInfo.slice.hash}`)
+        this.logger.error(`Slice has invalid transactions - slice.hash: ${sliceInfo.slice.hash}`);
         sliceInfo.status = BlockchainStatus.TX_FAILED;
       } else {
         const envOut = ctx.getEnvOut();
-        sliceInfo.isExecuted = true;
-        success = true;
         sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
-        await this.environmentProvider.push(envOut, chain, sliceInfo.slice.hash, sliceInfo.slice.lastHash, sliceInfo.slice.hash);
-        this.logger.verbose(`exec-slices: exec slice - height: ${sliceInfo.slice.blockHeight} - txs: ${sliceInfo.slice.transactionsCount} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
+        await this.environmentProvider.push(envOut, sliceInfo.slice.chain, sliceInfo.slice.hash, sliceInfo.slice.lastHash, sliceInfo.slice.hash);
+        this.logger.verbose(`exec-slices: height: ${sliceInfo.slice.blockHeight} - txs: ${sliceInfo.slice.transactionsCount} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
+        success = true;
       }
     } catch (err: any) {
       this.logger.error(`Error: ${err.message}`, err);
@@ -164,7 +197,7 @@ export class SlicesProvider {
   async getByHeight(chain: string, from: string, height: number) {
     let lastSlices = await this.SliceRepository.findByChainAndBlockHeight(chain, height);
     lastSlices = lastSlices.filter(sliceInfo => sliceInfo.slice.from === from);
-    lastSlices = lastSlices.filter(sliceInfo => sliceInfo.isExecuted === true);
+    lastSlices = lastSlices.filter(sliceInfo => sliceInfo.status == BlockchainStatus.TX_CONFIRMED);
     lastSlices = lastSlices.sort((s1, s2) => s1.slice.height - s2.slice.height);
     let slices: Slices[] = [];
     for (let i = 0; i < lastSlices.length; i++) {
@@ -181,25 +214,12 @@ export class SlicesProvider {
   }
 
   async getSliceInfo(hash: string): Promise<Slices> {
-    const slice = await this.SliceRepository.findByHash(hash);
-    if (!slice) throw new Error(`slice not found ${hash}`);
-    const sliceInfo: Slices = {
-      slice: new Slice(slice.slice),
-      status: slice.status,
-      isComplete: slice.isComplete,
-      isExecuted: slice.isExecuted,
-      blockHash: slice.blockHash,
-    }
+    const sliceInfo = await this.SliceRepository.findByHash(hash);
+    if (!sliceInfo) throw new Error(`slice not found ${hash}`);
     return sliceInfo;
   }
 
   async updateSlice(infoSlice: Slices) {
-    const bslice = await this.SliceRepository.findByHash(infoSlice.slice.hash);
-    if (bslice) {
-      bslice.status = infoSlice.status;
-      bslice.isComplete = infoSlice.isComplete;
-      bslice.isExecuted = infoSlice.isExecuted;
-      await this.SliceRepository.save(bslice);
-    }
+    await this.SliceRepository.save(infoSlice);
   }
 }

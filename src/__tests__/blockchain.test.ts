@@ -19,7 +19,7 @@ beforeAll(async () => {
         ChainConfig.addAdmin(wallet.address),
         ChainConfig.addValidator(wallet.address),
         ChainConfig.addBalance(wallet.address, ConfigProvider.MIN_BWS_VALUE),
-        ChainConfig.setConfig('blockTime', `600`),
+        ChainConfig.setBlockTime(`600`),
     ]);
     node0 = await Bywise.newBywiseInstance({
         name: `test${port0}`,
@@ -32,6 +32,8 @@ beforeAll(async () => {
         zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: wallet.seed,
         startServices: ['api', 'core', 'network', 'vm'],
+        vmSize: 1,
+        vmIndex: 0
     });
 
     web3 = new Web3({

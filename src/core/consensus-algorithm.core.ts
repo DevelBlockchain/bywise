@@ -1,5 +1,5 @@
 import { Block } from "@bywise/web3";
-import { Task } from "../types";
+import { BlockchainStatus, Task } from "../types";
 import { Blocks, Votes } from "../models";
 import helper from "../utils/helper";
 import { CoreProvider } from "../services";
@@ -29,7 +29,7 @@ export default class ConsensusAlgorithm implements Task {
 
     private async selectNewBlock(blockTime: number, currentBlock: Block): Promise<boolean> {
         let lastBlocks = await this.BlockRepository.findByChainAndGreaterHeight(currentBlock.chain, currentBlock.height);
-        lastBlocks = lastBlocks.filter(info => (info.isExecuted));
+        lastBlocks = lastBlocks.filter(blockInfo => blockInfo.status == BlockchainStatus.TX_CONFIRMED || blockInfo.status == BlockchainStatus.TX_MINED);
 
         let currentBlocks: Blocks[] = [];
         let nextBlocks: Blocks[] = [];

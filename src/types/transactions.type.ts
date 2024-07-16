@@ -3,6 +3,7 @@ import { EnvironmentContext } from './environment.types';
 
 export enum BlockchainStatus {
   TX_MEMPOOL = 'mempool',
+  TX_COMPLETE = 'complete',
   TX_CONFIRMED = 'confirmed',
   TX_MINED = 'mined',
   TX_FAILED = 'failed',

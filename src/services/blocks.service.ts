@@ -32,30 +32,21 @@ export class BlocksProvider {
   }
 
   async getBlockInfo(hash: string): Promise<Blocks> {
-    let foundBlock = await this.BlockRepository.findByHash(hash);
-    if (!foundBlock) throw new Error(`block not found ${hash}`);
-    const info: Blocks = {
-      block: new Block(foundBlock.block),
-      status: foundBlock.status,
-      countTrys: foundBlock.countTrys,
-      isComplete: foundBlock.isComplete,
-      isExecuted: foundBlock.isExecuted,
-      distance: foundBlock.distance,
-    }
-    return info;
+    let blockInfo = await this.BlockRepository.findByHash(hash);
+    if (!blockInfo) throw new Error(`block not found ${hash}`);
+    return blockInfo;
   }
 
   async saveNewBlock(block: Block): Promise<Blocks> {
     let bBlock = await this.BlockRepository.findByHash(block.hash);
     if (!bBlock) {
       block.isValid();
+      if(block.height == 0) throw new Error("Block invalid height zero");
 
       bBlock = {
         block: block,
         status: BlockchainStatus.TX_MEMPOOL,
-        countTrys: 0,
-        isComplete: false,
-        isExecuted: false,
+        attempts: 0,
         distance: '',
       }
       await this.BlockRepository.save(bBlock);
@@ -83,30 +74,30 @@ export class BlocksProvider {
 
   async syncBlocks(chain: string) {
     let blockInfoList = await this.BlockRepository.findByChainAndStatus(chain, BlockchainStatus.TX_MEMPOOL);
-    blockInfoList = blockInfoList.filter(info => info.isComplete === false);
 
     for (let i = 0; i < blockInfoList.length; i++) {
       const blockInfo = blockInfoList[i];
 
-      await this.syncBlockByHash(blockInfo.block.hash);
+      await this.syncBlockByHash(blockInfo);
     }
     return blockInfoList.length > 0;
   }
 
-  async syncBlockByHash(hash: string) {
-    const blockInfo = await this.getBlockInfo(hash);
-
+  async syncBlockByHash(blockInfo: Blocks): Promise<boolean> {
     let isComplete = true;
-    const lastBlockInfo = await this.BlockRepository.findByHash(blockInfo.block.lastHash);
 
-    if (!lastBlockInfo) {
-      if (blockInfo.block.lastHash !== ZERO_HASH) {
+    if (blockInfo.block.lastHash !== ZERO_HASH) {
+      const lastBlock = await this.BlockRepository.findByHash(blockInfo.block.lastHash);
+      if (!lastBlock) {
         isComplete = false;
-        await this.mq.send(RoutingKeys.find_block, blockInfo.block.lastHash);
-      }
-    } else {
-      if (!lastBlockInfo.isComplete) {
-        isComplete = false;
+        await this.mq.send(RoutingKeys.find_slice, blockInfo.block.lastHash);
+      } else if (lastBlock.status == BlockchainStatus.TX_FAILED) {
+        lastBlock.status = BlockchainStatus.TX_FAILED;
+        this.applicationContext.logger.error(`sync-blocks: Last block is failed - block.hash: ${blockInfo.block.hash}`);
+        await this.updateBlock(lastBlock);
+        return false;
+      } else if (lastBlock.status == BlockchainStatus.TX_MEMPOOL) {
+        return false; // wait
       }
     }
     for (let j = 0; j < blockInfo.block.slices.length; j++) {
@@ -117,24 +108,28 @@ export class BlocksProvider {
         isComplete = false;
         await this.mq.send(RoutingKeys.find_slice, sliceHash);
       } else {
-        if (!sliceInfo.isComplete) {
-          isComplete = false;
+        if (sliceInfo.status == BlockchainStatus.TX_FAILED) {
+          blockInfo.status = BlockchainStatus.TX_FAILED;
+          this.applicationContext.logger.error(`Last block is failed - block.hash: ${blockInfo.block.hash}`);
+          await this.updateBlock(blockInfo);
+          return false;
         }
       }
     }
 
     if (!isComplete) {
-      blockInfo.countTrys++;
-      if (blockInfo.countTrys > 100) {
-        this.applicationContext.logger.error(`Block reached max countTrys - ${blockInfo.block.hash}`)
+      blockInfo.attempts++;
+      if (blockInfo.attempts > 100) {
+        this.applicationContext.logger.error(`sync-slices: Not found some transactions - block.hash: ${blockInfo.block.hash}`);
         blockInfo.status = BlockchainStatus.TX_FAILED;
       }
     } else {
-      this.applicationContext.logger.verbose(`sync-blocks: complete - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
-      blockInfo.isComplete = true;
+      this.applicationContext.logger.info(`sync-blocks: height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
+      blockInfo.status = BlockchainStatus.TX_COMPLETE;
+      blockInfo.attempts = 0;
     }
     await this.updateBlock(blockInfo);
-    return blockInfo;
+    return isComplete;
   }
 
   async processVotes(chain: string) {
@@ -165,78 +160,70 @@ export class BlocksProvider {
   }
 
   async executeCompleteBlocks(chain: string) {
-    let hasNewBlocks = false;
-    let blockInfoList = await this.BlockRepository.findByChainAndStatus(chain, BlockchainStatus.TX_MEMPOOL);
-    blockInfoList = blockInfoList.filter(info => info.isComplete === true && info.isExecuted === false);
+    let isExecuted = false;
+    let blockInfoList = await this.BlockRepository.findByChainAndStatus(chain, BlockchainStatus.TX_COMPLETE);
     blockInfoList = blockInfoList.sort((b1, b2) => b1.block.created - b2.block.created);
 
     for (let i = 0; i < blockInfoList.length; i++) {
       const blockInfo = blockInfoList[i];
 
-      const lastHash = blockInfo.block.lastHash;
-      let lastBlockIsExecuted = false;
-      if (lastHash == ZERO_HASH) {
-        lastBlockIsExecuted = true;
-      } else {
-        const lastBlock = await this.getBlockInfo(lastHash);
-        if (lastBlock.isExecuted) {
-          lastBlockIsExecuted = true;
-        }
-      }
-      if (lastBlockIsExecuted) {
-        let success = await this.executeCompleteBlockByHash(blockInfo);
-        if(success) {
-          hasNewBlocks = true;
-        }
+      let success = await this.executeCompleteBlockByHash(blockInfo);
+      if (success) {
+        isExecuted = true;
       }
     }
-    return hasNewBlocks;
+    return isExecuted;
   }
 
-  async executeCompleteBlockByHash(blockInfo: Blocks) {
-    let lastBlockInfo = null;
+  async executeCompleteBlockByHash(blockInfo: Blocks): Promise<boolean> {
+    let lastBlock: Blocks | null = null;
     let expectedFrom = blockInfo.block.from;
-    let success = false;
     if (blockInfo.block.lastHash !== ZERO_HASH) {
-      lastBlockInfo = await this.getBlockInfo(blockInfo.block.lastHash);
-      expectedFrom = lastBlockInfo.block.from;
-      if (lastBlockInfo.block.lastHash !== ZERO_HASH) {
-        const lastlastBlockInfo = await this.getBlockInfo(lastBlockInfo.block.lastHash);
+      lastBlock = await this.getBlockInfo(blockInfo.block.lastHash);
+      expectedFrom = lastBlock.block.from;
+      if (lastBlock.block.lastHash !== ZERO_HASH) {
+        const lastlastBlockInfo = await this.getBlockInfo(lastBlock.block.lastHash);
         expectedFrom = lastlastBlockInfo.block.from;
       }
-    }
-    if (blockInfo.block.lastHash === ZERO_HASH || lastBlockInfo && lastBlockInfo.isExecuted) {
-      try {
-        let isExecuted = true;
-        const slices = await this.SliceRepository.findByHashs(blockInfo.block.slices);
-        for (let j = 0; j < slices.length; j++) {
-          const sliceInfo = slices[j];
 
-          if (!sliceInfo.isExecuted) {
-            isExecuted = false;
-          } else {
-            if (blockInfo.block.height !== sliceInfo.slice.blockHeight) throw new Error(`tryExecBlock - wrong blockHeight ${blockInfo.block.height}/${sliceInfo.slice.blockHeight}`);
-            if (expectedFrom !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
-          }
-        }
-        if (isExecuted) {
-          if (!lastBlockInfo) {
-            blockInfo.distance = '0';
-          } else {
-            blockInfo.distance = this.calcBlockModule(lastBlockInfo.block, blockInfo.block, lastBlockInfo.distance);
-          }
-          blockInfo.isExecuted = true;
-          success = true;
-          this.applicationContext.logger.verbose(`sync-blocks: exec block - height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
-        }
-      } catch (err: any) {
-        blockInfo.isExecuted = false;
-        this.applicationContext.logger.error(`Error: ${err.message}`, err);
+      if (lastBlock.status == BlockchainStatus.TX_FAILED) {
         blockInfo.status = BlockchainStatus.TX_FAILED;
+        await this.updateBlock(blockInfo);
+        return false;
+      } else if (lastBlock.status == BlockchainStatus.TX_MEMPOOL) {
+        throw new Error(`error execute slice - last slice status mempool`);
+      } else if (lastBlock.status == BlockchainStatus.TX_COMPLETE) {
+        return false; // wait execute last block
       }
-      await this.updateBlock(blockInfo);
-      return success;
     }
+
+    const slices = await this.SliceRepository.findByHashs(blockInfo.block.slices);
+    for (let j = 0; j < slices.length; j++) {
+      const sliceInfo = slices[j];
+
+      if (sliceInfo.status == BlockchainStatus.TX_FAILED) {
+        blockInfo.status = BlockchainStatus.TX_FAILED;
+        await this.updateBlock(blockInfo);
+        return false;
+      } else if (sliceInfo.status == BlockchainStatus.TX_COMPLETE) {
+        return false; // wait execute slice
+      } else if (sliceInfo.status == BlockchainStatus.TX_MEMPOOL) {
+        throw new Error(`error execute block - slice status mempool`);
+      }
+
+      if (blockInfo.block.height !== sliceInfo.slice.blockHeight) throw new Error(`tryExecBlock - wrong blockHeight ${blockInfo.block.height}/${sliceInfo.slice.blockHeight}`);
+      if (expectedFrom !== sliceInfo.slice.from) throw new Error(`tryExecBlock - slice invalid from`);
+    }
+    if (!lastBlock) {
+      blockInfo.distance = '0';
+    } else {
+      blockInfo.distance = this.calcBlockModule(lastBlock.block, blockInfo.block, lastBlock.distance);
+    }
+    blockInfo.status = BlockchainStatus.TX_CONFIRMED;
+    this.applicationContext.logger.info(`exec block: height: ${blockInfo.block.height} - hash: ${blockInfo.block.hash.substring(0, 10)}...`)
+
+    await this.updateBlock(blockInfo);
+    return true;
   }
 
   async selectUndoMiningBlock(blockInfo: Blocks) {
@@ -256,10 +243,10 @@ export class BlocksProvider {
       return;
     }
     const blockInfo = await this.getBlockInfo(hash);
-    if (!blockInfo.isExecuted) throw new Error(`block not executed`);
     if (blockInfo.status === BlockchainStatus.TX_MINED) {
       return;
     }
+    if (blockInfo.status !== BlockchainStatus.TX_CONFIRMED) throw new Error(`block not executed`);
 
     let lastMinnedBlock = await this.BlockRepository.findByChainAndStatusAndHeight(chain, BlockchainStatus.TX_MINED, blockInfo.block.height);
     if (lastMinnedBlock.length > 0) {
@@ -291,9 +278,7 @@ export class BlocksProvider {
     const newBlock: Blocks = {
       block: blockPack.block,
       status: BlockchainStatus.TX_MEMPOOL,
-      countTrys: 0,
-      isComplete: false,
-      isExecuted: false,
+      attempts: 0,
       distance: '',
     }
     await this.BlockRepository.save(newBlock);
@@ -312,13 +297,13 @@ export class BlocksProvider {
     for (let i = 0; i < blockPack.slices.length; i++) {
       const slice = blockPack.slices[i];
       let sliceInfo = await this.slicesProvider.saveNewSlice(slice);
-      sliceInfo = await this.slicesProvider.syncSliceByHash(slice.hash);
-      await this.slicesProvider.executeCompleteSlice(chain, sliceInfo);
+      await this.slicesProvider.syncSliceByHash(sliceInfo);
+      await this.slicesProvider.executeCompleteSlice(sliceInfo);
       if (sliceInfo.status !== BlockchainStatus.TX_CONFIRMED) throw new Error(`slice not executed ${slice.hash}`);
     }
 
     await this.processVotes(chain);
-    blockInfo = await this.syncBlockByHash(blockPack.block.hash);
+    await this.syncBlockByHash(blockInfo);
     await this.executeCompleteBlockByHash(blockInfo);
     await this.selectMinedBlock(chain, blockPack.block.hash);
   }
@@ -329,23 +314,23 @@ export class BlocksProvider {
 
   async getBlockPack(chain: string, height: number) {
     const blocks = await this.BlockRepository.findByChainAndHeight(chain, height);
-    let block: Blocks | undefined;
+    let blockInfo: Blocks | undefined;
     blocks.forEach(b => {
       if (b.status === BlockchainStatus.TX_MINED) {
-        block = b;
+        blockInfo = b;
       }
     })
-    if (!block) return null;
+    if (!blockInfo) return null;
     const blockPack: BlockPack = {
-      block: new Block(block.block),
+      block: blockInfo.block,
       slices: [],
       txs: [],
     }
-    const slices = await this.slicesProvider.getSlices(block.block.slices);
+    const slices = await this.slicesProvider.getSlices(blockInfo.block.slices);
     for (let i = 0; i < slices.length; i++) {
       const slice = slices[i];
 
-      blockPack.slices.push(new Slice(slice.slice));
+      blockPack.slices.push(slice.slice);
       const transactions = await this.transactionsProvider.getTransactions(slice.slice.transactions);
 
       for (let j = 0; j < transactions.length; j++) {
@@ -385,7 +370,7 @@ export class BlocksProvider {
     }
 
     const slices = await this.slicesProvider.getByHeight(chain, from, block.height + 1);
-    if(slices.length > 0) {
+    if (slices.length > 0) {
       return slices[slices.length - 1];
     }
 

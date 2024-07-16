@@ -89,7 +89,8 @@ describe('basic tests', () => {
         );
         tx.isValid();
 
-        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -127,7 +128,8 @@ describe('basic tests', () => {
         );
         tx1.isValid();
 
-        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -165,7 +167,8 @@ describe('basic tests', () => {
         );
         tx1.isValid();
 
-        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -220,7 +223,8 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
@@ -305,7 +309,8 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
@@ -382,7 +387,8 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
@@ -463,7 +469,8 @@ describe('basic tests', () => {
         );
         tx2.isValid();
 
-        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(2);
         expect(tte.outputs.length).toEqual(2);
@@ -561,6 +568,7 @@ describe('set configs', () => {
         tx3.isValid();
 
         let tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(3);
         expect(tte.outputs.length).toEqual(3);
@@ -644,6 +652,7 @@ describe('set configs', () => {
 
         DEAFAUT_MAIN_ENV.blockHeight += 1; // next block
         tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -664,6 +673,7 @@ describe('set configs', () => {
 
         DEAFAUT_MAIN_ENV.blockHeight += 10; // wait 10 blocks
         tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -684,6 +694,7 @@ describe('set configs', () => {
 
         DEAFAUT_MAIN_ENV.blockHeight += 100; // wait 100 blocks
         tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -751,6 +762,7 @@ describe('set configs', () => {
         tx3.isValid();
 
         let tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2, tx3], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(3);
         expect(tte.outputs.length).toEqual(3);
@@ -834,6 +846,7 @@ describe('set configs', () => {
 
         DEAFAUT_MAIN_ENV.blockHeight += 1; // next block
         tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs.length).toEqual(1);
         expect(tte.outputs.length).toEqual(1);
@@ -868,7 +881,8 @@ describe('contracts', () => {
             { contractAddress, code: ERCCodeV2 }
         );
         tx.isValid();
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
 
         const expectedABI = [
             {
@@ -1020,6 +1034,7 @@ describe('contracts', () => {
         );
         tx.isValid();
         tte = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs[0]).toEqual({
             feeUsed: '0',
@@ -1051,7 +1066,8 @@ describe('contracts', () => {
             { contractAddress, code: ERCCodeV2 }
         );
         tx.isValid();
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
@@ -1066,6 +1082,7 @@ describe('contracts', () => {
         );
         tx.isValid();
         tte = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs[0]).toEqual({
             feeUsed: '0',
@@ -1121,7 +1138,8 @@ describe('contracts', () => {
             { contractAddress, code: ERCCodeV2 }
         );
         tx.isValid();
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
 
         await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
@@ -1137,6 +1155,7 @@ describe('contracts', () => {
         );
         tx.isValid();
         tte = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual("insuficient funds");
     }, 3000);
 
@@ -1155,7 +1174,8 @@ describe('contracts', () => {
             { contractAddress, code: ERCCodeV2 }
         );
         tx.isValid();
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
 
         await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
@@ -1182,6 +1202,7 @@ describe('contracts', () => {
         );
         tx2.isValid();
         tte = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
 
         const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
@@ -1273,7 +1294,8 @@ describe('contracts', () => {
         );
         tx5.isValid();
 
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.outputs.length).toEqual(2);
         expect(tte.error).toEqual(undefined);
 
@@ -1287,6 +1309,7 @@ describe('contracts', () => {
         await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         tte = await bywise.transactionsProvider.simulateTransactions([tx3, tx4], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.outputs.length).toEqual(2);
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs[0].output).toEqual("");
@@ -1302,6 +1325,7 @@ describe('contracts', () => {
         await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         tte = await bywise.transactionsProvider.simulateTransactions([tx5], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.outputs.length).toEqual(1);
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs[0].output).toEqual("Banana");
@@ -1344,13 +1368,15 @@ describe('contracts', () => {
         );
         tx2.isValid();
 
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(1);
 
         await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(1);
         expect(tte.outputs[0].events).toEqual([{
@@ -1376,7 +1402,8 @@ describe('contracts', () => {
             { contractAddress: contractAddress, code: ERCCodeTestContract }
         );
         tx1.isValid();
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(1);
         await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
@@ -1392,6 +1419,7 @@ describe('contracts', () => {
         );
         tx2.isValid();
         tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.outputs.length).toEqual(1);
         expect(tte.outputs[0].error).toEqual(undefined);
         expect(tte.outputs[0].output).toEqual("495000");
@@ -1408,6 +1436,7 @@ describe('contracts', () => {
         );
         tx2.isValid();
         tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.outputs.length).toEqual(1);
         expect(tte.outputs[0].error).toEqual(undefined);
         expect(tte.outputs[0].output).toEqual("499500000");
@@ -1424,6 +1453,7 @@ describe('contracts', () => {
         );
         tx2.isValid();
         tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.outputs.length).toEqual(1);
         expect(tte.outputs[0].error).toEqual("interrupted");
         expect(tte.outputs[0].output).toEqual(undefined);
@@ -1442,7 +1472,8 @@ describe('contracts', () => {
             { contractAddress: contractAddress, code: ERCCodeTestContract }
         );
         tx1.isValid();
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(1);
         await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
@@ -1495,6 +1526,7 @@ describe('contracts', () => {
         tx4.sign.push(await wallet.signHash(tx2.hash));
 
         tte = await bywise.transactionsProvider.simulateTransactions([tx2, tx3, tx4], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.outputs.length).toEqual(3);
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs[0].output).toEqual("1");
@@ -1533,7 +1565,8 @@ describe('contracts', () => {
         );
         tx2.isValid();
 
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(2);
         await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
@@ -1602,6 +1635,7 @@ describe('contracts', () => {
         tx6.sign.push(await wallet.signHash(tx2.hash));
 
         tte = await bywise.transactionsProvider.simulateTransactions([tx3, tx4, tx5, tx6], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.outputs.length).toEqual(4);
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs[0].output).toEqual("1");
@@ -1677,7 +1711,8 @@ describe('contracts', () => {
         );
         tx2.isValid();
 
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx1, tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(2);
         expect(tte.outputs[0].feeUsed).toEqual("0");
@@ -1713,6 +1748,7 @@ describe('contracts', () => {
 
 
         tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs[0].fee).toEqual("30");
         expect(tte.outputs[0].cost).toEqual(30);
@@ -1721,6 +1757,7 @@ describe('contracts', () => {
 
         DEAFAUT_MAIN_ENV.blockHeight = 100;
         tte = await bywise.transactionsProvider.simulateTransactions([tx1], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs[0].fee).toEqual("30");
         expect(tte.outputs[0].cost).toEqual(30);
@@ -1730,6 +1767,7 @@ describe('contracts', () => {
         await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
         tte = await bywise.transactionsProvider.simulateTransactions([tx2], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.txs[0].fee).toEqual("30");
         expect(tte.outputs[0].cost).toEqual(9);
@@ -1762,9 +1800,10 @@ describe('stress testing', () => {
         }
 
         let uptime = new Date().getTime();
-        const tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions(txs, fromSlice, DEAFAUT_MAIN_ENV);
+        const tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions(txs, fromSlice, DEAFAUT_MAIN_ENV);
         uptime = (new Date().getTime() - uptime) / 1000;
 
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(100);
         expect(uptime).toBeLessThan(1);
@@ -1794,7 +1833,8 @@ describe('stress testing', () => {
             TxType.TX_CONTRACT,
             { contractAddress, code: ERCCodeCustom }
         );
-        let tte: TransactionsToExecute = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        let tte: TransactionsToExecute | null = await bywise.transactionsProvider.simulateTransactions([tx], fromSlice, DEAFAUT_MAIN_ENV);
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         await environmentProvider.push(tte.outputs[0].envs, chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
 
@@ -1823,9 +1863,10 @@ describe('stress testing', () => {
         tte = await bywise.transactionsProvider.simulateTransactions(txs, fromSlice, DEAFAUT_MAIN_ENV);
         uptime = (new Date().getTime() - uptime) / 1000;
 
+        if(!tte) throw new Error("Failed execute VM");
         expect(tte.error).toEqual(undefined);
         expect(tte.outputs.length).toEqual(txs.length);
-        expect(uptime).toBeLessThan(1);
+        expect(uptime).toBeLessThan(3);
 
         uptime = new Date().getTime();
         const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);

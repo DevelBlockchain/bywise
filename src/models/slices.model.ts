@@ -2,8 +2,7 @@ import { Slice } from '@bywise/web3';
 
 export type Slices = {
   slice: Slice,
-  isComplete: boolean,
-  isExecuted: boolean,
   status: string,
+  attempts: number,
   blockHash: string,
 };
