@@ -18,6 +18,7 @@ export enum RoutingKeys {
 
 export enum RequestKeys {
     get_connected_nodes = 'get_connected_nodes',
+    get_last_slice = 'get_last_slice',
     get_contract = 'get_contract',
     get_info_wallet = 'get_info_wallet',
     get_confirmed_slices = 'get_confirmed_slices',

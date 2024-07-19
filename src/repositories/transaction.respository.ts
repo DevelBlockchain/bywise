@@ -1,5 +1,6 @@
 import { Tx } from "@bywise/web3";
 import Database, { SaveRequest } from "../datasource/database";
+import helper from "../utils/helper";
 
 export class TransactionRepository {
     private db: Database;
@@ -13,16 +14,26 @@ export class TransactionRepository {
     addMempool(tx: Tx) {
         let mempoolTx: Tx | undefined = this.mempool.get(tx.hash);
         if (!mempoolTx) {
-            tx.isValid();
+            tx = new Tx(tx);
             this.mempool.set(tx.hash, tx);
         }
         return mempoolTx;
     }
 
+    getMempoolByHash(hash: string): Tx | null {
+        const tx = this.mempool.get(hash);
+        if (tx) {
+            tx.isValid();
+            this.mempool.delete(hash);
+            return tx;
+        }
+        return null;
+    }
+
     getMempoolArray(size: number): Tx[] {
         const txs: Tx[] = [];
         for (let [hash, mempoolTx] of this.mempool) {
-            if(txs.length < size) {
+            if (txs.length < size) {
                 txs.push(mempoolTx);
             } else {
                 break;
@@ -40,27 +51,28 @@ export class TransactionRepository {
             const tx = txs[i];
 
             query.push({ key: `${this.table}-hash-${tx.hash}`, data: tx });
-            query.push({ key: `${this.table}-chain-${tx.chain}-${tx.created}-${tx.hash}`, data: tx.hash });
+            query.push({ key: `${this.table}-chain-${tx.chain}-${helper.numberToString(tx.created)}-${tx.hash}`, data: tx.hash });
+            query.push({ key: `${this.table}-ctx-${tx.chain}-${tx.output.ctx}-${helper.numberToString(tx.created)}-${tx.hash}`, data: tx.hash });
 
             const addresses: string[] = []
             tx.from.forEach(address => {
                 if (!addresses.includes(address)) {
                     addresses.push(address)
                 }
-                query.push({ key: `${this.table}-from-${tx.chain}-${address}-${tx.created}-${tx.hash}`, data: tx.hash });
+                query.push({ key: `${this.table}-from-${tx.chain}-${address}-${helper.numberToString(tx.created)}-${tx.hash}`, data: tx.hash });
             });
             tx.to.forEach(address => {
                 if (!addresses.includes(address)) {
                     addresses.push(address)
                 }
-                query.push({ key: `${this.table}-to-${tx.chain}-${address}-${tx.created}-${tx.hash}`, data: tx.hash });
+                query.push({ key: `${this.table}-to-${tx.chain}-${address}-${helper.numberToString(tx.created)}-${tx.hash}`, data: tx.hash });
             });
             addresses.forEach(address => {
-                query.push({ key: `${this.table}-address-${tx.chain}-${address}-${tx.created}-${tx.hash}`, data: tx.hash });
+                query.push({ key: `${this.table}-address-${tx.chain}-${address}-${helper.numberToString(tx.created)}-${tx.hash}`, data: tx.hash });
             });
             if (tx.foreignKeys) {
                 tx.foreignKeys.forEach(key => {
-                    query.push({ key: `${this.table}-key-${tx.chain}-${key}-${tx.created}-${tx.hash}`, data: tx.hash });
+                    query.push({ key: `${this.table}-key-${tx.chain}-${key}-${helper.numberToString(tx.created)}-${tx.hash}`, data: tx.hash });
                 });
             }
 
@@ -68,17 +80,12 @@ export class TransactionRepository {
         await this.db.saveMany(query);
     }
 
-    async getFromMempool(hash: string): Promise<Tx | null> {
-        const mempoolTx = this.mempool.get(hash);
-        if(mempoolTx) {
-            this.mempool.delete(hash);
-            return mempoolTx;
-        }
-        return null;
-    }
-
     async findTxByHash(hash: string): Promise<Tx | null> {
         return await this.db.get(`${this.table}-hash-${hash}`);
+    }
+
+    async exist(tx: Tx): Promise<boolean> {
+        return (await this.db.get(`${this.table}-chain-${tx.chain}-${helper.numberToString(tx.created)}-${tx.hash}`)) !== null;
     }
 
     async findTxByHashs(hashs: string[]): Promise<Tx[]> {
@@ -87,6 +94,11 @@ export class TransactionRepository {
 
     async findByChain(chain: string, limit?: number, offset?: number, order: 'asc' | 'desc' = 'asc'): Promise<Tx[]> {
         const values = await this.db.find(`${this.table}-chain-${chain}`, limit, offset, order === 'desc');
+        return await this.db.getMany(values.map(hash => `${this.table}-hash-${hash}`))
+    }
+
+    async findByChainAndContext(chain: string, ctx: string, limit?: number, offset?: number, order: 'asc' | 'desc' = 'asc'): Promise<Tx[]> {
+        const values = await this.db.find(`${this.table}-ctx-${chain}-${ctx}`, limit, offset, order === 'desc');
         return await this.db.getMany(values.map(hash => `${this.table}-hash-${hash}`))
     }
 

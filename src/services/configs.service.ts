@@ -10,7 +10,7 @@ type ConfigMeta = {
 
 export class ConfigProvider {
 
-  static MIN_BWS_VALUE = '10000';
+  static readonly MIN_BWS_VALUE = '10000';
 
   private getDefaultConfigs(): ConfigDTO[] {
     let configs: ConfigDTO[] = [];

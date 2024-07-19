@@ -59,7 +59,7 @@ export class SlicesProvider {
       const lastSlice = await this.SliceRepository.findByHash(sliceInfo.slice.lastHash);
       if (!lastSlice) {
         isComplete = false;
-        await this.mq.send(RoutingKeys.find_slice, sliceInfo.slice.lastHash);
+        this.mq.send(RoutingKeys.find_slice, sliceInfo.slice.lastHash);
       } else if (lastSlice.status == BlockchainStatus.TX_FAILED) {
         sliceInfo.status = BlockchainStatus.TX_FAILED;
         this.logger.error(`sync-slices: Last slice is failed - slice.hash: ${sliceInfo.slice.hash}`);
@@ -70,21 +70,22 @@ export class SlicesProvider {
       }
     }
     const mempool: Tx[] = [];
-    for (let z = 0; z < sliceInfo.slice.transactions.length; z++) {
+    const txs = await this.TransactionRepository.findTxByHashs(sliceInfo.slice.transactions);
+    for (let z = 0; z < txs.length; z++) {
       const txHash = sliceInfo.slice.transactions[z];
-      const mempoolTx = await this.TransactionRepository.getFromMempool(txHash);
-      if (!mempoolTx) {
-        const tx = await this.TransactionRepository.findTxByHash(txHash);
+      let tx = txs[z] as Tx | null;
+      if (!tx) {
+        tx = this.TransactionRepository.getMempoolByHash(txHash);
         if (!tx) {
           isComplete = false;
-          await this.mq.send(RoutingKeys.find_tx, txHash);
+          this.mq.send(RoutingKeys.find_tx, txHash);
+        } else {
+          mempool.push(tx);
         }
-      } else {
-        mempool.push(mempoolTx);
       }
     }
     if (mempool.length > 0) {
-      await this.transactionsProvider.save(mempool);
+      this.TransactionRepository.saveTxMany(mempool);
     }
     if (isComplete) {
       sliceInfo.attempts = 0;
@@ -136,27 +137,16 @@ export class SlicesProvider {
       if (!tte) return false;
       for (let j = 0; j < sliceInfo.slice.transactions.length && !error; j++) {
         const txHash = sliceInfo.slice.transactions[j];
-        const tx = new Tx(txs[j]);
+        const tx = txs[j];
         const output = tte.outputs[j];
-        const txOutput = tx.output;
-        tx.output = output;
 
-        if (!output) {
-          this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "Transaction Output Not Found"`)
-          error = true;
-        } else if (output.error) {
-          this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "${output.error}"`)
-          error = true;
-        } else if (tx.hash !== tx.toHash()) {
-          this.logger.error(`Invalid output - tx.hash: ${txHash}`);
-          console.log("tx", tx)
-          console.log("expected", output)
-          console.log("received", txOutput)
+        if (sliceInfo.slice.lastHash !== tx.output.ctx) {
+          this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "Invalid ctx"`);
           error = true;
         } else {
           const errorMessage = await this.transactionsProvider.executeTransaction(ctx, tx, output);
           if (errorMessage) {
-            this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "${errorMessage}"`)
+            this.logger.error(`Invalid transaction - tx.hash: ${txHash} - error: "${errorMessage}"`);
             error = true;
           } else {
             this.mq.send(RoutingKeys.new_tx, tx);
@@ -170,7 +160,7 @@ export class SlicesProvider {
         const envOut = ctx.getEnvOut();
         sliceInfo.status = BlockchainStatus.TX_CONFIRMED;
         await this.environmentProvider.push(envOut, sliceInfo.slice.chain, sliceInfo.slice.hash, sliceInfo.slice.lastHash, sliceInfo.slice.hash);
-        this.logger.verbose(`exec-slices: height: ${sliceInfo.slice.blockHeight} - txs: ${sliceInfo.slice.transactionsCount} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`)
+        this.logger.verbose(`exec-slices: height: ${sliceInfo.slice.blockHeight} - txs: ${sliceInfo.slice.transactionsCount} - hash: ${sliceInfo.slice.hash.substring(0, 10)}...`);
         success = true;
       }
     } catch (err: any) {

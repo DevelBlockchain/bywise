@@ -13,29 +13,48 @@ import MintSlices from "./mint-slices.core";
 import SyncChain from "./sync-chain.core";
 import VoteBlocks from "./vote-blocks.core";
 
-const DEFAULT_DELAY = 200;
+const DEFAULT_DELAY = 100;
 
 export default class PipelineChain implements Task {
     public isRun = false;
     private runWorkersCount = 0;
     public coreProvider;
-    public executeTransactionsTask;
+    public syncChain;
+    public executeTransactions;
+    public keepSyncNetwork;
+    public mintBlocks;
+    public keepSyncBlocks;
+    public executeBlocks;
+    public voteBlocks;
+    public consensusAlgorithm;
+    public keepSyncSlices;
+    public executeSlices;
+    public mintSlices;
 
     constructor(coreProvider: CoreProvider) {
         this.coreProvider = coreProvider;
-        this.executeTransactionsTask = new ExecuteTransactions(this.coreProvider);
+        this.syncChain = new SyncChain(this.coreProvider);
+        this.executeTransactions = new ExecuteTransactions(this.coreProvider);
+        this.keepSyncNetwork = new KeepSyncNetwork(this.coreProvider);
+        this.mintBlocks = new MintBlocks(this.coreProvider);
+        this.keepSyncBlocks = new KeepSyncBlocks(this.coreProvider);
+        this.executeBlocks = new ExecuteBlocks(this.coreProvider);
+        this.voteBlocks = new VoteBlocks(this.coreProvider);
+        this.consensusAlgorithm = new ConsensusAlgorithm(this.coreProvider);
+        this.keepSyncSlices = new KeepSyncSlices(this.coreProvider);
+        this.executeSlices = new ExecuteSlices(this.coreProvider);
+        this.mintSlices = new MintSlices(this, this.coreProvider);
     }
 
     private async runSyncChain() {
         this.runWorkersCount++;
         try {
-            const task = new SyncChain(this.coreProvider);
-            await task.start();
             this.coreProvider.applicationContext.logger.verbose(`start sync chain ${this.coreProvider.chain}`);
-            while (this.isRun && task.isRun) {
-                await task.run();
-
+            let end = false;
+            while (this.isRun && !end) {
                 await helper.sleep(10);
+                
+                end = await this.syncChain.run();
             }
             this.coreProvider.applicationContext.logger.verbose(`sync chain ${this.coreProvider.chain} done`);
         } catch (err: any) {
@@ -48,33 +67,23 @@ export default class PipelineChain implements Task {
     private async blocksFlow() {
         this.runWorkersCount++;
         try {
-            const syncNetwork = new KeepSyncNetwork(this.coreProvider);
-            const mint = new MintBlocks(this.coreProvider);
-            const sync = new KeepSyncBlocks(this.coreProvider);
-            const exec = new ExecuteBlocks(this.coreProvider);
-            const vb = new VoteBlocks(this.coreProvider);
-            const ca = new ConsensusAlgorithm(this.coreProvider);
-
-            await syncNetwork.start();
-            await mint.start();
-            await sync.start();
-            await exec.start();
-            await ca.start();
-            await vb.start();
-            await this.executeTransactionsTask.start();
-
             while (this.isRun) {
-                let used = await mint.run();
-                used = used || await syncNetwork.run();
-                used = used || await sync.run();
-                used = used || await exec.run();
-                used = used || await ca.run();
-                used = used || await this.executeTransactionsTask.run();
-                used = used || await vb.run();
-                
-                if (!used) {
-                    await helper.sleep(DEFAULT_DELAY);
-                }
+                await helper.sleep(DEFAULT_DELAY);
+
+                if (this.isRun)
+                    await this.keepSyncNetwork.run();
+                if (this.isRun)
+                    await this.mintBlocks.run();
+                if (this.isRun)
+                    await this.keepSyncBlocks.run();
+                if (this.isRun)
+                    await this.executeBlocks.run();
+                if (this.isRun)
+                    await this.voteBlocks.run();
+                if (this.isRun)
+                    await this.consensusAlgorithm.run();
+                if (this.isRun)
+                    await this.executeTransactions.run();
             }
         } catch (err: any) {
             this.coreProvider.applicationContext.logger.error(`error blocksFlow chain ${this.coreProvider.chain} - ${err.message}`, err);
@@ -86,17 +95,13 @@ export default class PipelineChain implements Task {
     private async slicesFlow() {
         this.runWorkersCount++;
         try {
-            const sync = new KeepSyncSlices(this.coreProvider);
-            const exec = new ExecuteSlices(this.coreProvider);
-            await sync.start();
-            await exec.start();
             while (this.isRun) {
-                let used = await sync.run();
-                used = used || await exec.run();
-                
-                if (!used) {
-                    await helper.sleep(DEFAULT_DELAY);
-                }
+                await helper.sleep(DEFAULT_DELAY);
+
+                if (this.isRun)
+                    await this.keepSyncSlices.run();
+                if (this.isRun)
+                    await this.executeSlices.run();
             }
         } catch (err: any) {
             this.coreProvider.applicationContext.logger.error(`error slicesFlow chain ${this.coreProvider.chain} - ${err.message}`, err);
@@ -104,18 +109,14 @@ export default class PipelineChain implements Task {
         }
         this.runWorkersCount--;
     }
-    
-    private async mintSlices() {
+
+    private async mintSlicesFlow() {
         this.runWorkersCount++;
         try {
-            const mint = new MintSlices(this.coreProvider);
-            await mint.start();
             while (this.isRun) {
-                let used = await mint.run();
-                
-                if (!used) {
-                    await helper.sleep(DEFAULT_DELAY);
-                }
+                await helper.sleep(DEFAULT_DELAY);
+                if (this.isRun)
+                    await this.mintSlices.run();
             }
         } catch (err: any) {
             this.coreProvider.applicationContext.logger.error(`error slicesFlow chain ${this.coreProvider.chain} - ${err.message}`, err);
@@ -131,7 +132,7 @@ export default class PipelineChain implements Task {
 
         this.blocksFlow();
         this.slicesFlow();
-        this.mintSlices();
+        this.mintSlicesFlow();
 
         this.runWorkersCount--;
         return true;
@@ -145,6 +146,7 @@ export default class PipelineChain implements Task {
 
     async stop() {
         this.isRun = false;
+
         while (this.runWorkersCount !== 0) {
             await helper.sleep(DEFAULT_DELAY);
         }

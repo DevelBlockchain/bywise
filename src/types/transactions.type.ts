@@ -127,7 +127,8 @@ export type WalletCodeDTO = {
 export type TransactionsToExecute = {
   id: string;
   vmIndex: number;
-  ignoreBalance: boolean;
+  simulateMode?: boolean;
+  forceGenerateOutput?: boolean;
   error?: string;
   fromSlice: string;
   env: EnvironmentContext;

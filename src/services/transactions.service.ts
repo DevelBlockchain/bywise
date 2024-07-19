@@ -40,7 +40,7 @@ export class TransactionsProvider {
     tx.fee = fee;
     tx.type = type;
     tx.data = data;
-    tx.foreignKeys = foreignKeys;
+    tx.foreignKeys = foreignKeys ?? [];
     tx.created = Math.floor(Date.now() / 1000);
     tx.hash = tx.toHash();
     tx.sign = [await wallet.signHash(tx.hash)];
@@ -57,21 +57,22 @@ export class TransactionsProvider {
     tx.fee = fee;
     tx.type = type;
     tx.data = data;
-    tx.foreignKeys = foreignKeys;
+    tx.foreignKeys = foreignKeys ?? [];
     tx.created = Math.floor(Date.now() / 1000);
     tx.hash = tx.toHash();
     tx.sign = [await wallet.signHash(tx.hash)];
     return tx;
   }
 
-  async simulateTransactions(txs: Tx[], fromSlice: string, env: EnvironmentContext, ignoreBalance: boolean = false): Promise<TransactionsToExecute | null> {
+  async simulateTransactions(txs: Tx[], fromSlice: string, env: EnvironmentContext, simulateMode?: boolean, forceGenerateOutput?: boolean): Promise<TransactionsToExecute | null> {
     let tte: TransactionsToExecute = {
       id: helper.getRandomHash(),
       env: env,
       txs: txs,
       vmIndex: this.vmIndex,
       fromSlice: fromSlice,
-      ignoreBalance: ignoreBalance,
+      simulateMode: simulateMode,
+      forceGenerateOutput: forceGenerateOutput,
       outputs: [],
     }
     this.vmIndex++;
@@ -89,7 +90,7 @@ export class TransactionsProvider {
         this.transactionsToExecute.delete(tte.id);
         return tte;
       }
-      if(!this.task.isRun) return null;
+      if (!this.task.isRun) return null;
     }
     return null;
   }
@@ -104,10 +105,15 @@ export class TransactionsProvider {
 
   async executeTransaction(ctx: RuntimeContext, tx: Tx, output: TxOutput) {
     let error: string | null = null;
+    if (!output) {
+      return "Transaction Output Not Found";
+    } else if (output.error) {
+      return output.error;
+    }
     for (let i = 0; i < output.get.length && !error; i++) {
       const key = output.get[i];
       if (ctx.setMainKeys.has(key)) {
-        error = `changed key`;
+        return `changed key`;
       }
     }
     for (let i = 0; i < output.envs.keys.length && !error; i++) {

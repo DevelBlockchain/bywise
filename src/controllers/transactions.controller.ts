@@ -1,10 +1,11 @@
 import express from 'express';
 import metadataDocument from '../metadata/metadataDocument';
-import { Tx } from '@bywise/web3';
+import { Slice, Tx } from '@bywise/web3';
 import SCHEMA_TYPES from '../metadata/metadataSchemas';
 import { RequestProcess, TransactionsToExecute } from '../types';
 import { RequestKeys } from '../datasource/message-queue';
 import { ApiService } from '../services';
+import helper from '../utils/helper';
 
 export default async function transactionsController(app: express.Express, apiProvider: ApiService): Promise<void> {
     const router = express.Router();
@@ -253,7 +254,7 @@ export default async function transactionsController(app: express.Express, apiPr
                     status: 400
                 }
             }
-            const tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, ignoreBalance: true });
+            const tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, simulateMode: true });
             if (!tte) {
                 return {
                     id: req.id,
@@ -308,7 +309,7 @@ export default async function transactionsController(app: express.Express, apiPr
     });
 
     const reqProcessTransactions: RequestProcess = async (req, context) => {
-        const tx = new Tx(req.body);
+        const tx = req.body;
         try {
             if (!apiProvider.chains.includes(tx.chain)) {
                 return {
@@ -318,11 +319,6 @@ export default async function transactionsController(app: express.Express, apiPr
                 }
             }
             TransactionRepository.addMempool(tx);
-            for (let i = 0; i < 100; i++) {
-                const tx2 = new Tx(tx);
-                tx2.hash = tx2.hash+i;
-                TransactionRepository.addMempool(tx2);
-            }
             return {
                 id: req.id,
                 body: { message: 'OK' },
@@ -358,6 +354,53 @@ export default async function transactionsController(app: express.Express, apiPr
         const response = await reqProcessTransactions(req, req.context);
         return res.status(response.status).send(response.body);
     });
+    
+    const reqProcessValidator: RequestProcess = async (req, context) => {
+        const tx = req.body;
+        try {
+            if (!apiProvider.chains.includes(tx.chain)) {
+                return {
+                    id: req.id,
+                    body: { error: `Node does not work with this chain` },
+                    status: 400
+                }
+            }
+            TransactionRepository.addMempool(tx);
+            return {
+                id: req.id,
+                body: { message: 'OK' },
+                status: 200
+            }
+        } catch (err: any) {
+            return {
+                id: req.id,
+                body: { error: err.message },
+                status: 400
+            }
+        }
+    };
+    metadataDocument.addPath({
+        path: "/api/v2/transactions/validator",
+        type: 'post',
+        controller: 'TransactionsController',
+        description: 'Insert new transactions',
+        securityType: ['node'],
+        body: {
+            $ref: SCHEMA_TYPES.TxDTO
+        },
+        responses: [{
+            code: 200,
+            description: 'Success',
+            body: {
+                $ref: SCHEMA_TYPES.TransactionDTO
+            }
+        }],
+        reqProcess: reqProcessValidator,
+    })
+    router.post('/transactions/validator', async (req: any, res: express.Response) => {
+        const response = await reqProcessValidator(req, req.context);
+        return res.status(response.status).send(response.body);
+    });
 
     const reqProcessPub: RequestProcess = async (req, context) => {
         const body: { token: string, chain: string, to: string[], amount: string[], type: string, foreignKeys: string[], data: any } = req.body;
@@ -376,7 +419,6 @@ export default async function transactionsController(app: express.Express, apiPr
                     status: 400
                 }
             }
-
             const mainWallet = await apiProvider.applicationContext.mainWallet;
             const tx = new Tx();
             tx.version = '3';
@@ -390,7 +432,7 @@ export default async function transactionsController(app: express.Express, apiPr
             tx.foreignKeys = body.foreignKeys;
             tx.created = Math.floor(Date.now() / 1000);
 
-            let tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, ignoreBalance: true });
+            let tte: TransactionsToExecute = await apiProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx, simulateMode: true });
             if (!tte) throw new Error(`failed VM`);
             tx.output = tte.outputs[0];
 

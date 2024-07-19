@@ -90,7 +90,7 @@ export class BlocksProvider {
       const lastBlock = await this.BlockRepository.findByHash(blockInfo.block.lastHash);
       if (!lastBlock) {
         isComplete = false;
-        await this.mq.send(RoutingKeys.find_slice, blockInfo.block.lastHash);
+        this.mq.send(RoutingKeys.find_slice, blockInfo.block.lastHash);
       } else if (lastBlock.status == BlockchainStatus.TX_FAILED) {
         lastBlock.status = BlockchainStatus.TX_FAILED;
         this.applicationContext.logger.error(`sync-blocks: Last block is failed - block.hash: ${blockInfo.block.hash}`);
@@ -106,7 +106,7 @@ export class BlocksProvider {
       const sliceInfo = await this.SliceRepository.findByHash(sliceHash);
       if (!sliceInfo) {
         isComplete = false;
-        await this.mq.send(RoutingKeys.find_slice, sliceHash);
+        this.mq.send(RoutingKeys.find_slice, sliceHash);
       } else {
         if (sliceInfo.status == BlockchainStatus.TX_FAILED) {
           blockInfo.status = BlockchainStatus.TX_FAILED;
@@ -153,7 +153,7 @@ export class BlocksProvider {
           }
         }
       } else {
-        await this.mq.send(RoutingKeys.find_block, unprocessedVote.blockHash);
+        this.mq.send(RoutingKeys.find_block, unprocessedVote.blockHash);
       }
     }
     await this.VotesRepository.saveMany(unprocessedVotes)
@@ -205,10 +205,8 @@ export class BlocksProvider {
         blockInfo.status = BlockchainStatus.TX_FAILED;
         await this.updateBlock(blockInfo);
         return false;
-      } else if (sliceInfo.status == BlockchainStatus.TX_COMPLETE) {
+      } else if (sliceInfo.status == BlockchainStatus.TX_COMPLETE || sliceInfo.status == BlockchainStatus.TX_MEMPOOL) {
         return false; // wait execute slice
-      } else if (sliceInfo.status == BlockchainStatus.TX_MEMPOOL) {
-        throw new Error(`error execute block - slice status mempool`);
       }
 
       if (blockInfo.block.height !== sliceInfo.slice.blockHeight) throw new Error(`tryExecBlock - wrong blockHeight ${blockInfo.block.height}/${sliceInfo.slice.blockHeight}`);
@@ -265,7 +263,7 @@ export class BlocksProvider {
     await this.updateBlock(blockInfo);
   }
 
-  async setNewZeroBlock(blockPack: BlockPack): Promise<void> {
+  async setNewZeroBlock(blockPack: BlockPack): Promise<Blocks> {
     const foundBlocks = await this.BlockRepository.findByChainAndHeight(blockPack.block.chain, 0);
     if (foundBlocks.length > 0) {
       throw new Error(`conflict zero block`);
@@ -283,14 +281,15 @@ export class BlocksProvider {
     }
     await this.BlockRepository.save(newBlock);
 
-    await this.setNewBlockPack(newBlock.block.chain, blockPack);
+    return await this.setNewBlockPack(newBlock.block.chain, blockPack);
   }
 
-  async setNewBlockPack(chain: string, blockPack: BlockPack): Promise<void> {
+  async setNewBlockPack(chain: string, blockPack: BlockPack): Promise<Blocks> {
     for (let i = 0; i < blockPack.txs.length; i++) {
       const tx = blockPack.txs[i];
-      this.TransactionRepository.addMempool(tx);
+      tx.isValid();
     }
+    await this.TransactionRepository.saveTxMany(blockPack.txs);
 
     let blockInfo = await this.saveNewBlock(blockPack.block);
 
@@ -306,6 +305,7 @@ export class BlocksProvider {
     await this.syncBlockByHash(blockInfo);
     await this.executeCompleteBlockByHash(blockInfo);
     await this.selectMinedBlock(chain, blockPack.block.hash);
+    return blockInfo;
   }
 
   async getMempool(chain: string) {

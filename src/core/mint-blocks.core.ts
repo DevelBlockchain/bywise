@@ -3,11 +3,9 @@ import { Blocks, Slices } from "../models";
 import { BlockchainStatus, ZERO_HASH } from "../types";
 import helper from "../utils/helper";
 import { CoreProvider } from "../services";
-import { Task } from "../types";
 import { RoutingKeys } from "../datasource/message-queue";
 
-export default class MintBlocks implements Task {
-    public isRun = true;
+export default class MintBlocks {
     private coreProvider;
     private mainWallet;
     private BlockRepository;
@@ -16,12 +14,6 @@ export default class MintBlocks implements Task {
         this.coreProvider = coreProvider;
         this.mainWallet = coreProvider.applicationContext.mainWallet;
         this.BlockRepository = coreProvider.applicationContext.database.BlockRepository;
-    }
-
-    async start() {
-    }
-
-    async stop() {
     }
 
     async run() {
@@ -144,17 +136,16 @@ export default class MintBlocks implements Task {
         block.sign = await mainWallet.signHash(block.hash);
 
         this.coreProvider.applicationContext.logger.info(`mint block - height: ${block.height} - slices: ${block.slices.length} - transactions: ${block.transactionsCount} - hash: ${block.hash.substring(0, 10)}`)
-        await this.coreProvider.blockProvider.saveNewBlock(block);
-        //const blockInfo: Blocks = {
-        //    block: block,
-        //    status: BlockchainStatus.TX_MEMPOOL,
-        //    countTrys: 0,
-        //    isComplete: true,
-        //    isExecuted: false,
-        //    distance: '',
-        //}
-        //await this.coreProvider.blockProvider.executeCompleteBlockByHash(blockInfo);
-        //this.coreProvider.applicationContext.mq.send(RoutingKeys.new_block, block);
+        //await this.coreProvider.blockProvider.saveNewBlock(block);
+        const lastBlock = await this.coreProvider.blockProvider.getBlockInfo(block.lastHash);
+        const blockInfo: Blocks = {
+            block: block,
+            status: BlockchainStatus.TX_CONFIRMED,
+            attempts: 0,
+            distance: this.coreProvider.blockProvider.calcBlockModule(lastBlock.block, block, lastBlock.distance),
+        }
+        await this.coreProvider.blockProvider.updateBlock(blockInfo);
+        this.coreProvider.applicationContext.mq.send(RoutingKeys.new_block, block);
         return true;
     }
 }

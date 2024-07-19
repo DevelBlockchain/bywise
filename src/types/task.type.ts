@@ -3,12 +3,14 @@ import winston from "winston";
 import Database from "../datasource/database";
 import MessageQueue from "../datasource/message-queue";
 
-export type BywiseStartServices = 'api' | 'core' | 'network' | 'vm'
+export type BywiseStartServices = 'api' | 'core' | 'network' | 'vm';
+
+type SSLConfig = { cert: string, key: string }
 
 export type BywiseStartNodeConfig = {
     name: string;
     port: number;
-    https?: { cert: string, key: string };
+    ssl: SSLConfig | null;
     myHost: string;
     keyJWT: string;
     vmSize: number;
@@ -31,7 +33,7 @@ export type ApplicationContext = {
     port: number;
     vmSize: number;
     vmIndex?: number;
-    https?: { cert: string, key: string };
+    ssl: SSLConfig | null;
     initialNodes: string[];
     chains: string[];
     nodeLimit: number;

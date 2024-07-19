@@ -18,9 +18,9 @@ export class SliceRepository {
         ];
         Object.values(BlockchainStatus).forEach(status => {
             if (status === slice.status) {
-                query.push({ key: `${this.table}-status-${slice.slice.chain}-${status}-${slice.slice.created}-${slice.slice.hash}`, data: slice.slice.hash });
+                query.push({ key: `${this.table}-status-${slice.slice.chain}-${status}-${helper.numberToString(slice.slice.created)}-${slice.slice.hash}`, data: slice.slice.hash });
             } else {
-                query.push({ delete: true, key: `${this.table}-status-${slice.slice.chain}-${status}-${slice.slice.created}-${slice.slice.hash}`, data: slice.slice.hash });
+                query.push({ delete: true, key: `${this.table}-status-${slice.slice.chain}-${status}-${helper.numberToString(slice.slice.created)}-${slice.slice.hash}`, data: slice.slice.hash });
             }
         })
         await this.db.saveMany(query);

@@ -1,6 +1,6 @@
 import request from 'supertest';
 import helper from '../utils/helper';
-import { BlockPack, Wallet } from '@bywise/web3';
+import { BlockPack, Wallet, Block } from '@bywise/web3';
 import { ChainConfig } from '../types';
 import Bywise from '../bywise';
 import { ConfigProvider } from '../services';
@@ -9,12 +9,12 @@ var node0: Bywise;
 var node1: Bywise;
 var node2: Bywise;
 var b0: BlockPack;
-const blockDelay = 5000;
+const blockDelay = 3000;
 const keyJWT = helper.getRandomString();
 const chain = 'local';
-const port0 = Math.floor(Math.random() * 7000 + 3000);
-const port1 = Math.floor(Math.random() * 7000 + 3000);
-const port2 = Math.floor(Math.random() * 7000 + 3000);
+const port0 = 4000;
+const port1 = 4001;
+const port2 = 4002;
 const node0Wallet = new Wallet();
 const node1Wallet = new Wallet();
 const node2Wallet = new Wallet();
@@ -37,6 +37,7 @@ beforeAll(async () => {
         name: `test${port0}`,
         port: port0,
         keyJWT: keyJWT,
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port0}`,
@@ -52,6 +53,7 @@ beforeAll(async () => {
         name: `test${port1}`,
         port: port1,
         keyJWT: keyJWT,
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port1}`,
@@ -67,6 +69,7 @@ beforeAll(async () => {
         name: `test${port2}`,
         port: port2,
         keyJWT: keyJWT,
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port2}`,
@@ -99,13 +102,13 @@ beforeEach(async () => {
     await node0.core.network.start([]);
     await node1.core.network.start([]);
     await node2.core.network.start([]);
-}, 2000)
+}, 10000)
 
 afterAll(async () => {
     await node0.stop();
     await node1.stop();
     await node2.stop();
-}, 2000)
+}, 10000)
 
 const connectNodes = async () => {
     await node0.core.network.web3.network.connect([`http://localhost:${port1}`, `http://localhost:${port2}`]);
@@ -116,7 +119,7 @@ const connectNodes = async () => {
 }
 
 describe('propagation test', () => {
-    /*
+
     test('test enviroment', async () => {
         expect(node0.core.network.connectedNodesSize()).toEqual(0);
         expect(node1.core.network.connectedNodesSize()).toEqual(0);
@@ -168,7 +171,7 @@ describe('propagation test', () => {
         expect(res.status).toEqual(200);
         expect(res.body.length).toBeGreaterThan(0);
     }, blockDelay * 5);
-    */
+    
     test('sync nodes', async () => {
         await node0.core.start();
         await helper.sleep(blockDelay * 6);
@@ -197,6 +200,7 @@ describe('propagation test', () => {
         await connectNodes();
         await node1.core.start();
         await helper.sleep(blockDelay * 6); // sync chains and create more 5 blocks
+        await node1.core.stop();
 
         res = await request(node1.api.server)
             .get('/api/v2/blocks/last/' + chain)
@@ -213,15 +217,14 @@ describe('propagation test', () => {
             }
         }
     }, blockDelay * 15);
-    /*
+    
     test('multiple validators', async () => {
-        await node0.core.start();
+        node0.core.start();
         await helper.sleep(blockDelay * 3); // start alone
 
         await connectNodes();
-
-        await node1.core.start();
-        await node2.core.start();
+        node1.core.start();
+        node2.core.start();
         await helper.sleep(blockDelay * 9); // sync and build new blocks with multiple validators
 
         let blocksNode0: Block[] = []
@@ -335,5 +338,5 @@ describe('propagation test', () => {
             expect(b1.hash).toEqual(b2.hash);
             expect(b0.hash).toEqual(b2.hash);
         }
-    }, blockDelay * 20);*/
+    }, blockDelay * 20);
 });

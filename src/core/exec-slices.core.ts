@@ -1,21 +1,13 @@
 import { CoreProvider } from "../services";
 import { BlockchainStatus } from "../types";
-import { Task } from "../types";
 
-export default class ExecuteSlices implements Task {
-    public isRun = true;
+export default class ExecuteSlices {
     private coreProvider;
     private SliceRepository;
 
     constructor(coreProvider: CoreProvider) {
         this.coreProvider = coreProvider;
         this.SliceRepository = coreProvider.applicationContext.database.SliceRepository;
-    }
-
-    async start() {
-    }
-
-    async stop() {
     }
 
     async run() {

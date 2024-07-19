@@ -3,6 +3,7 @@ import ws from 'ws';
 
 export type WSRequest = {
   id: string;
+  broadcast?: boolean;
   path: string;
   method: string;
   token?: string;

@@ -91,7 +91,7 @@ const createNewBlockZero = async (chain: string, wallet: Wallet = new Wallet(), 
     const txs: Tx[] = [];
     const slices: Slice[] = [];
 
-    const tx = new Tx();
+    let tx = new Tx();
     tx.version = '3';
     tx.chain = chain;
     tx.from = [wallet.address];
@@ -109,7 +109,7 @@ const createNewBlockZero = async (chain: string, wallet: Wallet = new Wallet(), 
 
     for (let i = 0; i < configs.length; i++) {
         const cfg = configs[i];
-        const tx = new Tx();
+        tx = new Tx();
         tx.version = '3';
         tx.chain = chain;
         tx.from = [wallet.address];
@@ -129,6 +129,22 @@ const createNewBlockZero = async (chain: string, wallet: Wallet = new Wallet(), 
         tx.isValid();
         txs.push(tx);
     }
+
+    tx = new Tx();
+    tx.version = '3';
+    tx.chain = chain;
+    tx.from = [wallet.address];
+    tx.to = [wallet.address];
+    tx.amount = ['0'];
+    tx.fee = '0';
+    tx.type = TxType.TX_BLOCKCHAIN_COMMAND;
+    tx.data = { name: 'end-slice', input: [`0`] };
+    tx.foreignKeys = [];
+    tx.created = Math.floor(Date.now() / 1000);
+    tx.hash = tx.toHash();
+    tx.sign = [await wallet.signHash(tx.hash)];
+    tx.isValid();
+    txs.push(tx);
 
     const slice = new Slice();
     slice.height = 0;

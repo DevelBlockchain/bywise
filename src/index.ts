@@ -27,7 +27,7 @@ const newBywiseWorker = async (isMultiThread: boolean, bywiseStartNodeConfig: By
                 w.postMessage(msg);
             })
         })
-        await helper.sleep(1000);
+        await helper.sleep(100);
     } else {
         await Bywise.newBywiseInstance(bywiseStartNodeConfig);
     }
@@ -63,7 +63,7 @@ const main = async () => {
             console.log('   -deploy');
             console.log('   -delay-block');
             console.log('   -host');
-            console.log('   -https');
+            console.log('   -ssl');
             console.log('   -name');
             console.log('   -new-chain');
             console.log('   -new-chain-local');
@@ -78,7 +78,7 @@ const main = async () => {
             return
         }
         let wallet = new Wallet().seed;
-        let https = false;
+        let ssl = false;
         let key = '';
         let cert = '';
         let keyJWT = helper.getRandomString();
@@ -94,8 +94,8 @@ const main = async () => {
         if (process.env.CERT_PATH) {
             cert = process.env.CERT_PATH;
         }
-        if (process.env.ENABLE_HTTPS) {
-            https = process.env.ENABLE_HTTPS.toLowerCase().trim() === 'true';
+        if (process.env.ENABLE_SSL) {
+            ssl = process.env.ENABLE_SSL.toLowerCase().trim() === 'true';
         }
         if (getCmd('-key', /^.+$/)) {
             key = lastParam;
@@ -146,11 +146,15 @@ const main = async () => {
         if (getCmd('-pnodes', /^[0-9\,]+$/)) {
             initialNodes = lastParam.split(',').map(p => `http://localhost:${p}`);
         }
-        if (getCmd('-https')) {
-            https = true;
+        if (getCmd('-ssl')) {
+            ssl = true;
+        }
+        if (key) {
             if (!fs.existsSync(key)) throw new Error('ssl key file not found')
-            if (!fs.existsSync(cert)) throw new Error('ssl cert file not found')
             key = fs.readFileSync(key, 'utf8');
+        }
+        if (cert) {
+            if (!fs.existsSync(cert)) throw new Error('ssl cert file not found')
             cert = fs.readFileSync(cert, 'utf8');
         }
         if (getCmd('-reset')) {
@@ -158,6 +162,7 @@ const main = async () => {
                 name: name,
                 port: 0,
                 keyJWT: '',
+                ssl: null,
                 isLog: isLog,
                 isReset: true,
                 vmSize: 0,
@@ -209,6 +214,7 @@ const main = async () => {
                     name: name,
                     port: 0,
                     keyJWT: '',
+                    ssl: null,
                     isLog: isLog,
                     myHost: '',
                     vmSize: 1,
@@ -224,11 +230,12 @@ const main = async () => {
             }
         }
         if (getCmd('-start')) {
-            const vmSize = 2;
+            const vmSize = 10;
             await newBywiseWorker(true, {
                 name: name,
                 port: port,
                 keyJWT: keyJWT,
+                ssl: ssl ? { key, cert } : null,
                 isLog: isLog,
                 myHost: host,
                 vmSize: vmSize,
@@ -242,6 +249,7 @@ const main = async () => {
                     name: name,
                     port: port,
                     keyJWT: keyJWT,
+                    ssl: ssl ? { key, cert } : null,
                     isLog: isLog,
                     myHost: host,
                     vmSize: vmSize,
@@ -258,6 +266,7 @@ const main = async () => {
                 name: name,
                 port: port,
                 keyJWT: keyJWT,
+                ssl: ssl ? { key, cert } : null,
                 isLog: isLog,
                 myHost: host,
                 vmSize: 1,

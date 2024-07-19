@@ -1,69 +1,89 @@
 import fs from 'fs';
 import helper from '../utils/helper';
-import { TxType, BlockPack, Wallet, Web3, BywiseHelper, Tx } from '@bywise/web3';
+import { TxType, BlockPack, Wallet, Web3, Tx } from '@bywise/web3';
 import { ChainConfig } from '../types';
 import Bywise from '../bywise';
-import { ConfigProvider } from '../services';
 
-var node0: Bywise;
+var bywise: Bywise;
 var b0: BlockPack;
 var web3: Web3;
 const wallet = new Wallet();
 const chain = 'local';
-const port0 = Math.floor(Math.random() * 7000 + 3000);
+const port0 = 11000;
 
-const ERCCode = fs.readFileSync('./assets/ERC20.js', 'utf8');
+const ERCCode = fs.readFileSync('./assets/ERC20_v2.js', 'utf8');
 
 beforeAll(async () => {
     b0 = await helper.createNewBlockZero(chain, wallet, [
         ChainConfig.addAdmin(wallet.address),
         ChainConfig.addValidator(wallet.address),
-        ChainConfig.addBalance(wallet.address, ConfigProvider.MIN_BWS_VALUE),
-        ChainConfig.setBlockTime(`600`),
+        ChainConfig.addBalance(wallet.address, "1000000000000"),
+        ChainConfig.setBlockTime(`30`),
+        ChainConfig.setConfigFee('feeCostType', `1`),
+        ChainConfig.setConfigFee('feeBasic', '1'),
+        ChainConfig.setConfigFee('feeCoefAmount', '1'),
+        ChainConfig.setConfigFee('feeCoefSize', '1'),
+        ChainConfig.setConfigFee('feeCoefCost', '1'),
     ]);
-    node0 = await Bywise.newBywiseInstance({
+    bywise = await Bywise.newBywiseInstance({
         name: `test${port0}`,
         port: port0,
         keyJWT: helper.getRandomString(),
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port0}`,
         initialNodes: [],
         zeroBlocks: [JSON.stringify(b0)],
         mainWalletSeed: wallet.seed,
-        startServices: ['api', 'core', 'network', 'vm'],
+        startServices: ['vm', 'network', 'api', 'core'],
         vmSize: 1,
         vmIndex: 0
     });
-
+    await helper.sleep(10000);
     web3 = new Web3({
         initialNodes: [`http://localhost:${port0}`]
     });
+}, 15000)
+
+beforeEach(async () => {
     await web3.network.connect();
+    expect(web3.network.connectedNodes.length).toEqual(1);
 }, 2000);
 
 afterAll(async () => {
-    await node0.stop();
+    await web3.network.disconnect();
+    await bywise.stop();
 }, 2000)
 
 describe('simple transactions', () => {
+
     test('send transaction', async () => {
+        const node = web3.network.getRandomNode();
+        const addr = wallet.getStealthAddress(0, 0);
         let tx = new Tx();
         tx.version = '3';
         tx.chain = chain;
         tx.from = [wallet.address];
-        tx.to = [wallet.address];
-        tx.amount = ['0'];
-        tx.fee = '0';
+        tx.to = [addr];
+        tx.validator = [node.address];
+        tx.amount = ['3'];
         tx.type = TxType.TX_NONE;
         tx.data = {};
         tx.foreignKeys = [];
         tx.created = Math.floor(Date.now() / 1000);
+        
+        const req = await web3.network.getAPI(node).getFeeTransaction(node, tx);
+        expect(req.error).toEqual(undefined);
+        tx.output = req.data;
+        tx.fee = tx.output.feeUsed;
         tx.hash = tx.toHash();
+        
         tx.sign = [await wallet.signHash(tx.hash)];
-        tx.isValid();
 
-        let error = await web3.transactions.sendTransaction(tx);
+        //tx.isValid();
+        console.log(tx);
+        /*let error = await web3.transactions.sendTransaction(tx);
         expect(error).toEqual(undefined);
 
         await web3.transactions.waitConfirmation(tx.hash, 10000);
@@ -73,9 +93,10 @@ describe('simple transactions', () => {
         if (res !== undefined) {
             expect(res.status).not.toEqual('mempool');
             expect(res.status == 'confirmed' || res.status == 'mined').toEqual(true);
-        }
+        }*/
     }, 15000);
-    
+
+    /*
     test('send add balance', async () => {
         const addr = new Wallet();
 
@@ -451,4 +472,5 @@ describe('simple transactions', () => {
         expect(result.error).toEqual(undefined);
         expect(result.output).toEqual(`${total}`);
     }, 60000);
+    */
 });

@@ -74,7 +74,9 @@ class Api implements Task {
                             authMiddleware.wsAuthMiddleware(this.apiCtx, node, req, metadataPath).then(context => {
                                 if(context) {
                                     metadataPath.reqProcess(req, context).then(res => {
-                                        this.apiCtx.sendToNode(node, res);
+                                        if(!req.broadcast) {
+                                            this.apiCtx.sendToNode(node, res);
+                                        }
                                     });
                                 }
                             })
@@ -128,15 +130,15 @@ class Api implements Task {
 
         swaggerJson = metadataDocument.generateSwaggerJson();
         let run = false;
-        if (!this.applicationContext.https) {
+        if (!this.applicationContext.ssl) {
             this.server = this.app.listen(this.applicationContext.port, () => {
                 this.applicationContext.logger.verbose('Start server on port ' + this.applicationContext.port);
                 run = true;
             });
         } else {
             this.server = https.createServer({
-                key: this.applicationContext.https.key,
-                cert: this.applicationContext.https.cert,
+                key: this.applicationContext.ssl.key,
+                cert: this.applicationContext.ssl.cert,
                 secureProtocol: 'TLSv1_2_method',
             }, this.app);
             this.server.listen(this.applicationContext.port, () => {

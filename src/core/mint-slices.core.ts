@@ -1,5 +1,5 @@
 import { Block, EnvironmentChanges, Slice, Tx, TxType } from "@bywise/web3";
-import { BlockchainStatus, CompiledContext, ZERO_HASH } from "../types";
+import { BlockchainStatus, CompiledContext, TransactionsToExecute, ZERO_HASH } from "../types";
 import helper from "../utils/helper";
 import { Slices } from "../models";
 import { CoreProvider } from "../services";
@@ -8,9 +8,11 @@ import { Task } from "../types";
 import { RoutingKeys } from "../datasource/message-queue";
 
 const TIME_LIMIT_SLICE = 5000;
+const MEMPOOL_SIZE = 10000;
+const BATCH_SIZE = 1000;
 
-export default class MintSlices implements Task {
-    public isRun = true;
+export default class MintSlices {
+    private task: Task;
     private coreProvider;
     private SliceRepository;
     private transactionsProvider;
@@ -18,19 +20,14 @@ export default class MintSlices implements Task {
     private TransactionRepository;
     private mainWallet;
 
-    constructor(coreProvider: CoreProvider) {
+    constructor(task: Task, coreProvider: CoreProvider) {
+        this.task = task;
         this.coreProvider = coreProvider;
         this.mainWallet = coreProvider.applicationContext.mainWallet;
         this.SliceRepository = coreProvider.applicationContext.database.SliceRepository;
         this.transactionsProvider = coreProvider.transactionsProvider;
         this.environmentProvider = coreProvider.environmentProvider;
         this.TransactionRepository = coreProvider.applicationContext.database.TransactionRepository;
-    }
-
-    async start() {
-    }
-
-    async stop() {
     }
 
     async run() {
@@ -54,16 +51,18 @@ export default class MintSlices implements Task {
 
         let end = false;
         let executed = true;
+        let lastSliceCreated: number = -1;
         let lastSliceHeight: number = -1;
         let lastSliceHash: string = '';
         for (let i = 0; i < slices.length; i++) {
             const sliceInfo = slices[i];
             lastSliceHeight = sliceInfo.slice.height;
             lastSliceHash = sliceInfo.slice.hash;
+            lastSliceCreated = sliceInfo.slice.created;
             if (sliceInfo.slice.end) {
                 end = true;
             }
-            if(sliceInfo.status !== BlockchainStatus.TX_CONFIRMED) {
+            if (sliceInfo.status !== BlockchainStatus.TX_CONFIRMED) {
                 executed = false;
             }
         }
@@ -73,9 +72,10 @@ export default class MintSlices implements Task {
         if (!executed) {
             return false; // wait execute slice
         }
-        if(!lastSliceHash) {
+        if (!lastSliceHash) {
             const lastSlice = await this.coreProvider.blockProvider.getLastContext(this.coreProvider.chain);
             lastSliceHash = lastSlice.slice.hash;
+            lastSliceCreated = lastSlice.slice.created;
         }
 
         const isConnected = this.coreProvider.network.isConnected();
@@ -100,7 +100,6 @@ export default class MintSlices implements Task {
         }
         const ctx = new RuntimeContext(this.environmentProvider, env);
         await this.environmentProvider.compile(this.coreProvider.chain, lastSliceHash, CompiledContext.SLICE_MINT_CONTEXT_HASH);
-        const promises: Promise<any>[] = [];
 
         if (lastSliceHeight == -1) {
             const tx = new Tx();
@@ -117,50 +116,73 @@ export default class MintSlices implements Task {
             };
             tx.foreignKeys = [];
             tx.created = Math.floor(Date.now() / 1000);
-            const tte = await this.coreProvider.transactionsProvider.simulateTransactions([tx], lastSliceHash, env, false);
-            if (!tte) return false;
-            if (tte.error) throw new Error(`Failed create start transaction`);
-            const output = tte.outputs[0];
-            tx.output = output;
+            tx.output.ctx = lastSliceHash;
             tx.hash = tx.toHash();
             tx.sign = [await mainWallet.signHash(tx.hash)];
-            await this.transactionsProvider.executeTransaction(ctx, tx, output);
+            await this.transactionsProvider.executeTransaction(ctx, tx, tx.output);
             newTransactions.push(tx);
-            promises.push(this.transactionsProvider.save([tx]));
+            this.transactionsProvider.save([tx]);
             this.coreProvider.applicationContext.mq.send(RoutingKeys.new_tx, tx);
         }
 
         const uptime = new Date().getTime();
         let currentTime = new Date().getTime();
         while ((currentTime - uptime) < TIME_LIMIT_SLICE && !end) {
-            const mempool = this.TransactionRepository.getMempoolArray(1000);
+            const mempool = this.TransactionRepository.getMempoolArray(MEMPOOL_SIZE);
 
-            const successTxs = []
-            for (let i = 0; i < mempool.length; i++) {
-                const tx = mempool[i];
+            if (mempool.length > 0) {
+                //this.coreProvider.applicationContext.logger.verbose(`process mempool ${mempool.length}/${this.TransactionRepository.mempool.size}`);
+                let batch = [];
+                const promises: Promise<void>[] = [];
+                const processSimulatedTransactions = async (tte: TransactionsToExecute | null) => {
+                    if (tte) {
+                        for (let j = 0; j < tte.txs.length; j++) {
+                            const tx = tte.txs[j];
+                            const output = tte.outputs[j];
 
-                if (tx.output.ctx === lastSliceHash) {
-                    const error = await this.transactionsProvider.executeTransaction(ctx, tx, tx.output);
-                    if (!error) {
-                        newTransactions.push(tx);
-                        successTxs.push(tx);
-                        this.coreProvider.applicationContext.mq.send(RoutingKeys.new_tx, tx);
+                            const error = await this.transactionsProvider.executeTransaction(ctx, tx, output);
+                            if (!error) {
+                                newTransactions.push(tx);
+                                this.coreProvider.applicationContext.mq.send(RoutingKeys.new_tx, tx);
+                            }
+                        }
                     }
-                } else {
-                    console.log("TRANSAÇÂO IGNORADA", tx.data)
                 }
-            }
-            if (successTxs.length > 0) {
-                promises.push(this.transactionsProvider.save(successTxs));
-            }
-            if (mempool.length == 0) {
-                await helper.sleep(100);
+                for (let i = 0; i < mempool.length; i++) {
+                    const tx = mempool[i];
+                    batch.push(tx);
+                    if (batch.length >= BATCH_SIZE) {
+                        promises.push(this.transactionsProvider.simulateTransactions(batch, lastSliceHash, env).then(processSimulatedTransactions));
+                        batch = [];
+                    }
+                }
+                if (batch.length > 0) {
+                    promises.push(this.transactionsProvider.simulateTransactions(batch, lastSliceHash, env).then(processSimulatedTransactions));
+                }
+                await Promise.all(promises);
+
+                /*const successTxs: Tx[] = [];
+                for (let i = 0; i < mempool.length; i++) {
+                    const tx = mempool[i];
+                    const output = tx.output;
+                    if (output.ctx === lastSliceHash) {
+                        const error = await this.transactionsProvider.executeTransaction(ctx, tx, output);
+                        if (!error) {
+                            newTransactions.push(tx);
+                            successTxs.push(tx);
+                            this.coreProvider.applicationContext.mq.send(RoutingKeys.new_tx, tx);
+                        } else {
+                            console.log("EERRROORR", error, tx.output, output)
+                        }
+                    }
+                }
+                this.TransactionRepository.saveTxMany(successTxs);*/
             } else {
-                this.coreProvider.applicationContext.logger.verbose(`process mempool ${newTransactions.length}/${this.TransactionRepository.mempool.size}`);
+                await helper.sleep(100);
             }
+            if (!this.task.isRun) return false;
 
             currentTime = new Date().getTime();
-            if (!this.isRun) return false;
             if (currentTime / 1000 >= currentMinnedBlock.created + this.coreProvider.blockTime) {
                 const tx = new Tx();
                 tx.version = '3';
@@ -176,16 +198,12 @@ export default class MintSlices implements Task {
                 };
                 tx.foreignKeys = [];
                 tx.created = Math.floor(Date.now() / 1000);
-                const tte = await this.coreProvider.transactionsProvider.simulateTransactions([tx], lastSliceHash, env, false);
-                if (!tte) return false;
-                if (tte.error) throw new Error(`Failed create start transaction`);
-                const output = tte.outputs[0];
-                tx.output = output;
+                tx.output.ctx = lastSliceHash;
                 tx.hash = tx.toHash();
                 tx.sign = [await mainWallet.signHash(tx.hash)];
-                await this.transactionsProvider.executeTransaction(ctx, tx, output);
+                await this.transactionsProvider.executeTransaction(ctx, tx, tx.output);
                 newTransactions.push(tx);
-                promises.push(this.transactionsProvider.save([tx]));
+                this.transactionsProvider.save([tx]);
                 this.coreProvider.applicationContext.mq.send(RoutingKeys.new_tx, tx);
                 end = true;
                 this.coreProvider.applicationContext.logger.verbose(`mint slice - mint by END`);
@@ -194,9 +212,9 @@ export default class MintSlices implements Task {
         if (newTransactions.length > 0) {
             const envOut = ctx.getEnvOut();
             lastSliceHeight++;
-            await Promise.all(promises);
             const sliceInfo = await this.mintSlice(lastSliceHash, lastSliceHeight, newTransactions, currentMinnedBlock, end, envOut);
             await this.environmentProvider.push(envOut, env.chain, CompiledContext.SLICE_MINT_CONTEXT_HASH, sliceInfo.slice.lastHash, sliceInfo.slice.hash);
+            this.coreProvider.applicationContext.logger.debug(`MINT SLICE - TPS: ${sliceInfo.slice.transactionsCount/(sliceInfo.slice.created-lastSliceCreated)}`);
         }
         return true;
     }
@@ -235,18 +253,16 @@ export default class MintSlices implements Task {
         slice.hash = slice.toHash();
         slice.sign = await mainWallet.signHash(slice.hash);
 
+        const bslice: Slices = {
+            slice: slice,
+            attempts: 0,
+            status: BlockchainStatus.TX_CONFIRMED,
+            blockHash: ''
+        };
+        await this.environmentProvider.push(changes, bslice.slice.chain, bslice.slice.hash, bslice.slice.lastHash, bslice.slice.hash);
+        await this.SliceRepository.save(bslice);
+        this.coreProvider.applicationContext.mq.send(RoutingKeys.new_slice, slice);
         this.coreProvider.applicationContext.logger.info(`mint slice - height: ${slice.blockHeight}/${slice.height} - txs: ${slice.transactions.length} - end: ${slice.end} - hash: ${slice.hash.substring(0, 10)}...`);
-        const bslice = await this.coreProvider.slicesProvider.saveNewSlice(slice);
-        //const bslice: Slices = {
-        //    slice: slice,
-        //    isComplete: true,
-        //    isExecuted: true,
-        //    status: BlockchainStatus.TX_CONFIRMED,
-        //    blockHash: ''
-        //};
-        //await this.environmentProvider.push(changes, bslice.slice.chain, bslice.slice.hash, bslice.slice.lastHash, bslice.slice.hash);
-        //await this.SliceRepository.save(bslice);
-        //this.coreProvider.applicationContext.mq.send(RoutingKeys.new_slice, slice);
         return bslice;
     }
 }

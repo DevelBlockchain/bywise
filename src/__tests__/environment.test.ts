@@ -9,13 +9,14 @@ const chain = "local"
 const wallet = new Wallet();
 var bywise: Bywise;
 var environmentProvider: EnvironmentProvider;
-const port0 = Math.floor(Math.random() * 7000 + 3000);
+const port0 = 7000;
 
 beforeAll(async () => {
     bywise = await Bywise.newBywiseInstance({
         name: `test${port0}`,
         port: port0,
         keyJWT: helper.getRandomString(),
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port0}`,

@@ -1,8 +1,6 @@
 import { CoreProvider } from "../services";
-import { Task } from "../types";
 
-export default class ExecuteBlocks implements Task {
-    public isRun = true;
+export default class ExecuteBlocks {
     private coreProvider;
 
     constructor(coreProvider: CoreProvider) {
@@ -11,11 +9,5 @@ export default class ExecuteBlocks implements Task {
 
     async run() {
         return await this.coreProvider.blockProvider.executeCompleteBlocks(this.coreProvider.chain);
-    }
-
-    async start() {
-    }
-
-    async stop() {
     }
 }

@@ -12,7 +12,7 @@ var b0: BlockPack;
 
 const chain = 'local';
 var fromSlice = '';
-const port0 = Math.floor(Math.random() * 7000 + 3000);
+const port0 = 11000;
 const wallet = new Wallet();
 var DEAFAUT_MAIN_ENV: EnvironmentContext = {
     chain,
@@ -43,6 +43,7 @@ beforeAll(async () => {
         name: `test${port0}`,
         port: port0,
         keyJWT: helper.getRandomString(),
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port0}`,
@@ -261,7 +262,7 @@ describe('basic tests', () => {
         for (let i = 0; i < tte.outputs.length; i++) {
             const tx = tte.txs[i];
             const output = tte.outputs[i];
-            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output, false);
             expect(error).toEqual(null);
         }
         const envOut: EnvironmentChanges = ctx.getEnvOut();
@@ -344,9 +345,9 @@ describe('basic tests', () => {
         });
 
         const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
-        let error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[0], tte.outputs[0]);
+        let error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[0], tte.outputs[0], false);
         expect(error).toEqual(null);
-        error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[1], tte.outputs[1]);
+        error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[1], tte.outputs[1], false);
         expect(error).toEqual("low balance");
         const envOut: EnvironmentChanges = ctx.getEnvOut();
         expect(envOut).toEqual({
@@ -425,7 +426,7 @@ describe('basic tests', () => {
         for (let i = 0; i < tte.outputs.length; i++) {
             const tx = tte.txs[i];
             const output = tte.outputs[i];
-            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output, false);
             expect(error).toEqual(null);
         }
         const envOut: EnvironmentChanges = ctx.getEnvOut();
@@ -504,9 +505,9 @@ describe('basic tests', () => {
         });
 
         const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
-        let error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[0], tte.outputs[0]);
+        let error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[0], tte.outputs[0], false);
         expect(error).toEqual(null);
-        error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[1], tte.outputs[1]);
+        error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[1], tte.outputs[1], false);
         expect(error).toEqual("Insuficient funds");
         const envOut: EnvironmentChanges = ctx.getEnvOut();
         expect(envOut).toEqual({
@@ -625,7 +626,7 @@ describe('set configs', () => {
         for (let i = 0; i < tte.outputs.length; i++) {
             const tx = tte.txs[i];
             const output = tte.outputs[i];
-            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output, false);
             expect(error).toEqual(null);
         }
         const envOut: EnvironmentChanges = ctx.getEnvOut();
@@ -819,7 +820,7 @@ describe('set configs', () => {
         for (let i = 0; i < tte.outputs.length; i++) {
             const tx = tte.txs[i];
             const output = tte.outputs[i];
-            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output, false);
             expect(error).toEqual(null);
         }
         const envOut: EnvironmentChanges = ctx.getEnvOut();
@@ -1206,9 +1207,9 @@ describe('contracts', () => {
         expect(tte.error).toEqual(undefined);
 
         const ctx = new RuntimeContext(environmentProvider, DEAFAUT_MAIN_ENV);
-        let error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[0], tte.outputs[0]);
+        let error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[0], tte.outputs[0], false);
         expect(error).toEqual(null);
-        error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[1], tte.outputs[1]);
+        error = await bywise.transactionsProvider.executeTransaction(ctx, tte.txs[1], tte.outputs[1], false);
         expect(error).toEqual("changed key");
     }, 3000);
 
@@ -1303,7 +1304,7 @@ describe('contracts', () => {
         for (let i = 0; i < tte.outputs.length; i++) {
             const tx = tte.txs[i];
             const output = tte.outputs[i];
-            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output, false);
             expect(error).toEqual(null);
         }
         await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
@@ -1319,7 +1320,7 @@ describe('contracts', () => {
         for (let i = 0; i < tte.outputs.length; i++) {
             const tx = tte.txs[i];
             const output = tte.outputs[i];
-            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output, false);
             expect(error).toEqual(null);
         }
         await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
@@ -1813,7 +1814,7 @@ describe('stress testing', () => {
         for (let i = 0; i < tte.outputs.length; i++) {
             const tx = tte.txs[i];
             const output = tte.outputs[i];
-            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output, false);
             expect(error).toEqual(null);
         }
         await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);
@@ -1873,7 +1874,7 @@ describe('stress testing', () => {
         for (let i = 0; i < tte.outputs.length; i++) {
             const tx = tte.txs[i];
             const output = tte.outputs[i];
-            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output);
+            const error = await bywise.transactionsProvider.executeTransaction(ctx, tx, output, false);
             expect(error).toEqual(null);
         }
         await environmentProvider.push(ctx.getEnvOut(), chain, CompiledContext.MAIN_CONTEXT_HASH, ZERO_HASH, fromSlice);

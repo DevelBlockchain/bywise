@@ -1,18 +1,10 @@
 import { CoreProvider } from "../services";
-import { Task } from "../types";
 
-export default class SyncChain implements Task {
-    public isRun = true;
+export default class SyncChain {
     private coreProvider;
 
     constructor(coreProvider: CoreProvider) {
         this.coreProvider = coreProvider;
-    }
-
-    async start() {
-    }
-
-    async stop() {
     }
 
     async run() {
@@ -21,13 +13,14 @@ export default class SyncChain implements Task {
 
             const nextBlock = await this.coreProvider.network.web3.blocks.getBlockPackByHeight(currentBlock.chain, currentBlock.height + 1);
             if (nextBlock) {
-                await this.coreProvider.blockProvider.setNewBlockPack(currentBlock.chain, nextBlock);
+                const newCurrentBlock = await this.coreProvider.blockProvider.setNewBlockPack(currentBlock.chain, nextBlock);
+                this.coreProvider.currentBlock = newCurrentBlock.block;
             } else {
                 await this.coreProvider.blockProvider.selectMinedBlock(currentBlock.chain, currentBlock.hash);
                 this.coreProvider.currentBlock = currentBlock;
-                this.isRun = false;
+                return true;
             }
         }
-        return true;
+        return false;
     }
 }

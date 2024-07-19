@@ -4,20 +4,13 @@ import { Blocks, Votes } from "../models";
 import helper from "../utils/helper";
 import { CoreProvider } from "../services";
 
-export default class ConsensusAlgorithm implements Task {
-    public isRun = true;
+export default class ConsensusAlgorithm {
     private coreProvider;
     private BlockRepository;
 
     constructor(coreProvider: CoreProvider) {
         this.coreProvider = coreProvider;
         this.BlockRepository = coreProvider.applicationContext.database.BlockRepository;
-    }
-
-    async start() {
-    }
-
-    async stop() {
     }
 
     async run() {

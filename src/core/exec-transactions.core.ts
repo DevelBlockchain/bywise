@@ -3,13 +3,11 @@ import helper from "../utils/helper";
 import { ConfigProvider, CoreProvider, WalletProvider } from "../services";
 import { RuntimeContext } from "../vm/RuntimeContext";
 import { Tx } from "@bywise/web3";
-import { Task } from "../types";
 
 const EVENT_PAGE_SIZE = 100;
 const SIMULATE_BATCH = 500;
 
-export default class ExecuteTransactions implements Task {
-    public isRun = true;
+export default class ExecuteTransactions {
     public busy = false;
     private coreProvider;
     private currentHash = '';
@@ -22,12 +20,6 @@ export default class ExecuteTransactions implements Task {
         this.coreProvider = coreProvider;
         this.walletProvider = new WalletProvider();
         this.configProvider = new ConfigProvider();
-    }
-
-    async start() {
-    }
-
-    async stop() {
     }
 
     private async waitBusy() {
@@ -52,6 +44,7 @@ export default class ExecuteTransactions implements Task {
         }
 
         this.currentHash = currentSlice.slice.hash;
+        this.coreProvider.currentSlice = currentSlice.slice;
         this.nextBlockHeight = this.coreProvider.currentBlock.height + 1;
 
         this.coreProvider.applicationContext.logger.verbose(`update main context - hash: ${this.currentHash.substring(0, 10)}...`);
@@ -108,7 +101,7 @@ export default class ExecuteTransactions implements Task {
         };
     }
 
-    async executeSimulation(tx: Tx, env?: EnvironmentContext, ignoreBalance?: boolean) {
+    async executeSimulation(tx: Tx, env?: EnvironmentContext, simulateMode?: boolean) {
         await this.waitBusy();
 
         const currentContext = this.currentContext;
@@ -119,7 +112,7 @@ export default class ExecuteTransactions implements Task {
         if (!env) {
             env = currentContext.env
         }
-        const tte = await this.coreProvider.transactionsProvider.simulateTransactions([tx], this.currentHash, env, ignoreBalance);
+        const tte = await this.coreProvider.transactionsProvider.simulateTransactions([tx], this.currentHash, env, simulateMode);
 
         this.busy = false;
         return tte;

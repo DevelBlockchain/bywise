@@ -65,16 +65,24 @@ swaggerDocument.addSchema({
         { name: 'fee', type: 'string', example: '0' },
         { name: 'feeUsed', type: 'string', example: '0' },
         { name: 'logs', type: 'array', items: { type: 'string' } },
-        { name: 'events', type: 'array', items: { type: 'object', properties: [
-            { name: 'contractAddress', type: 'string', example: 'BWS1MC328A63061f8CCC10a593fa2fE79d7A05F7C6a810d73' },
-            { name: 'eventName', type: 'string', example: 'Mint' },
-            { name: 'entries', type: 'array', items: { type: 'object', properties: [
-                { name: 'key', type: 'string', example: 'recipient' },
-                { name: 'value', type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc' },
-            ]}},
-            { name: 'hash', type: 'string', example: 'e2b77904a118ea06a9ae2b2eebb977d974d856b53bde32bcae1ddbc7e7777e81' },
+        {
+            name: 'events', type: 'array', items: {
+                type: 'object', properties: [
+                    { name: 'contractAddress', type: 'string', example: 'BWS1MC328A63061f8CCC10a593fa2fE79d7A05F7C6a810d73' },
+                    { name: 'eventName', type: 'string', example: 'Mint' },
+                    {
+                        name: 'entries', type: 'array', items: {
+                            type: 'object', properties: [
+                                { name: 'key', type: 'string', example: 'recipient' },
+                                { name: 'value', type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc' },
+                            ]
+                        }
+                    },
+                    { name: 'hash', type: 'string', example: 'e2b77904a118ea06a9ae2b2eebb977d974d856b53bde32bcae1ddbc7e7777e81' },
 
-        ] } },
+                ]
+            }
+        },
         { name: 'error', type: 'string' },
         { name: 'output', type: 'object' },
         { name: 'payableContracts', type: 'object' },
@@ -100,7 +108,7 @@ swaggerDocument.addSchema({
         { name: 'height', type: 'number', example: '0' },
         { name: 'transactionsCount', type: 'number', example: '9' },
         { name: 'blockHeight', type: 'number', example: '0' },
-        { name: 'transactions', type: 'array', items: { type: 'string' , example: '299ad5865ab35f852fd3fec8a715f7235acf8631ff96305927ecf6ad779c230a'} },
+        { name: 'transactions', type: 'array', items: { type: 'string', example: '299ad5865ab35f852fd3fec8a715f7235acf8631ff96305927ecf6ad779c230a' } },
         { name: 'version', type: 'string', example: '2' },
         { name: 'chain', type: 'string', example: 'local' },
         { name: 'from', type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc' },
@@ -117,7 +125,7 @@ swaggerDocument.addSchema({
     properties: [
         { name: 'height', type: 'number', example: '0' },
         { name: 'transactionsCount', type: 'number', example: '9' },
-        { name: 'slices', type: 'array', items: { type: 'string',  example: '6307b4222fb6d7b9eb612ee3e1c1bef3d6f001f7f4df3d0814d4c545a30c35c6' },},
+        { name: 'slices', type: 'array', items: { type: 'string', example: '6307b4222fb6d7b9eb612ee3e1c1bef3d6f001f7f4df3d0814d4c545a30c35c6' }, },
         { name: 'version', type: 'string', example: '2' },
         { name: 'chain', type: 'string', example: 'local' },
         { name: 'from', type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc' },
@@ -126,7 +134,7 @@ swaggerDocument.addSchema({
         { name: 'hash', type: 'string', example: 'f0580ad8feb6d69a6818e26f8bf59cdf71526d3271a9ababaae67231605b173e' },
         { name: 'sign', type: 'string', example: '0x406802187c88feac20984d9acb5aa632cff53278c0eb351b30a190bd3097990671a5d54da053eb3402154f1e9884e5bf9eaed36061563e93c929c9bb44c19d9c1b' },
         { name: 'status', type: 'string', example: 'mined' },
-        { name: 'externalTxID', type: 'array', items: { type: 'string', example: 'f0580ad8feb6d69a6818e26f8bf59cdf71526d3271a9ababaae67231605b173e' }},
+        { name: 'externalTxID', type: 'array', items: { type: 'string', example: 'f0580ad8feb6d69a6818e26f8bf59cdf71526d3271a9ababaae67231605b173e' } },
     ]
 });
 
@@ -136,7 +144,7 @@ swaggerDocument.addSchema({
     properties: [
         { name: 'height', type: 'number', example: '0' },
         { name: 'transactionsCount', type: 'number', example: '9' },
-        { name: 'slices', type: 'array', items: { type: 'string',  example: '6307b4222fb6d7b9eb612ee3e1c1bef3d6f001f7f4df3d0814d4c545a30c35c6' },},
+        { name: 'slices', type: 'array', items: { type: 'string', example: '6307b4222fb6d7b9eb612ee3e1c1bef3d6f001f7f4df3d0814d4c545a30c35c6' }, },
         { name: 'version', type: 'string', example: '2' },
         { name: 'chain', type: 'string', example: 'local' },
         { name: 'from', type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc' },
@@ -144,7 +152,7 @@ swaggerDocument.addSchema({
         { name: 'lastHash', type: 'string' },
         { name: 'hash', type: 'string', example: 'f0580ad8feb6d69a6818e26f8bf59cdf71526d3271a9ababaae67231605b173e' },
         { name: 'sign', type: 'string', example: '0x406802187c88feac20984d9acb5aa632cff53278c0eb351b30a190bd3097990671a5d54da053eb3402154f1e9884e5bf9eaed36061563e93c929c9bb44c19d9c1b' },
-        { name: 'externalTxID', type: 'array', items: { type: 'string', example: 'f0580ad8feb6d69a6818e26f8bf59cdf71526d3271a9ababaae67231605b173e' }},
+        { name: 'externalTxID', type: 'array', items: { type: 'string', example: 'f0580ad8feb6d69a6818e26f8bf59cdf71526d3271a9ababaae67231605b173e' } },
     ]
 });
 
@@ -154,7 +162,6 @@ swaggerDocument.addSchema({
     properties: [
         { name: 'version', type: 'string' },
         { name: 'chain', type: 'string' },
-        { name: 'validator', type: 'string' },
         { name: 'from', type: 'array', items: { type: 'string' } },
         { name: 'to', type: 'array', items: { type: 'string' } },
         { name: 'amount', type: 'array', items: { type: 'string' } },
@@ -165,7 +172,9 @@ swaggerDocument.addSchema({
         { name: 'data', type: 'object' },
         { name: 'created', type: 'number' },
         { name: 'hash', type: 'string' },
-        { name: 'validatorSign', type: 'string' },
+        { name: 'validator', type: 'array', items: { type: 'string' } },
+        { name: 'validatorSign', type: 'array', items: { type: 'string' } },
+
         { name: 'sign', type: 'array', items: { type: 'string' } },
     ]
 });
@@ -176,17 +185,19 @@ swaggerDocument.addSchema({
     properties: [
         { name: 'version', type: 'string', example: '2' },
         { name: 'chain', type: 'string', example: 'local' },
-        { name: 'from', type: 'array', items: { type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc'} },
-        { name: 'to', type: 'array', items: { type: 'string',  example: 'BWSaDF93012178eec6afc58eec6afc171090292C91MUF89C3a'} },
+        { name: 'from', type: 'array', items: { type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc' } },
+        { name: 'to', type: 'array', items: { type: 'string', example: 'BWSaDF93012178eec6afc58eec6afc171090292C91MUF89C3a' } },
         { name: 'amount', type: 'array', items: { type: 'string' }, example: '0' },
         { name: 'tag', type: 'string', example: '' },
         { name: 'fee', type: 'string', example: '0' },
         { name: 'type', type: 'string', example: 'blockchain-command' },
-        { name: 'foreignKeys', type: 'array', items: { type: 'string', example: 'b6e865e357738ae530c4074dc3bc6a9aa9b6173177dc40f13d4fbe094c3faab9'} },
-        { name: 'data', type: 'object'},
+        { name: 'foreignKeys', type: 'array', items: { type: 'string', example: 'b6e865e357738ae530c4074dc3bc6a9aa9b6173177dc40f13d4fbe094c3faab9' } },
+        { name: 'validator', type: 'array', items: { type: 'string', example: 'BWSaDF93012178eec6afc58eec6afc171090292C91MUF89C3a' } },
+        { name: 'validatorSign', type: 'array', items: { type: 'string', example: '0x1993bbd25a2a4ccf69d6dff69bae2c37442cd38523abc4e45531d561aceea59f64179e1eb39f96b7366b68de782d83dcd033667ad509b8ae5f5ae0ccb591909c1c' } },
+        { name: 'data', type: 'object' },
         { name: 'created', type: 'number', example: '1719152363' },
         { name: 'hash', type: 'string', example: '40f13d4fbe094c3faab9b6e865e357738ae530c4074dc3bc6a9aa9b6173177dc' },
-        { name: 'sign', type: 'array', items: { type: 'string', example: '0x3c2682e52e906c32551b0d22c4ca57bdb7fac231af8d9993c693c7a39a922d6f6c51f9a7d007687677bbcef18a036a2f0c5b027ae044d75da4028a5898e2d6421c'} },
+        { name: 'sign', type: 'array', items: { type: 'string', example: '0x3c2682e52e906c32551b0d22c4ca57bdb7fac231af8d9993c693c7a39a922d6f6c51f9a7d007687677bbcef18a036a2f0c5b027ae044d75da4028a5898e2d6421c' } },
     ]
 });
 
@@ -196,17 +207,17 @@ swaggerDocument.addSchema({
     properties: [
         { name: 'version', type: 'string', example: '2' },
         { name: 'chain', type: 'string', example: 'local' },
-        { name: 'from', type: 'array', items: { type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc'} },
-        { name: 'to', type: 'array', items: { type: 'string',  example: 'BWSaDF93012178eec6afc58eec6afc171090292C91MUF89C3a'} },
+        { name: 'from', type: 'array', items: { type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc' } },
+        { name: 'to', type: 'array', items: { type: 'string', example: 'BWSaDF93012178eec6afc58eec6afc171090292C91MUF89C3a' } },
         { name: 'amount', type: 'array', items: { type: 'string' }, example: '0' },
         { name: 'tag', type: 'string', example: '' },
         { name: 'fee', type: 'string', example: '0' },
         { name: 'type', type: 'string', example: 'blockchain-command' },
-        { name: 'foreignKeys', type: 'array', items: { type: 'string', example: 'b6e865e357738ae530c4074dc3bc6a9aa9b6173177dc40f13d4fbe094c3faab9'} },
-        { name: 'data', type: 'object'},
+        { name: 'foreignKeys', type: 'array', items: { type: 'string', example: 'b6e865e357738ae530c4074dc3bc6a9aa9b6173177dc40f13d4fbe094c3faab9' } },
+        { name: 'data', type: 'object' },
         { name: 'created', type: 'number', example: '1719152363' },
         { name: 'hash', type: 'string', example: '40f13d4fbe094c3faab9b6e865e357738ae530c4074dc3bc6a9aa9b6173177dc' },
-        { name: 'sign', type: 'array', items: { type: 'string', example: '0x3c2682e52e906c32551b0d22c4ca57bdb7fac231af8d9993c693c7a39a922d6f6c51f9a7d007687677bbcef18a036a2f0c5b027ae044d75da4028a5898e2d6421c'} },
+        { name: 'sign', type: 'array', items: { type: 'string', example: '0x3c2682e52e906c32551b0d22c4ca57bdb7fac231af8d9993c693c7a39a922d6f6c51f9a7d007687677bbcef18a036a2f0c5b027ae044d75da4028a5898e2d6421c' } },
         { name: 'status', type: 'string', example: 'mined' },
     ]
 });
@@ -221,7 +232,7 @@ swaggerDocument.addSchema({
 
 swaggerDocument.addSchema({
     name: 'NodeInfoDTO',
-    type: 'object', 
+    type: 'object',
     properties: [
         { name: 'address', type: 'string', example: 'BWS1MUF89C3a7E49fA2601aDF93171090292C92158eec6afc' },
         { name: 'host', type: 'string', example: 'http://localhost:8080' },

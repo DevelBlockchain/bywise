@@ -31,7 +31,7 @@ export class VirtualMachineProvider {
     const outputs = [];
     for (let i = 0; i < tte.txs.length; i++) {
       if (!this.task.isRun) return;
-      const tx = tte.txs[i];
+      const tx = new Tx(tte.txs[i]);
 
       let output: TxOutput = {
         feeUsed: '0',
@@ -50,25 +50,69 @@ export class VirtualMachineProvider {
         },
         output: undefined
       };
-      try {
-        await this.executeTransaction(tx, ctx, tte.ignoreBalance, output);
-      } catch (err: any) {
-        if (err.message && typeof err.message == 'string') {
-          output.error = err.message;
+      if (tte.simulateMode) {
+        try {
+          await this.executeTransaction(tx, ctx, tte.simulateMode, output);
+        } catch (err: any) {
+          if (err.message && typeof err.message == 'string') {
+            output.error = err.message;
+          } else {
+            output.error = `Error: ${JSON.stringify(err)}`
+          }
+        }
+      } else {
+        if (tx.output.ctx !== tte.fromSlice) {
+          output.error = "Invalid context";
         } else {
-          output.error = `Error: ${JSON.stringify(err)}`
+          try {
+            tx.isValid();
+          } catch (err: any) {
+            output.error = err.message;
+          }
+        }
+        if (!output.error) {
+          if (tx.validator) {
+            for (let i = 0; i < tx.validator.length && !output.error; i++) {
+              const validatorAddress = tx.validator[i];
+              const isValidator = await this.configsProvider.isValidator(ctx, validatorAddress);
+              if (!isValidator) {
+                output.error = "Invalid validator";
+              }
+            }
+            if (!output.error) {
+              output = tx.output;
+            }
+          }
+          if (!output.error && (!tx.validator || tte.forceGenerateOutput)) {
+            try {
+              console.log("executeTransaction")
+              await this.executeTransaction(tx, ctx, tte.simulateMode, output);
+            } catch (err: any) {
+              if (err.message && typeof err.message == 'string') {
+                output.error = err.message;
+              } else {
+                output.error = `Error: ${JSON.stringify(err)}`
+              }
+            }
+          }
+        }
+        if (!output.error) {
+          tx.output = output;
+          if (tx.hash !== tx.toHash()) {
+            output.error = "Invalid transaction output";
+          }
+        }
+        if (output.error) {
+          tte.error = output.error;
         }
       }
-      if (output.error) {
-        tte.error = output.error;
-      }
-      ctx.deleteCommit();
       outputs.push(output);
+      ctx.deleteCommit();
     }
     tte.outputs = outputs;
   }
 
-  private async executeTransaction(tx: Tx, ctx: RuntimeContext, ignoreBalance: boolean, output: TxOutput): Promise<void> {
+  private async executeTransaction(tx: Tx, ctx: RuntimeContext, simulateMode: boolean | undefined, output: TxOutput): Promise<void> {
     ctx.tx = tx;
     ctx.cost = 0;
     ctx.output = '';
@@ -165,7 +209,7 @@ export class VirtualMachineProvider {
       feeUsed = "0";
       ctx.size = 0;
     }
-    if (!ignoreBalance && (BigInt(ctx.tx.fee) < BigInt(feeUsed))) {
+    if (!simulateMode && (BigInt(ctx.tx.fee) < BigInt(feeUsed))) {
       throw new Error(`Invalid fee`);
     }
     debit = debit + BigInt(feeUsed);

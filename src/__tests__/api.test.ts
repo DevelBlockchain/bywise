@@ -4,7 +4,7 @@ import helper from '../utils/helper';
 import { Wallet } from '@bywise/web3';
 import { AuthProvider } from '../services';
 
-const port0 = Math.floor(Math.random() * 7000 + 3000);
+const port0 = 5000;
 
 var bywise: Bywise;
 
@@ -14,6 +14,7 @@ beforeAll(async () => {
         name: `test${port0}`,
         port: port0,
         keyJWT: helper.getRandomString(),
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port0}`,

@@ -27,7 +27,7 @@ export class ApiService {
             node.strikes++;
             if(node.strikes > 100) {
                 this.blockList.set(node.ip, Date.now());
-                node.socket.close(400);
+                //node.socket.close(400);
 
                 this.clients = this.clients.filter(socket => socket !== node);
                 this.applicationContext.logger.warn(`network - block node: ${node.ip}`);

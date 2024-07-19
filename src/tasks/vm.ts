@@ -24,11 +24,11 @@ class VM implements Task {
             const tte = this.transactionsToExecute.pop();
 
             if (tte) {
-                let uptime = Date.now();
+                //let uptime = Date.now();
                 await this.virtualMachineProvider.executeTransactions(tte);
-                uptime = Date.now() - uptime;
-                this.logger.verbose(`VM ${this.mq.getThreadId()} - executed ${tte.txs.length} in ${uptime} ms - TPS ${(tte.txs.length/(uptime/1000)).toFixed(2)}`);
-                await this.mq.send(RoutingKeys.set_transactions_to_execute, tte);
+                //uptime = Date.now() - uptime;
+                //this.logger.verbose(`VM ${this.mq.getThreadId()} - executed ${tte.txs.length} in ${uptime} ms - TPS ${(tte.txs.length/(uptime/1000)).toFixed(2)}`);
+                this.mq.send(RoutingKeys.set_transactions_to_execute, tte);
             } else {
                 await helper.sleep(50);
             }

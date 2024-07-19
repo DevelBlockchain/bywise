@@ -20,7 +20,7 @@ export default class Bywise {
             mq,
             database,
             port: bywiseStartNodeConfig.port,
-            https: bywiseStartNodeConfig.https,
+            ssl: bywiseStartNodeConfig.ssl,
             vmSize: bywiseStartNodeConfig.vmSize,
             vmIndex: bywiseStartNodeConfig.vmIndex,
             nodeLimit,
@@ -113,9 +113,9 @@ export default class Bywise {
 
     stop = async () => {
         await this.api.stop();
-        await this.core.stop();
         await this.vm.stop();
         await this.core.network.stop();
+        await this.core.stop();
         await this.applicationContext.mq.stop();
         await helper.sleep(300);
         await this.applicationContext.database.stop();

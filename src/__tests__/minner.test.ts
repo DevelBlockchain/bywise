@@ -10,7 +10,7 @@ const wallet = new Wallet();
 var bywise: Bywise;
 var b0: BlockPack;
 var minnerProvider: MinnerProvider;
-const port0 = Math.floor(Math.random() * 7000 + 3000);
+const port0 = 8000;
 
 beforeAll(async () => {
     b0 = await helper.createNewBlockZero('local', wallet);
@@ -18,6 +18,7 @@ beforeAll(async () => {
         name: `test${port0}`,
         port: port0,
         keyJWT: helper.getRandomString(),
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `http://localhost:${port0}`,

@@ -8,15 +8,16 @@ var node1: Bywise;
 var node2: Bywise;
 var authProvide: AuthProvider;
 const keyJWT = helper.getRandomString();
-const port0 = Math.floor(Math.random() * 7000 + 3000);
-const port1 = Math.floor(Math.random() * 7000 + 3000);
-const port2 = Math.floor(Math.random() * 7000 + 3000);
+const port0 = 9000;
+const port1 = 9001;
+const port2 = 9002;
 
 beforeAll(async () => {
     node0 = await Bywise.newBywiseInstance({
         name: `test${port0}`,
         port: port0,
         keyJWT: keyJWT,
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `ws://localhost:${port0}`,
@@ -33,6 +34,7 @@ beforeAll(async () => {
         name: `test${port1}`,
         port: port1,
         keyJWT: keyJWT,
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `ws://localhost:${port1}`,
@@ -47,6 +49,7 @@ beforeAll(async () => {
         name: `test${port2}`,
         port: port2,
         keyJWT: helper.getRandomString(),
+        ssl: null,
         isLog: process.env.BYWISE_TEST !== '1',
         isReset: true,
         myHost: `ws://localhost:${port2}`,

@@ -3,13 +3,14 @@ import { BlocksProvider, EnvironmentProvider, SlicesProvider, TransactionsProvid
 import { EventsProvider } from "./events.service";
 import { MinnerProvider } from "./minner.service";
 import { ApplicationContext } from "../types/task.type";
-import { Block } from "@bywise/web3";
+import { Block, Slice } from "@bywise/web3";
 
 export class CoreProvider {
     applicationContext;
     network;
     chain;
     currentBlock: Block;
+    currentSlice: Slice = new Slice();
     blockProvider;
     slicesProvider;
     transactionsProvider;

@@ -116,11 +116,11 @@ class Core implements Task {
             }
         });
 
-        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx, fromSlice: string, env?: EnvironmentContext, ignoreBalance?: boolean }) => {
+        this.applicationContext.mq.addRequestListener(RequestKeys.simulate_tx, async (data: { tx: Tx, fromSlice: string, env?: EnvironmentContext, simulateMode?: boolean }) => {
             const tx = new Tx(data.tx);
             const pipelineChain = this.runChains.get(tx.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.executeSimulation(tx, data.env, data.ignoreBalance);
+                return await pipelineChain.executeTransactions.executeSimulation(tx, data.env, data.simulateMode);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
@@ -129,7 +129,7 @@ class Core implements Task {
         this.applicationContext.mq.addRequestListener(RequestKeys.get_info_wallet, async (data: { chain: string, address: string }) => {
             const pipelineChain = this.runChains.get(data.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.getWalletInfo(data.address);
+                return await pipelineChain.executeTransactions.getWalletInfo(data.address);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
@@ -137,7 +137,7 @@ class Core implements Task {
         this.applicationContext.mq.addRequestListener(RequestKeys.get_contract, async (data: { chain: string, address: string }) => {
             const pipelineChain = this.runChains.get(data.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.getContract(data.address);
+                return await pipelineChain.executeTransactions.getContract(data.address);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
@@ -145,7 +145,7 @@ class Core implements Task {
         this.applicationContext.mq.addRequestListener(RequestKeys.get_events, async (data: { chain: string, contractAddress: string, eventName: string, page: number }) => {
             const pipelineChain = this.runChains.get(data.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.getEvents(data.contractAddress, data.eventName, data.page);
+                return await pipelineChain.executeTransactions.getEvents(data.contractAddress, data.eventName, data.page);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
@@ -153,7 +153,7 @@ class Core implements Task {
         this.applicationContext.mq.addRequestListener(RequestKeys.get_events_by_key, async (data: { chain: string, contractAddress: string, eventName: string, key: string, value: string, page: number }) => {
             const pipelineChain = this.runChains.get(data.chain);
             if (pipelineChain) {
-                return await pipelineChain.executeTransactionsTask.getEventsByKey(data.contractAddress, data.eventName, data.key, data.value, data.page);
+                return await pipelineChain.executeTransactions.getEventsByKey(data.contractAddress, data.eventName, data.key, data.value, data.page);
             } else {
                 throw new Error(`Node does not work with this chain`);
             }
@@ -163,6 +163,15 @@ class Core implements Task {
             if (pipelineChain) {
                 const slices = await pipelineChain.coreProvider.blockProvider.getLastSlicesBlock(data.chain);
                 return slices;
+            } else {
+                throw new Error(`Node does not work with this chain`);
+            }
+        });
+        this.applicationContext.mq.addRequestListener(RequestKeys.get_last_slice, async (data: { chain: string }) => {
+            const pipelineChain = this.runChains.get(data.chain);
+            if (pipelineChain) {
+                const slice = await pipelineChain.coreProvider.currentSlice;
+                return slice;
             } else {
                 throw new Error(`Node does not work with this chain`);
             }

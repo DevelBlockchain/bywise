@@ -133,6 +133,9 @@ export class RuntimeContext {
     }
 
     deleteCommit() {
+        for (let [key, env] of this.getStageKeys) {
+            this.getMainKeys.set(key, env);
+        }
         this.setStageKeys.clear();
         this.getStageKeys.clear();
     }

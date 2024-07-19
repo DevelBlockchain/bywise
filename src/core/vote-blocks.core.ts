@@ -1,22 +1,15 @@
 import { Tx, TxType } from "@bywise/web3";
 import { CoreProvider } from "../services";
 import helper from "../utils/helper";
-import { Task, TransactionsToExecute } from "../types";
-import { RequestKeys } from "../datasource/message-queue";
+import { Task } from "../types";
+import ExecuteTransactions from "./exec-transactions.core";
 
-export default class VoteBlocks implements Task {
-    public isRun = true;
+export default class VoteBlocks {
     private coreProvider;
     private blockHeight = -1;
 
     constructor(coreProvider: CoreProvider) {
         this.coreProvider = coreProvider;
-    }
-
-    async start() {
-    }
-
-    async stop() {
     }
 
     async run() {
@@ -52,11 +45,7 @@ export default class VoteBlocks implements Task {
         };
         tx.foreignKeys = [];
         tx.created = Math.floor(Date.now() / 1000);
-        
-        let tte: TransactionsToExecute = await this.coreProvider.applicationContext.mq.request(RequestKeys.simulate_tx, { tx: tx });
-        if (!tte) throw new Error(`failed VM`);
-        if (tte.error) throw new Error(`Failed create vote transaction`);
-        tx.output = tte.outputs[0];
+        tx.output.ctx = this.coreProvider.currentSlice.hash;
         tx.hash = tx.toHash();
         tx.sign = [await mainWallet.signHash(tx.hash)];
         this.coreProvider.applicationContext.database.TransactionRepository.addMempool(tx);
