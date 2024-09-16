@@ -6,6 +6,13 @@
 
 Bywise is an enterprise-grade permissioned Distributed Ledger Technology (DLT), Blockchain for developing solutions and applications. Its modular and versatile design suits a wide range of industry use cases. It offers a unique approach to consensus that enables performance at scale while preserving privacy.
 
+| Describe         | URL                                 |
+| ---------------- | ----------------------------------- |
+| Mainnet          | https://node1.bywise.org            |
+| Explorer         | https://explorer.bywise.org         |
+| Testnet          | https://testnet-node1.bywise.org    |
+| Explorer Testnet | https://testnet-explorer.bywise.org |
+
 ## Setup
 
 ### System Requirements
