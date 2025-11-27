@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bywise Wallet</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e4;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #888;
+            font-size: 1rem;
+        }
+
+        /* Login Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: #1e1e30;
+            padding: 40px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #00d4ff;
+        }
+
+        .modal.hidden, .modal-overlay.hidden {
+            display: none;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            background: #2a2a40;
+            border: 1px solid #3a3a50;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #2a2a40;
+            color: #fff;
+            border: 1px solid #3a3a50;
+        }
+
+        .btn-secondary:hover {
+            background: #3a3a50;
+        }
+
+        .btn-danger {
+            background: #3a2a2a;
+            color: #ff4d4d;
+            border: 1px solid #ff4d4d;
+        }
+
+        .btn-danger:hover {
+            background: #4a3a3a;
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        h4 {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Card styles */
+        .card {
+            background: #1e1e30;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h3 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card h3 .icon {
+            font-size: 1.4rem;
+        }
+
+        /* Wallet Info Card */
+        .wallet-card {
+            background: linear-gradient(135deg, #252550 0%, #1e1e40 100%);
+            border: 1px solid #3a3a60;
+        }
+
+        .wallet-address {
+            font-family: monospace;
+            font-size: 1.1rem;
+            color: #00d4ff;
+            word-break: break-all;
+            padding: 15px;
+            background: #1a1a30;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .wallet-address .address-text {
+            flex: 1;
+        }
+
+        .wallet-balance {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+
+        .wallet-balance-label {
+            color: #888;
+            font-size: 0.9rem;
+        }
+
+        /* Stats grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #252540;
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+
+        .stat-card .label {
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        /* Info rows */
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #2a2a40;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-row .label {
+            color: #888;
+        }
+
+        .info-row .value {
+            color: #fff;
+            font-family: monospace;
+            word-break: break-all;
+            text-align: right;
+            max-width: 60%;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: #252540;
+            border: none;
+            border-radius: 8px;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.95rem;
+        }
+
+        .tab.active {
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            color: #fff;
+        }
+
+        .tab:hover:not(.active) {
+            background: #3a3a50;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Table */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table th, .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #2a2a40;
+        }
+
+        .table th {
+            color: #888;
+            font-weight: normal;
+            font-size: 0.9rem;
+        }
+
+        .table td {
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        /* Alert */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert.error {
+            background: rgba(255, 77, 77, 0.2);
+            color: #ff4d4d;
+            border: 1px solid rgba(255, 77, 77, 0.3);
+        }
+
+        .alert.success {
+            background: rgba(0, 212, 106, 0.2);
+            color: #00d46a;
+            border: 1px solid rgba(0, 212, 106, 0.3);
+        }
+
+        .alert.info {
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+        }
+
+        .alert.hidden {
+            display: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #3a3a50;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 40px;
+            color: #888;
+        }
+
+        /* Copy button */
+        .copy-btn {
+            background: #3a3a50;
+            border: none;
+            color: #00d4ff;
+            cursor: pointer;
+            padding: 8px 12px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+            transition: background 0.3s;
+        }
+
+        .copy-btn:hover {
+            background: #4a4a60;
+        }
+
+        /* Status indicator */
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .status.connected {
+            background: rgba(0, 212, 106, 0.2);
+            color: #00d46a;
+        }
+
+        .status.disconnected {
+            background: rgba(255, 77, 77, 0.2);
+            color: #ff4d4d;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* Form row */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            header h1 {
+                font-size: 1.8rem;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .info-row {
+                flex-direction: column;
+                gap: 5px;
+            }
+            .info-row .value {
+                text-align: left;
+                max-width: 100%;
+            }
+        }
+
+        /* Result display */
+        .result-box {
+            background: #1a1a30;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .result-box pre {
+            white-space: pre-wrap;
+            margin: 0;
+        }
+
+        /* Grid layout for main content */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 768px) {
+            .main-grid {
+                grid-template-columns: 350px 1fr;
+            }
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Modal -->
+    <div id="loginOverlay" class="modal-overlay hidden">
+        <div class="modal">
+            <h2>Authentication Required</h2>
+            <div id="loginError" class="alert error hidden"></div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>Bywise Wallet</h1>
+            <p>Blockchain Explorer & Wallet Interface</p>
+        </header>
+
+        <div id="mainContent" class="hidden">
+            <div class="main-grid">
+                <!-- Sidebar -->
+                <div class="sidebar">
+                    <!-- Wallet Info -->
+                    <div class="card wallet-card">
+                        <h3><span class="icon">&#128179;</span> My Wallet</h3>
+                        <div class="wallet-address">
+                            <span class="address-text" id="myAddress">Loading...</span>
+                            <button class="copy-btn" onclick="copyAddress()">Copy</button>
+                        </div>
+                        <div class="wallet-balance" id="myBalance">-</div>
+                        <div class="wallet-balance-label">Balance</div>
+
+                        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #2a2a40;">
+                            <div class="stats-grid">
+                                <div class="stat-card" style="background: #2a2a40;">
+                                    <div class="value" id="myMinerStake" style="color: #7b2cbf;">-</div>
+                                    <div class="label">Miner Stake</div>
+                                </div>
+                                <div class="stat-card" style="background: #2a2a40;">
+                                    <div class="value" id="myValidatorStake" style="color: #00d4ff;">-</div>
+                                    <div class="label">Validator Stake</div>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Total Staked</span>
+                                <span class="value" id="myTotalStake">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Rewards</span>
+                                <span class="value" id="myRewards">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Node Status -->
+                    <div class="card">
+                        <h3><span class="icon">&#9881;</span> Node Status</h3>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="value" id="latestBlock">-</div>
+                                <div class="label">Block</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="value" id="connectedPeers">-</div>
+                                <div class="label">Peers</div>
+                            </div>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Status</span>
+                            <span id="connectionStatus" class="status disconnected">
+                                <span class="status-dot"></span>
+                                Disconnected
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="content">
+                    <!-- Tabs -->
+                    <div class="tabs">
+                        <button class="tab active" data-tab="transfer">Transfer</button>
+                        <button class="tab" data-tab="staking">Staking</button>
+                        <button class="tab" data-tab="deploy">Deploy Contract</button>
+                        <button class="tab" data-tab="interact">Call Contract</button>
+                        <button class="tab" data-tab="explorer">Explorer</button>
+                    </div>
+
+                    <!-- Transfer Tab -->
+                    <div id="transferTab" class="tab-content active">
+                        <div class="card">
+                            <h3><span class="icon">&#8644;</span> Send Tokens</h3>
+                            <div id="transferAlert" class="alert hidden"></div>
+                            <form id="transferForm">
+                                <div class="form-group">
+                                    <label for="toAddress">Recipient Address</label>
+                                    <input type="text" id="toAddress" placeholder="0x..." required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="amount">Amount</label>
+                                    <input type="text" id="amount" placeholder="0" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full" id="transferBtn">Send Transaction</button>
+                            </form>
+                            <div id="transferResult" class="result-box hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Staking Tab -->
+                    <div id="stakingTab" class="tab-content">
+                        <div class="card">
+                            <h3><span class="icon">&#11088;</span> Manage Staking</h3>
+                            <div id="stakingAlert" class="alert hidden"></div>
+
+                            <div style="margin-bottom: 30px;">
+                                <h4 style="color: #00d4ff; margin-bottom: 15px;">Add Stake</h4>
+                                <form id="addStakeForm">
+                                    <div class="form-group">
+                                        <label>Stake Type</label>
+                                        <select id="addStakeType">
+                                            <option value="miner">Miner Stake</option>
+                                            <option value="validator">Validator Stake</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="addStakeAmount">Amount to Stake</label>
+                                        <input type="text" id="addStakeAmount" placeholder="1000000" required>
+                                        <small style="color: #888; display: block; margin-top: 5px;">Minimum: 1,000,000</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-full" id="addStakeBtn">Add Stake</button>
+                                </form>
+                            </div>
+
+                            <div style="margin-bottom: 30px; padding-top: 30px; border-top: 1px solid #2a2a40;">
+                                <h4 style="color: #ff4d4d; margin-bottom: 15px;">Remove Stake</h4>
+                                <form id="removeStakeForm">
+                                    <div class="form-group">
+                                        <label>Stake Type</label>
+                                        <select id="removeStakeType">
+                                            <option value="miner">Miner Stake</option>
+                                            <option value="validator">Validator Stake</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="removeStakeAmount">Amount to Remove</label>
+                                        <input type="text" id="removeStakeAmount" placeholder="1000000" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-danger btn-full" id="removeStakeBtn">Remove Stake</button>
+                                </form>
+                            </div>
+
+                            <div class="alert info">
+                                <strong>Note:</strong> Staking requires tokens to be locked. Removing stake may require a waiting period. Make sure you have sufficient balance before adding stake.
+                            </div>
+                            <div id="stakingResult" class="result-box hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Deploy Contract Tab -->
+                    <div id="deployTab" class="tab-content">
+                        <div class="card">
+                            <h3><span class="icon">&#128196;</span> Deploy Smart Contract</h3>
+                            <div id="deployAlert" class="alert hidden"></div>
+                            <form id="deployForm">
+                                <div class="form-group">
+                                    <label for="contractCode">Contract Code (Bytecode or Source)</label>
+                                    <textarea id="contractCode" placeholder="Enter contract bytecode or source code..." required></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="constructorArgs">Constructor Arguments (JSON array, optional)</label>
+                                    <input type="text" id="constructorArgs" placeholder='["arg1", "arg2"]'>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full" id="deployBtn">Deploy Contract</button>
+                            </form>
+                            <div id="deployResult" class="result-box hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Interact with Contract Tab -->
+                    <div id="interactTab" class="tab-content">
+                        <div class="card">
+                            <h3><span class="icon">&#9997;</span> Call Smart Contract</h3>
+                            <div id="interactAlert" class="alert hidden"></div>
+                            <form id="interactForm">
+                                <div class="form-group">
+                                    <label for="contractAddress">Contract Address</label>
+                                    <input type="text" id="contractAddress" placeholder="0x..." required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="methodName">Method Name</label>
+                                    <input type="text" id="methodName" placeholder="transfer, balanceOf, etc." required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="methodArgs">Arguments (JSON array)</label>
+                                    <input type="text" id="methodArgs" placeholder='["0x...", "1000"]'>
+                                </div>
+                                <div class="form-group">
+                                    <label for="callValue">Value (optional)</label>
+                                    <input type="text" id="callValue" placeholder="0">
+                                </div>
+                                <div class="form-row">
+                                    <button type="button" class="btn btn-secondary" id="simulateBtn" onclick="simulateContract()">Simulate</button>
+                                    <button type="submit" class="btn btn-primary" id="executeBtn">Execute</button>
+                                </div>
+                            </form>
+                            <div id="interactResult" class="result-box hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Explorer Tab -->
+                    <div id="explorerTab" class="tab-content">
+                        <div class="card">
+                            <h3><span class="icon">&#128269;</span> Account Lookup</h3>
+                            <div class="form-group">
+                                <label for="accountAddress">Address</label>
+                                <input type="text" id="accountAddress" placeholder="0x...">
+                            </div>
+                            <button class="btn btn-primary" onclick="lookupAccount()">Lookup</button>
+                        </div>
+
+                        <div id="accountInfo" class="card hidden">
+                            <h3><span class="icon">&#128100;</span> Account Info</h3>
+                            <div class="info-row">
+                                <span class="label">Address</span>
+                                <span class="value" id="accAddress">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Balance</span>
+                                <span class="value" id="accBalance">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="label">Nonce</span>
+                                <span class="value" id="accNonce">-</span>
+                            </div>
+                            <div id="accStakeInfo" class="hidden" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #2a2a40;">
+                                <!-- Stake info will be inserted here -->
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3><span class="icon">&#9638;</span> Recent Blocks</h3>
+                            <div id="blocksLoading" class="loading">
+                                <div class="spinner"></div>
+                                Loading blocks...
+                            </div>
+                            <table class="table" id="blocksTable" style="display: none;">
+                                <thead>
+                                    <tr>
+                                        <th>Block</th>
+                                        <th>Hash</th>
+                                        <th>Miner</th>
+                                        <th>Txs</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="blocksBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="loadingContent" class="loading">
+            <div class="spinner"></div>
+            Connecting to node...
+        </div>
+    </div>
+
+    <script>
+        // State
+        let authCredentials = null;
+        let authRequired = false;
+        let walletAddress = '';
+
+        // API helper
+        async function api(endpoint, options = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+
+            if (authCredentials) {
+                headers['Authorization'] = 'Basic ' + btoa(authCredentials.username + ':' + authCredentials.password);
+            }
+
+            const response = await fetch(endpoint, {
+                ...options,
+                headers
+            });
+
+            if (response.status === 401) {
+                showLogin();
+                throw new Error('Unauthorized');
+            }
+
+            return response;
+        }
+
+        // Check auth status
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/auth/status');
+                const data = await response.json();
+
+                authRequired = data.authRequired;
+
+                if (authRequired && !data.authenticated) {
+                    showLogin();
+                } else {
+                    hideLogin();
+                    initializeApp();
+                }
+            } catch (error) {
+                console.error('Failed to check auth status:', error);
+                document.getElementById('loadingContent').innerHTML =
+                    '<div class="alert error">Failed to connect to node</div>';
+            }
+        }
+
+        // Show login modal
+        function showLogin() {
+            document.getElementById('loginOverlay').classList.remove('hidden');
+            document.getElementById('loadingContent').classList.add('hidden');
+            document.getElementById('mainContent').classList.add('hidden');
+        }
+
+        // Hide login modal
+        function hideLogin() {
+            document.getElementById('loginOverlay').classList.add('hidden');
+        }
+
+        // Handle login form
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorEl = document.getElementById('loginError');
+
+            try {
+                const response = await fetch('/auth/status', {
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(username + ':' + password)
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.authenticated) {
+                    authCredentials = { username, password };
+                    errorEl.classList.add('hidden');
+                    hideLogin();
+                    initializeApp();
+                } else {
+                    errorEl.textContent = 'Invalid username or password';
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (error) {
+                errorEl.textContent = 'Connection error';
+                errorEl.classList.remove('hidden');
+            }
+        });
+
+        // Initialize app
+        async function initializeApp() {
+            document.getElementById('loadingContent').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+
+            await Promise.all([
+                loadNodeInfo(),
+                loadBlockchainInfo(),
+                loadRecentBlocks()
+            ]);
+
+            // Load stake info
+            await loadMyStake();
+
+            // Refresh data periodically
+            setInterval(() => {
+                loadNodeInfo();
+                loadBlockchainInfo();
+                loadMyBalance();
+                loadMyStake();
+            }, 10000);
+        }
+
+        // Load node info and wallet address
+        async function loadNodeInfo() {
+            try {
+                const response = await api('/info');
+                const data = await response.json();
+
+                walletAddress = data.walletAddress;
+                document.getElementById('myAddress').textContent = walletAddress;
+                document.getElementById('connectedPeers').textContent = data.connectedPeers;
+
+                const statusEl = document.getElementById('connectionStatus');
+                statusEl.className = 'status connected';
+                statusEl.innerHTML = '<span class="status-dot"></span> Connected';
+
+                // Load wallet balance
+                loadMyBalance();
+            } catch (error) {
+                console.error('Failed to load node info:', error);
+            }
+        }
+
+        // Load my wallet balance
+        async function loadMyBalance() {
+            if (!walletAddress) return;
+
+            try {
+                const response = await api(`/blockchain/account?address=${walletAddress}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('myBalance').textContent = formatBalance(data.balance);
+                }
+            } catch (error) {
+                console.error('Failed to load balance:', error);
+            }
+        }
+
+        // Load stake information
+        async function loadMyStake() {
+            if (!walletAddress) return;
+
+            try {
+                const response = await api(`/blockchain/stake?address=${walletAddress}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('myMinerStake').textContent = formatBalance(data.minerStake);
+                    document.getElementById('myValidatorStake').textContent = formatBalance(data.validatorStake);
+                    document.getElementById('myTotalStake').textContent = formatBalance(data.totalStake);
+                    document.getElementById('myRewards').textContent = formatBalance(data.rewards);
+                } else {
+                    // No stake info yet - show zeros
+                    document.getElementById('myMinerStake').textContent = '0';
+                    document.getElementById('myValidatorStake').textContent = '0';
+                    document.getElementById('myTotalStake').textContent = '0';
+                    document.getElementById('myRewards').textContent = '0';
+                }
+            } catch (error) {
+                console.error('Failed to load stake:', error);
+                // Set to 0 on error
+                document.getElementById('myMinerStake').textContent = '0';
+                document.getElementById('myValidatorStake').textContent = '0';
+                document.getElementById('myTotalStake').textContent = '0';
+                document.getElementById('myRewards').textContent = '0';
+            }
+        }
+
+        // Format balance for display
+        function formatBalance(balance) {
+            if (!balance) return '0';
+            // Format large numbers with commas
+            return balance.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        // Copy address to clipboard
+        function copyAddress() {
+            navigator.clipboard.writeText(walletAddress).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 2000);
+            });
+        }
+
+        // Load blockchain info
+        async function loadBlockchainInfo() {
+            try {
+                const response = await api('/blockchain/info');
+                const data = await response.json();
+
+                document.getElementById('latestBlock').textContent = data.latestBlock.toLocaleString();
+            } catch (error) {
+                console.error('Failed to load blockchain info:', error);
+            }
+        }
+
+        // Load recent blocks
+        async function loadRecentBlocks() {
+            try {
+                const response = await api('/blockchain/blocks?limit=10');
+                const data = await response.json();
+
+                const tbody = document.getElementById('blocksBody');
+                tbody.innerHTML = '';
+
+                for (const block of data.blocks) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${block.number}</td>
+                        <td>${block.hash.substring(0, 12)}...</td>
+                        <td>${block.minerAddress.substring(0, 10)}...</td>
+                        <td>${block.transactionCount}</td>
+                    `;
+                    tbody.appendChild(row);
+                }
+
+                document.getElementById('blocksLoading').style.display = 'none';
+                document.getElementById('blocksTable').style.display = 'table';
+            } catch (error) {
+                console.error('Failed to load blocks:', error);
+                document.getElementById('blocksLoading').innerHTML =
+                    '<div class="alert error">Failed to load blocks</div>';
+            }
+        }
+
+        // Lookup account
+        async function lookupAccount() {
+            const address = document.getElementById('accountAddress').value.trim();
+            if (!address) return;
+
+            try {
+                const accResponse = await api(`/blockchain/account?address=${address}`);
+                if (accResponse.ok) {
+                    const accData = await accResponse.json();
+                    document.getElementById('accAddress').textContent = accData.address;
+                    document.getElementById('accBalance').textContent = formatBalance(accData.balance);
+                    document.getElementById('accNonce').textContent = accData.nonce;
+                    document.getElementById('accountInfo').classList.remove('hidden');
+
+                    // Try to load stake info for this account
+                    try {
+                        const stakeResponse = await api(`/blockchain/stake?address=${address}`);
+                        if (stakeResponse.ok) {
+                            const stakeData = await stakeResponse.json();
+                            // Update account info with stake data if element exists
+                            const stakeInfoEl = document.getElementById('accStakeInfo');
+                            if (stakeInfoEl) {
+                                stakeInfoEl.innerHTML = `
+                                    <div class="info-row">
+                                        <span class="label">Miner Stake</span>
+                                        <span class="value">${formatBalance(stakeData.minerStake)}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="label">Validator Stake</span>
+                                        <span class="value">${formatBalance(stakeData.validatorStake)}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="label">Rewards</span>
+                                        <span class="value">${formatBalance(stakeData.rewards)}</span>
+                                    </div>
+                                `;
+                                stakeInfoEl.classList.remove('hidden');
+                            }
+                        }
+                    } catch (stakeError) {
+                        // Stake info not available - not an error
+                        const stakeInfoEl = document.getElementById('accStakeInfo');
+                        if (stakeInfoEl) {
+                            stakeInfoEl.classList.add('hidden');
+                        }
+                    }
+                } else {
+                    document.getElementById('accountInfo').classList.add('hidden');
+                    const stakeInfoEl = document.getElementById('accStakeInfo');
+                    if (stakeInfoEl) {
+                        stakeInfoEl.classList.add('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to lookup account:', error);
+            }
+        }
+
+        // Transfer form - Using simplified /validator/send endpoint
+        document.getElementById('transferForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const toAddress = document.getElementById('toAddress').value.trim();
+            const amount = document.getElementById('amount').value.trim();
+            const btn = document.getElementById('transferBtn');
+            const alertEl = document.getElementById('transferAlert');
+            const resultEl = document.getElementById('transferResult');
+
+            btn.disabled = true;
+            btn.textContent = 'Sending...';
+            alertEl.classList.add('hidden');
+            resultEl.classList.add('hidden');
+
+            try {
+                // Use the simplified /validator/send endpoint
+                // This executes, signs with node's wallet, and broadcasts in one call
+                const response = await api('/validator/send', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        to: toAddress,
+                        value: amount,
+                        data: ''
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showAlert('transferAlert', 'success', 'Transaction sent successfully!');
+                    resultEl.innerHTML = `<pre>Transaction ID: ${data.txId}\nStatus: Pending in mempool\nWaiting for block to be mined...</pre>`;
+                    resultEl.classList.remove('hidden');
+
+                    // Clear form
+                    document.getElementById('toAddress').value = '';
+                    document.getElementById('amount').value = '';
+
+                    // Refresh balance after a delay to allow block to be mined
+                    setTimeout(() => {
+                        loadMyBalance();
+                    }, 5000);
+                } else {
+                    showAlert('transferAlert', 'error', data.error || 'Failed to send transaction');
+                    if (data.error) {
+                        resultEl.innerHTML = `<pre>Error: ${data.error}</pre>`;
+                        resultEl.classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                showAlert('transferAlert', 'error', 'Failed to send transaction: ' + error.message);
+                console.error('Transfer error:', error);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send Transaction';
+            }
+        });
+
+        // Deploy contract form
+        document.getElementById('deployForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const code = document.getElementById('contractCode').value.trim();
+            const args = document.getElementById('constructorArgs').value.trim();
+            const btn = document.getElementById('deployBtn');
+            const alertEl = document.getElementById('deployAlert');
+            const resultEl = document.getElementById('deployResult');
+
+            btn.disabled = true;
+            btn.textContent = 'Deploying...';
+            alertEl.classList.add('hidden');
+            resultEl.classList.add('hidden');
+
+            try {
+                let parsedArgs = [];
+                if (args) {
+                    try {
+                        parsedArgs = JSON.parse(args);
+                    } catch (e) {
+                        showAlert('deployAlert', 'error', 'Invalid constructor arguments JSON');
+                        return;
+                    }
+                }
+
+                const response = await api('/validator/execute', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        from: walletAddress,
+                        to: '',  // Empty address = contract deployment
+                        value: '0',
+                        data: code,
+                        args: parsedArgs
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showAlert('deployAlert', 'success', 'Contract deployment submitted!');
+                    resultEl.innerHTML = `<pre>Transaction ID: ${data.txId || data.transactionId || 'N/A'}\nContract Address: ${data.contractAddress || 'Pending...'}\nStatus: ${data.status || 'Pending'}</pre>`;
+                    resultEl.classList.remove('hidden');
+                } else {
+                    showAlert('deployAlert', 'error', data.error || 'Deployment failed');
+                }
+            } catch (error) {
+                showAlert('deployAlert', 'error', 'Failed to deploy: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Deploy Contract';
+            }
+        });
+
+        // Simulate contract call
+        async function simulateContract() {
+            const contractAddress = document.getElementById('contractAddress').value.trim();
+            const methodName = document.getElementById('methodName').value.trim();
+            const methodArgs = document.getElementById('methodArgs').value.trim();
+            const value = document.getElementById('callValue').value.trim() || '0';
+            const btn = document.getElementById('simulateBtn');
+            const alertEl = document.getElementById('interactAlert');
+            const resultEl = document.getElementById('interactResult');
+
+            if (!contractAddress || !methodName) {
+                showAlert('interactAlert', 'error', 'Contract address and method name are required');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Simulating...';
+            alertEl.classList.add('hidden');
+            resultEl.classList.add('hidden');
+
+            try {
+                let parsedArgs = [];
+                if (methodArgs) {
+                    try {
+                        parsedArgs = JSON.parse(methodArgs);
+                    } catch (e) {
+                        showAlert('interactAlert', 'error', 'Invalid arguments JSON');
+                        return;
+                    }
+                }
+
+                const response = await api('/validator/simulate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        from: walletAddress,
+                        to: contractAddress,
+                        data: methodName,  // method name goes in data for now
+                        value: value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('interactAlert', 'info', 'Simulation completed');
+                    resultEl.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    resultEl.classList.remove('hidden');
+                } else {
+                    showAlert('interactAlert', 'error', data.error || 'Simulation failed');
+                }
+            } catch (error) {
+                showAlert('interactAlert', 'error', 'Failed to simulate: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Simulate';
+            }
+        }
+
+        // Execute contract call form
+        document.getElementById('interactForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const contractAddress = document.getElementById('contractAddress').value.trim();
+            const methodName = document.getElementById('methodName').value.trim();
+            const methodArgs = document.getElementById('methodArgs').value.trim();
+            const value = document.getElementById('callValue').value.trim() || '0';
+            const btn = document.getElementById('executeBtn');
+            const alertEl = document.getElementById('interactAlert');
+            const resultEl = document.getElementById('interactResult');
+
+            if (!contractAddress || !methodName) {
+                showAlert('interactAlert', 'error', 'Contract address and method name are required');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Executing...';
+            alertEl.classList.add('hidden');
+            resultEl.classList.add('hidden');
+
+            try {
+                let parsedArgs = [];
+                if (methodArgs) {
+                    try {
+                        parsedArgs = JSON.parse(methodArgs);
+                    } catch (e) {
+                        showAlert('interactAlert', 'error', 'Invalid arguments JSON');
+                        return;
+                    }
+                }
+
+                const response = await api('/validator/execute', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        from: walletAddress,
+                        to: contractAddress,
+                        data: methodName,  // method name goes in data for now
+                        value: value
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showAlert('interactAlert', 'success', 'Transaction submitted!');
+                    resultEl.innerHTML = `<pre>Transaction ID: ${data.txId || data.transactionId || 'N/A'}\nStatus: ${data.status || 'Pending'}\n${data.result ? 'Result: ' + JSON.stringify(data.result, null, 2) : ''}</pre>`;
+                    resultEl.classList.remove('hidden');
+                } else {
+                    showAlert('interactAlert', 'error', data.error || 'Execution failed');
+                }
+            } catch (error) {
+                showAlert('interactAlert', 'error', 'Failed to execute: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Execute';
+            }
+        });
+
+        // Add stake form
+        document.getElementById('addStakeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const stakeType = document.getElementById('addStakeType').value;
+            const amount = document.getElementById('addStakeAmount').value.trim();
+            const btn = document.getElementById('addStakeBtn');
+            const alertEl = document.getElementById('stakingAlert');
+            const resultEl = document.getElementById('stakingResult');
+
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            alertEl.classList.add('hidden');
+            resultEl.classList.add('hidden');
+
+            try {
+                // Get current stake first
+                const currentStakeResponse = await api(`/blockchain/stake?address=${walletAddress}`);
+                if (!currentStakeResponse.ok) {
+                    showAlert('stakingAlert', 'error', 'Failed to get current stake');
+                    btn.disabled = false;
+                    btn.textContent = 'Add Stake';
+                    return;
+                }
+                const currentStake = await currentStakeResponse.json();
+
+                // Calculate new stake (current + amount to add)
+                const amountNum = parseInt(amount);
+                if (isNaN(amountNum) || amountNum <= 0) {
+                    showAlert('stakingAlert', 'error', 'Invalid amount');
+                    btn.disabled = false;
+                    btn.textContent = 'Add Stake';
+                    return;
+                }
+
+                let newStakeAmount;
+                if (stakeType === 'miner') {
+                    const currentMiner = parseInt(currentStake.minerStake) || 0;
+                    newStakeAmount = currentMiner + amountNum;
+                } else {
+                    const currentValidator = parseInt(currentStake.validatorStake) || 0;
+                    newStakeAmount = currentValidator + amountNum;
+                }
+
+                const requestBody = {
+                    address: walletAddress
+                };
+
+                if (stakeType === 'miner') {
+                    requestBody.minerStake = newStakeAmount.toString();
+                } else {
+                    requestBody.validatorStake = newStakeAmount.toString();
+                }
+
+                const response = await api('/blockchain/stake/register', {
+                    method: 'POST',
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showAlert('stakingAlert', 'success', 'Stake added successfully!');
+                    resultEl.innerHTML = `<pre>Address: ${data.address}\nMiner Stake: ${formatBalance(data.minerStake)}\nValidator Stake: ${formatBalance(data.validatorStake)}\nTotal Stake: ${formatBalance(data.totalStake)}\nIs Active: ${data.isActive ? 'Yes' : 'No'}</pre>`;
+                    resultEl.classList.remove('hidden');
+
+                    // Clear form
+                    document.getElementById('addStakeAmount').value = '';
+
+                    // Refresh stake info
+                    setTimeout(() => {
+                        loadMyStake();
+                        loadMyBalance();
+                    }, 2000);
+                } else {
+                    showAlert('stakingAlert', 'error', data.error || 'Failed to add stake');
+                }
+            } catch (error) {
+                showAlert('stakingAlert', 'error', 'Failed to add stake: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Add Stake';
+            }
+        });
+
+        // Remove stake form
+        document.getElementById('removeStakeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const stakeType = document.getElementById('removeStakeType').value;
+            const amount = document.getElementById('removeStakeAmount').value.trim();
+            const btn = document.getElementById('removeStakeBtn');
+            const alertEl = document.getElementById('stakingAlert');
+            const resultEl = document.getElementById('stakingResult');
+
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            alertEl.classList.add('hidden');
+            resultEl.classList.add('hidden');
+
+            try {
+                // Get current stake
+                const currentStakeResponse = await api(`/blockchain/stake?address=${walletAddress}`);
+                if (!currentStakeResponse.ok) {
+                    showAlert('stakingAlert', 'error', 'Failed to get current stake');
+                    return;
+                }
+                const currentStake = await currentStakeResponse.json();
+
+                // Calculate new stake (current - amount to remove)
+                let currentAmount = stakeType === 'miner' ? currentStake.minerStake : currentStake.validatorStake;
+                let amountNum = parseInt(amount);
+                let currentNum = parseInt(currentAmount);
+
+                if (isNaN(amountNum) || isNaN(currentNum)) {
+                    showAlert('stakingAlert', 'error', 'Invalid stake amounts');
+                    return;
+                }
+
+                let newAmount = currentNum - amountNum;
+                if (newAmount < 0) {
+                    showAlert('stakingAlert', 'error', 'Cannot remove more than current stake');
+                    return;
+                }
+
+                // Send request to update stake to new amount
+                const requestBody = {
+                    address: walletAddress
+                };
+
+                if (stakeType === 'miner') {
+                    requestBody.minerStake = newAmount.toString();
+                } else {
+                    requestBody.validatorStake = newAmount.toString();
+                }
+
+                const response = await api('/blockchain/stake/register', {
+                    method: 'POST',
+                    body: JSON.stringify(requestBody)
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showAlert('stakingAlert', 'success', 'Stake removed successfully!');
+                    resultEl.innerHTML = `<pre>Address: ${data.address}\nMiner Stake: ${formatBalance(data.minerStake)}\nValidator Stake: ${formatBalance(data.validatorStake)}\nTotal Stake: ${formatBalance(data.totalStake)}\nIs Active: ${data.isActive ? 'Yes' : 'No'}</pre>`;
+                    resultEl.classList.remove('hidden');
+
+                    // Clear form
+                    document.getElementById('removeStakeAmount').value = '';
+
+                    // Refresh stake info
+                    setTimeout(() => {
+                        loadMyStake();
+                        loadMyBalance();
+                    }, 2000);
+                } else {
+                    showAlert('stakingAlert', 'error', data.error || 'Failed to remove stake');
+                }
+            } catch (error) {
+                showAlert('stakingAlert', 'error', 'Failed to remove stake: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Remove Stake';
+            }
+        });
+
+        // Show alert helper
+        function showAlert(id, type, message) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.className = `alert ${type}`;
+                el.textContent = message;
+                el.classList.remove('hidden');
+            }
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.dataset.tab;
+
+                // Update tab buttons
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Update tab content
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(tabId + 'Tab').classList.add('active');
+
+                // Load data for explorer tab
+                if (tabId === 'explorer') {
+                    loadRecentBlocks();
+                }
+            });
+        });
+
+        // Initialize on load
+        checkAuthStatus();
+    </script>
+</body>
+</html>

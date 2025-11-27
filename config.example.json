@@ -1,0 +1,57 @@
+{
+  "nodeId": "",
+  "bootstrapNodes": [
+    {
+      "address": "seed1.bywise.network:8080"
+    },
+    {
+      "address": "seed2.bywise.network:8080"
+    }
+  ],
+  "discovery": {
+    "enabled": true,
+    "interval": "30s",
+    "maxPeersToAsk": 5,
+    "maxPeersPerQuery": 10
+  },
+  "connection": {
+    "minConnections": 3,
+    "maxConnections": 50,
+    "connectionTimeout": "10s",
+    "handshakeTimeout": "5s",
+    "reconnectInterval": "30s",
+    "maxReconnectAttempts": 5
+  },
+  "rateLimit": {
+    "enabled": true,
+    "requestsPerSecond": 100,
+    "burstSize": 200,
+    "banDuration": "5m",
+    "maxInvalidRequests": 10
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080
+  },
+  "tls": {
+    "certFile": "certs/server.crt",
+    "keyFile": "certs/server.key",
+    "autoGenerate": true
+  },
+  "api": {
+    "enabled": true,
+    "host": "0.0.0.0",
+    "port": 8081,
+    "auth": {
+      "enabled": false,
+      "username": "",
+      "password": ""
+    }
+  },
+  "wallet": "wallet.json",
+  "blockchain": {
+    "dataDir": "data",
+    "miningEnabled": false,
+    "validatorEnabled": false
+  }
+}

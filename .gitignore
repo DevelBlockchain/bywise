@@ -1,0 +1,60 @@
+# Binaries
+bywise
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Go workspace file
+go.work
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+**/.DS_Store
+Thumbs.db
+
+# Certificates (generated)
+certs/
+*.crt
+*.key
+*.pem
+
+# Configuration files with sensitive data
+config.json
+!config.example.json
+
+# Wallet files (contain private keys)
+wallet.json
+*.wallet.json
+
+# Temporary files
+tmp/
+temp/
+
+# E2E tests
+e2e-tests/node_modules/
+e2e-tests/temp-configs/
+
+# Logs
+*.log
+
+# Blockchain data directory
+data/
+
+# Contracts
+contracts/output

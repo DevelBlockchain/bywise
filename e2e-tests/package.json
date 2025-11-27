@@ -1,0 +1,25 @@
+{
+  "name": "bywise-e2e-tests",
+  "version": "1.0.0",
+  "description": "E2E tests for Bywise P2P network",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --runInBand --detectOpenHandles",
+    "test:verbose": "jest --runInBand --detectOpenHandles --verbose"
+  },
+  "keywords": [
+    "bywise",
+    "p2p",
+    "e2e",
+    "test"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "axios": "^1.13.2",
+    "jest": "^30.2.0"
+  },
+  "dependencies": {
+    "ethereum-cryptography": "^3.2.0"
+  }
+}
