@@ -36,10 +36,12 @@ certs/
 
 # Configuration files with sensitive data
 config.json
+config2.json
 !config.example.json
 
 # Wallet files (contain private keys)
 wallet.json
+wallet2.json
 *.wallet.json
 
 # Temporary files
@@ -55,6 +57,10 @@ e2e-tests/temp-configs/
 
 # Blockchain data directory
 data/
+data2/
 
 # Contracts
 contracts/output
+
+# Explorer
+explorer/

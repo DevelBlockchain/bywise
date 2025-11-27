@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/bywise/go-bywise/src/wallet"
@@ -240,7 +241,7 @@ func (b *Block) Verify(previousBlock *Block) error {
 	// Verify all transactions
 	for i, tx := range b.Transactions {
 		if err := tx.Verify(); err != nil {
-			return errors.New("invalid transaction at index " + string(rune(i)))
+			return fmt.Errorf("invalid transaction at index %d: %w", i, err)
 		}
 	}
 

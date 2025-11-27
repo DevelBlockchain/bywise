@@ -2,6 +2,8 @@ package network
 
 import (
 	"context"
+	"encoding/hex"
+	"fmt"
 	"log"
 
 	"github.com/bywise/go-bywise/src/checkpoint"
@@ -438,6 +440,26 @@ func coreTxToPb(tx *core.Transaction) *pb.Transaction {
 		nonceBytes = tx.Nonce.Bytes()
 	}
 
+	// Encode ReadSet and WriteSet keys as hex strings for protobuf compatibility
+	// Protobuf requires map keys to be valid UTF-8 strings, but our keys are binary
+	readSet := make(map[string][]byte)
+	for k, v := range tx.ReadSet {
+		hexKey := fmt.Sprintf("%x", []byte(k))
+		readSet[hexKey] = v
+		if false { // Enable for debugging
+			log.Printf("[SEND] ReadSet: binary=%x hex=%s", []byte(k), hexKey)
+		}
+	}
+
+	writeSet := make(map[string][]byte)
+	for k, v := range tx.WriteSet {
+		hexKey := fmt.Sprintf("%x", []byte(k))
+		writeSet[hexKey] = v
+		if false { // Enable for debugging
+			log.Printf("[SEND] WriteSet: binary=%x hex=%s", []byte(k), hexKey)
+		}
+	}
+
 	return &pb.Transaction{
 		Id:           tx.ID[:],
 		Validator:    tx.Validator[:],
@@ -449,8 +471,8 @@ func coreTxToPb(tx *core.Transaction) *pb.Transaction {
 		Data:         tx.Data,
 		UserSig:      tx.UserSig,
 		SequenceId:   tx.SequenceID,
-		ReadSet:      tx.ReadSet,
-		WriteSet:     tx.WriteSet,
+		ReadSet:      readSet,
+		WriteSet:     writeSet,
 		ValidatorSig: tx.ValidatorSig,
 	}
 }
@@ -460,14 +482,87 @@ func pbTxToCore(pbTx *pb.Transaction) *core.Transaction {
 		return nil
 	}
 
+	// Decode ReadSet and WriteSet keys from hex strings back to binary
+	// Support backward compatibility: try hex decode first, fall back to direct binary
+	readSet := make(map[string][]byte)
+	if pbTx.ReadSet != nil {
+		for key, v := range pbTx.ReadSet {
+			var binaryKey []byte
+
+			// Try to decode as hex (new format)
+			decoded, err := hex.DecodeString(key)
+			if err == nil && len(decoded) > 0 {
+				// Successfully decoded as hex
+				binaryKey = decoded
+				if false { // Enable for debugging
+					log.Printf("[RECV] ReadSet: hex=%s decoded=%x", key, binaryKey)
+				}
+			} else {
+				// Not hex or decode failed - assume old format (direct binary string)
+				// This provides backward compatibility with nodes sending binary keys
+				binaryKey = []byte(key)
+				if false { // Enable for debugging
+					log.Printf("[RECV] ReadSet: FALLBACK binary=%x (original=%s err=%v)", binaryKey, key, err)
+				}
+			}
+
+			// Deep copy value
+			if v != nil {
+				readSet[string(binaryKey)] = append([]byte(nil), v...)
+			} else {
+				readSet[string(binaryKey)] = nil
+			}
+		}
+	}
+
+	writeSet := make(map[string][]byte)
+	if pbTx.WriteSet != nil {
+		for key, v := range pbTx.WriteSet {
+			var binaryKey []byte
+
+			// Try to decode as hex (new format)
+			decoded, err := hex.DecodeString(key)
+			if err == nil && len(decoded) > 0 {
+				// Successfully decoded as hex
+				binaryKey = decoded
+			} else {
+				// Not hex or decode failed - assume old format (direct binary string)
+				binaryKey = []byte(key)
+			}
+
+			// Deep copy value
+			if v != nil {
+				writeSet[string(binaryKey)] = append([]byte(nil), v...)
+			} else {
+				writeSet[string(binaryKey)] = nil
+			}
+		}
+	}
+
+	// Deep copy byte slices to avoid sharing references
+	var data []byte
+	if pbTx.Data != nil {
+		data = append([]byte(nil), pbTx.Data...)
+	}
+
+	var userSig []byte
+	if pbTx.UserSig != nil {
+		userSig = append([]byte(nil), pbTx.UserSig...)
+	}
+
+	var validatorSig []byte
+	if pbTx.ValidatorSig != nil {
+		validatorSig = append([]byte(nil), pbTx.ValidatorSig...)
+	}
+
 	tx := &core.Transaction{
 		BlockLimit:   pbTx.BlockLimit,
-		Data:         pbTx.Data,
-		UserSig:      pbTx.UserSig,
+		Data:         data,
+		UserSig:      userSig,
 		SequenceID:   pbTx.SequenceId,
-		ReadSet:      pbTx.ReadSet,
-		WriteSet:     pbTx.WriteSet,
-		ValidatorSig: pbTx.ValidatorSig,
+		ReadSet:      readSet,
+		WriteSet:     writeSet,
+		ValidatorSig: validatorSig,
 		Value:        core.NewBigInt(0),
 		Nonce:        core.NewBigInt(0),
 	}

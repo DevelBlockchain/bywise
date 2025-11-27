@@ -3,9 +3,13 @@ package core
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/bywise/go-bywise/src/wallet"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Transaction represents a complete, self-contained and stateless transaction.
@@ -125,7 +129,8 @@ func (tx *Transaction) HashForValidatorSigning() []byte {
 	var buf bytes.Buffer
 
 	// Include user proposal hash and signature
-	buf.Write(tx.HashForUserSigning())
+	proposalHash := tx.HashForUserSigning()
+	buf.Write(proposalHash)
 	buf.Write(tx.UserSig)
 
 	// SequenceID
@@ -147,7 +152,28 @@ func (tx *Transaction) HashForValidatorSigning() []byte {
 		buf.Write(tx.WriteSet[key])
 	}
 
-	return wallet.Keccak256(buf.Bytes())
+	preHashData := buf.Bytes()
+	result := wallet.Keccak256(preHashData)
+
+	// Debug logging to help diagnose signature issues
+	if false {  // Set to true for detailed debugging
+		fmt.Printf("[DEBUG] HashForValidatorSigning:\n")
+		fmt.Printf("  ProposalHash: %x\n", proposalHash)
+		fmt.Printf("  UserSig: %x\n", tx.UserSig)
+		fmt.Printf("  SequenceID: %d\n", tx.SequenceID)
+		fmt.Printf("  ReadSet: %d keys\n", len(tx.ReadSet))
+		for _, k := range sortedReadKeys {
+			fmt.Printf("    %x -> %x\n", k, tx.ReadSet[k])
+		}
+		fmt.Printf("  WriteSet: %d keys\n", len(tx.WriteSet))
+		for _, k := range sortedWriteKeys {
+			fmt.Printf("    %x -> %x\n", k, tx.WriteSet[k])
+		}
+		fmt.Printf("  PreHash length: %d\n", len(preHashData))
+		fmt.Printf("  Result hash: %x\n", result)
+	}
+
+	return result
 }
 
 // ComputeID computes and sets the transaction ID
@@ -217,7 +243,55 @@ func (tx *Transaction) VerifyValidatorSignature() bool {
 		return false
 	}
 	hash := tx.HashForValidatorSigning()
-	return wallet.VerifySignature(tx.Validator.Hex(), hash, tx.ValidatorSig)
+	valid := wallet.VerifySignature(tx.Validator.Hex(), hash, tx.ValidatorSig)
+	if !valid {
+		// Try to recover what address actually signed this
+		pubKey, err := crypto.SigToPub(hash, tx.ValidatorSig)
+		var recoveredAddr string
+		if err == nil {
+			recoveredAddr = crypto.PubkeyToAddress(*pubKey).Hex()
+		} else {
+			recoveredAddr = fmt.Sprintf("(recovery failed: %v)", err)
+		}
+
+		fmt.Printf("[DEBUG] VerifyValidatorSignature failed:\n")
+		fmt.Printf("  Expected Validator: %s\n", tx.Validator.Hex())
+		fmt.Printf("  Recovered Address:  %s\n", recoveredAddr)
+		fmt.Printf("  Hash: %x\n", hash)
+		fmt.Printf("  ValidatorSig: %x\n", tx.ValidatorSig)
+		fmt.Printf("  UserSig: %x\n", tx.UserSig)
+		fmt.Printf("  ReadSet size: %d\n", len(tx.ReadSet))
+		fmt.Printf("  WriteSet size: %d\n", len(tx.WriteSet))
+		sortedReadKeys := sortMapKeys(tx.ReadSet)
+		fmt.Printf("  ReadSet keys (hex): ")
+		for i, k := range sortedReadKeys {
+			if i > 0 {
+				fmt.Printf(", ")
+			}
+			fmt.Printf("%x", []byte(k))  // Convert string to []byte first
+		}
+		fmt.Printf("\n")
+		sortedWriteKeys := sortMapKeys(tx.WriteSet)
+		fmt.Printf("  WriteSet keys (hex): ")
+		for i, k := range sortedWriteKeys {
+			if i > 0 {
+				fmt.Printf(", ")
+			}
+			fmt.Printf("%x", []byte(k))  // Convert string to []byte first
+		}
+		fmt.Printf("\n")
+
+		// Show detailed comparison
+		fmt.Printf("  ReadSet details:\n")
+		for _, k := range sortedReadKeys {
+			fmt.Printf("    key=%x value=%x (len=%d)\n", []byte(k), tx.ReadSet[k], len(tx.ReadSet[k]))
+		}
+		fmt.Printf("  WriteSet details:\n")
+		for _, k := range sortedWriteKeys {
+			fmt.Printf("    key=%x value=%x (len=%d)\n", []byte(k), tx.WriteSet[k], len(tx.WriteSet[k]))
+		}
+	}
+	return valid
 }
 
 // VerifyUserSignature verifies the user's signature
@@ -336,4 +410,116 @@ func sortMapKeys(m map[string][]byte) []string {
 		}
 	}
 	return keys
+}
+
+// transactionJSON is used for JSON marshaling with hex-encoded keys
+type transactionJSON struct {
+	ID           Hash              `json:"id"`
+	Validator    Address           `json:"validator"`
+	From         Address           `json:"from"`
+	To           Address           `json:"to"`
+	Value        *BigInt           `json:"value"`
+	Nonce        *BigInt           `json:"nonce"`
+	BlockLimit   uint64            `json:"blockLimit"`
+	Data         []byte            `json:"data"`
+	UserSig      []byte            `json:"userSig"`
+	SequenceID   uint64            `json:"sequenceID"`
+	ReadSet      map[string]string `json:"readSet"`  // hex key -> hex value
+	WriteSet     map[string]string `json:"writeSet"` // hex key -> hex value
+	ValidatorSig []byte            `json:"validatorSig"`
+}
+
+// MarshalJSON implements custom JSON marshaling with hex-encoded ReadSet/WriteSet keys
+func (tx *Transaction) MarshalJSON() ([]byte, error) {
+	// Encode ReadSet and WriteSet keys/values as hex strings
+	readSetHex := make(map[string]string)
+	for k, v := range tx.ReadSet {
+		keyHex := fmt.Sprintf("%x", []byte(k))
+		valueHex := fmt.Sprintf("%x", v)
+		readSetHex[keyHex] = valueHex
+	}
+
+	writeSetHex := make(map[string]string)
+	for k, v := range tx.WriteSet {
+		keyHex := fmt.Sprintf("%x", []byte(k))
+		valueHex := fmt.Sprintf("%x", v)
+		writeSetHex[keyHex] = valueHex
+	}
+
+	return json.Marshal(&transactionJSON{
+		ID:           tx.ID,
+		Validator:    tx.Validator,
+		From:         tx.From,
+		To:           tx.To,
+		Value:        tx.Value,
+		Nonce:        tx.Nonce,
+		BlockLimit:   tx.BlockLimit,
+		Data:         tx.Data,
+		UserSig:      tx.UserSig,
+		SequenceID:   tx.SequenceID,
+		ReadSet:      readSetHex,
+		WriteSet:     writeSetHex,
+		ValidatorSig: tx.ValidatorSig,
+	})
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling with hex-decoded ReadSet/WriteSet keys
+func (tx *Transaction) UnmarshalJSON(data []byte) error {
+	var txJSON transactionJSON
+	if err := json.Unmarshal(data, &txJSON); err != nil {
+		return err
+	}
+
+	// Decode ReadSet keys/values from hex
+	readSet := make(map[string][]byte)
+	for keyHex, valueHex := range txJSON.ReadSet {
+		// Decode key
+		keyBytes, err := hex.DecodeString(keyHex)
+		if err != nil {
+			return fmt.Errorf("failed to decode ReadSet key %s: %v", keyHex, err)
+		}
+
+		// Decode value
+		valueBytes, err := hex.DecodeString(valueHex)
+		if err != nil {
+			return fmt.Errorf("failed to decode ReadSet value for key %s: %v", keyHex, err)
+		}
+
+		readSet[string(keyBytes)] = valueBytes
+	}
+
+	// Decode WriteSet keys/values from hex
+	writeSet := make(map[string][]byte)
+	for keyHex, valueHex := range txJSON.WriteSet {
+		// Decode key
+		keyBytes, err := hex.DecodeString(keyHex)
+		if err != nil {
+			return fmt.Errorf("failed to decode WriteSet key %s: %v", keyHex, err)
+		}
+
+		// Decode value
+		valueBytes, err := hex.DecodeString(valueHex)
+		if err != nil {
+			return fmt.Errorf("failed to decode WriteSet value for key %s: %v", keyHex, err)
+		}
+
+		writeSet[string(keyBytes)] = valueBytes
+	}
+
+	// Populate transaction
+	tx.ID = txJSON.ID
+	tx.Validator = txJSON.Validator
+	tx.From = txJSON.From
+	tx.To = txJSON.To
+	tx.Value = txJSON.Value
+	tx.Nonce = txJSON.Nonce
+	tx.BlockLimit = txJSON.BlockLimit
+	tx.Data = txJSON.Data
+	tx.UserSig = txJSON.UserSig
+	tx.SequenceID = txJSON.SequenceID
+	tx.ReadSet = readSet
+	tx.WriteSet = writeSet
+	tx.ValidatorSig = txJSON.ValidatorSig
+
+	return nil
 }
