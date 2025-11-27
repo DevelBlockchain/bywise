@@ -176,8 +176,12 @@ class NodeManager {
         if (code === 0) {
           resolve(stdout);
         } else {
-          reject(new Error(`Init failed (code ${code}): ${stderr}`));
+          reject(new Error(`Init failed (code ${code}): ${stderr || stdout || 'no output'}\nCommand: ${this.binaryPath} blockchain init ${configPath} --yes`));
         }
+      });
+
+      init.on('error', (err) => {
+        reject(new Error(`Failed to spawn init process: ${err.message}\nBinary path: ${this.binaryPath}`));
       });
     });
   }
