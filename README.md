@@ -348,7 +348,7 @@ The P2P layer uses gRPC with the following services:
 ### Unit Tests
 
 ```bash
-go test ./src/... -v -timeout=60s
+go clean -testcache && go test ./src/... -timeout=30s
 ```
 
 ### E2E Tests

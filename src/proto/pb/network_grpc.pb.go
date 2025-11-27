@@ -29,6 +29,7 @@ const (
 	NodeService_GetBlocks_FullMethodName            = "/network.NodeService/GetBlocks"
 	NodeService_GetLatestBlock_FullMethodName       = "/network.NodeService/GetLatestBlock"
 	NodeService_BroadcastTransaction_FullMethodName = "/network.NodeService/BroadcastTransaction"
+	NodeService_GetLatestCheckpoint_FullMethodName  = "/network.NodeService/GetLatestCheckpoint"
 )
 
 // NodeServiceClient is the client API for NodeService service.
@@ -57,6 +58,8 @@ type NodeServiceClient interface {
 	GetLatestBlock(ctx context.Context, in *GetLatestBlockRequest, opts ...grpc.CallOption) (*GetLatestBlockResponse, error)
 	// BroadcastTransaction broadcasts a new transaction to the network
 	BroadcastTransaction(ctx context.Context, in *BroadcastTransactionRequest, opts ...grpc.CallOption) (*BroadcastTransactionResponse, error)
+	// GetLatestCheckpoint retrieves the latest checkpoint info
+	GetLatestCheckpoint(ctx context.Context, in *GetLatestCheckpointRequest, opts ...grpc.CallOption) (*GetLatestCheckpointResponse, error)
 }
 
 type nodeServiceClient struct {
@@ -167,6 +170,16 @@ func (c *nodeServiceClient) BroadcastTransaction(ctx context.Context, in *Broadc
 	return out, nil
 }
 
+func (c *nodeServiceClient) GetLatestCheckpoint(ctx context.Context, in *GetLatestCheckpointRequest, opts ...grpc.CallOption) (*GetLatestCheckpointResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetLatestCheckpointResponse)
+	err := c.cc.Invoke(ctx, NodeService_GetLatestCheckpoint_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // NodeServiceServer is the server API for NodeService service.
 // All implementations must embed UnimplementedNodeServiceServer
 // for forward compatibility.
@@ -193,6 +206,8 @@ type NodeServiceServer interface {
 	GetLatestBlock(context.Context, *GetLatestBlockRequest) (*GetLatestBlockResponse, error)
 	// BroadcastTransaction broadcasts a new transaction to the network
 	BroadcastTransaction(context.Context, *BroadcastTransactionRequest) (*BroadcastTransactionResponse, error)
+	// GetLatestCheckpoint retrieves the latest checkpoint info
+	GetLatestCheckpoint(context.Context, *GetLatestCheckpointRequest) (*GetLatestCheckpointResponse, error)
 	mustEmbedUnimplementedNodeServiceServer()
 }
 
@@ -232,6 +247,9 @@ func (UnimplementedNodeServiceServer) GetLatestBlock(context.Context, *GetLatest
 }
 func (UnimplementedNodeServiceServer) BroadcastTransaction(context.Context, *BroadcastTransactionRequest) (*BroadcastTransactionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BroadcastTransaction not implemented")
+}
+func (UnimplementedNodeServiceServer) GetLatestCheckpoint(context.Context, *GetLatestCheckpointRequest) (*GetLatestCheckpointResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLatestCheckpoint not implemented")
 }
 func (UnimplementedNodeServiceServer) mustEmbedUnimplementedNodeServiceServer() {}
 func (UnimplementedNodeServiceServer) testEmbeddedByValue()                     {}
@@ -434,6 +452,24 @@ func _NodeService_BroadcastTransaction_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NodeService_GetLatestCheckpoint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLatestCheckpointRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(NodeServiceServer).GetLatestCheckpoint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: NodeService_GetLatestCheckpoint_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(NodeServiceServer).GetLatestCheckpoint(ctx, req.(*GetLatestCheckpointRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // NodeService_ServiceDesc is the grpc.ServiceDesc for NodeService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -480,6 +516,10 @@ var NodeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BroadcastTransaction",
 			Handler:    _NodeService_BroadcastTransaction_Handler,
+		},
+		{
+			MethodName: "GetLatestCheckpoint",
+			Handler:    _NodeService_GetLatestCheckpoint_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

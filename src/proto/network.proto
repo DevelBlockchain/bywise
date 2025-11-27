@@ -182,6 +182,20 @@ message BroadcastTransactionResponse {
     string tx_id = 3;
 }
 
+// GetLatestCheckpointRequest requests the latest checkpoint
+message GetLatestCheckpointRequest {
+    string token = 1;
+}
+
+// GetLatestCheckpointResponse returns the latest checkpoint info
+message GetLatestCheckpointResponse {
+    bool has_checkpoint = 1;
+    uint64 block_number = 2;      // Block number where checkpoint was created
+    uint64 state_block = 3;       // Block number of the state in checkpoint
+    string cid = 4;               // IPFS CID of checkpoint
+    bytes checkpoint_hash = 5;    // Hash of checkpoint for validation
+}
+
 // NodeService provides P2P network operations
 service NodeService {
     // Handshake initiates a connection between peers
@@ -213,4 +227,7 @@ service NodeService {
 
     // BroadcastTransaction broadcasts a new transaction to the network
     rpc BroadcastTransaction(BroadcastTransactionRequest) returns (BroadcastTransactionResponse);
+
+    // GetLatestCheckpoint retrieves the latest checkpoint info
+    rpc GetLatestCheckpoint(GetLatestCheckpointRequest) returns (GetLatestCheckpointResponse);
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/bywise/go-bywise/src/checkpoint"
 	"github.com/bywise/go-bywise/src/core"
 	"github.com/bywise/go-bywise/src/miner"
 	pb "github.com/bywise/go-bywise/src/proto/pb"
@@ -248,6 +249,65 @@ func (n *Network) BroadcastBlock(block *core.Block) {
 }
 
 // syncBlocksFromPeer requests and applies missing blocks from a peer
+// syncBlocksWithoutApply downloads and saves blocks without applying state.
+// Used after loading a checkpoint to restore the block chain without modifying
+// the already-applied checkpoint state.
+func (n *Network) syncBlocksWithoutApply(peer *Peer, fromBlock uint64, toBlock uint64) {
+	if n.blockchainHandler == nil {
+		return
+	}
+
+	client := peer.GetClient()
+	if client == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*n.config.Connection.ConnectionTimeout)
+	defer cancel()
+
+	// Request blocks in batches
+	batchSize := uint64(50)
+	for start := fromBlock; start <= toBlock; start += batchSize {
+		end := start + batchSize - 1
+		if end > toBlock {
+			end = toBlock
+		}
+
+		resp, err := client.GetBlocks(ctx, &pb.GetBlocksRequest{
+			Token:      peer.Token,
+			FromNumber: start,
+			ToNumber:   end,
+			Limit:      uint32(batchSize),
+		})
+		if err != nil {
+			log.Printf("[Blockchain] Failed to get blocks %d-%d from %s: %v", start, end, peer.NodeID, err)
+			return
+		}
+
+		// Save blocks without applying state
+		for _, pbBlock := range resp.Blocks {
+			block := pbBlockToCore(pbBlock)
+			if block == nil {
+				continue
+			}
+
+			// Skip if we already have this block
+			_, err := n.blockchainHandler.storage.GetBlockByNumber(block.Header.Number)
+			if err == nil {
+				continue
+			}
+
+			// Just save the block, don't apply state (already applied by checkpoint)
+			if err := n.blockchainHandler.storage.SaveBlock(block); err != nil {
+				log.Printf("[Blockchain] Failed to save block %d: %v", block.Header.Number, err)
+				continue
+			}
+
+			log.Printf("[Blockchain] Saved block %d from %s (no state apply)", block.Header.Number, peer.NodeID)
+		}
+	}
+}
+
 func (n *Network) syncBlocksFromPeer(peer *Peer, fromBlock uint64, toBlock uint64) {
 	if n.blockchainHandler == nil {
 		return
@@ -293,8 +353,8 @@ func (n *Network) syncBlocksFromPeer(peer *Peer, fromBlock uint64, toBlock uint6
 				continue
 			}
 
-			// Validate and apply block
-			if err := n.blockchainHandler.miner.ValidateBlock(block); err != nil {
+			// Validate and apply block (use sync validation which skips timestamp checks)
+			if err := n.blockchainHandler.miner.ValidateBlockForSync(block); err != nil {
 				log.Printf("[Blockchain] Failed to validate block %d: %v", block.Header.Number, err)
 				continue
 			}
@@ -516,4 +576,188 @@ func (n *Network) broadcastTransactionExcept(tx *core.Transaction, exceptNodeID 
 // BroadcastTransaction broadcasts a transaction to all connected peers
 func (n *Network) BroadcastTransaction(tx *core.Transaction) {
 	n.broadcastTransactionExcept(tx, "")
+}
+
+// GetLatestCheckpoint handles latest checkpoint info requests
+func (s *GRPCServer) GetLatestCheckpoint(ctx context.Context, req *pb.GetLatestCheckpointRequest) (*pb.GetLatestCheckpointResponse, error) {
+	// Validate token
+	peer := s.network.GetPeerByToken(req.Token)
+	if peer == nil {
+		return &pb.GetLatestCheckpointResponse{HasCheckpoint: false}, ErrInvalidToken
+	}
+
+	if !s.network.checkRateLimit(peer) {
+		return &pb.GetLatestCheckpointResponse{HasCheckpoint: false}, ErrRateLimitExceeded
+	}
+
+	if s.network.blockchainHandler == nil {
+		return &pb.GetLatestCheckpointResponse{HasCheckpoint: false}, nil
+	}
+
+	// Get latest block
+	latestBlock, err := s.network.blockchainHandler.storage.GetLatestBlock()
+	if err != nil {
+		return &pb.GetLatestCheckpointResponse{HasCheckpoint: false}, nil
+	}
+
+	// Find the most recent checkpoint block
+	latestCheckpointBlock := (latestBlock.Header.Number / core.CheckpointInterval) * core.CheckpointInterval
+	if latestCheckpointBlock == 0 {
+		return &pb.GetLatestCheckpointResponse{HasCheckpoint: false}, nil
+	}
+
+	// Get the checkpoint block
+	checkpointBlock, err := s.network.blockchainHandler.storage.GetBlockByNumber(latestCheckpointBlock)
+	if err != nil || checkpointBlock.Header.CheckpointCID == "" {
+		return &pb.GetLatestCheckpointResponse{HasCheckpoint: false}, nil
+	}
+
+	stateBlock := checkpoint.GetCheckpointStateBlockNumber(latestCheckpointBlock)
+
+	return &pb.GetLatestCheckpointResponse{
+		HasCheckpoint:   true,
+		BlockNumber:     latestCheckpointBlock,
+		StateBlock:      stateBlock,
+		Cid:             checkpointBlock.Header.CheckpointCID,
+		CheckpointHash:  checkpointBlock.Header.CheckpointHash[:],
+	}, nil
+}
+
+// SyncBlockchainFromNetwork performs initial blockchain synchronization
+// It first tries to download the latest checkpoint if available, then syncs remaining blocks
+func (n *Network) SyncBlockchainFromNetwork(ipfsClient checkpoint.IPFSClient) error {
+	if n.blockchainHandler == nil {
+		return nil
+	}
+
+	peers := n.GetConnectedPeers()
+	if len(peers) == 0 {
+		log.Printf("[Blockchain] No peers available for sync")
+		return nil
+	}
+
+	// Get our current state
+	var ourLatestBlock uint64 = 0
+	latestBlock, err := n.blockchainHandler.storage.GetLatestBlock()
+	if err == nil {
+		ourLatestBlock = latestBlock.Header.Number
+	} else if err == storage.ErrNotFound {
+		// Node has no blocks, need to sync from genesis (block 0)
+		ourLatestBlock = 0
+		log.Printf("[Blockchain] No blockchain data found, will sync from genesis")
+	}
+
+	log.Printf("[Blockchain] Starting blockchain sync from block %d", ourLatestBlock)
+
+	// Try to find and download checkpoint from peers
+	var bestCheckpoint *pb.GetLatestCheckpointResponse
+	var bestCheckpointPeer *Peer
+
+	for _, peer := range peers {
+		client := peer.GetClient()
+		if client == nil {
+			continue
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), n.config.Connection.ConnectionTimeout)
+		resp, err := client.GetLatestCheckpoint(ctx, &pb.GetLatestCheckpointRequest{
+			Token: peer.Token,
+		})
+		cancel()
+
+		if err != nil {
+			log.Printf("[Blockchain] Failed to get checkpoint info from %s: %v", peer.NodeID, err)
+			continue
+		}
+
+		if resp.HasCheckpoint && (bestCheckpoint == nil || resp.BlockNumber > bestCheckpoint.BlockNumber) {
+			bestCheckpoint = resp
+			bestCheckpointPeer = peer
+		}
+	}
+
+	// If we found a checkpoint and it's ahead of us, download and apply it
+	if bestCheckpoint != nil && bestCheckpoint.StateBlock > ourLatestBlock && ipfsClient != nil {
+		log.Printf("[Blockchain] Found checkpoint at block %d (state: %d) from %s",
+			bestCheckpoint.BlockNumber, bestCheckpoint.StateBlock, bestCheckpointPeer.NodeID)
+
+		// Create checkpoint manager
+		checkpointMgr := checkpoint.NewCheckpointManager(n.blockchainHandler.storage, ipfsClient)
+
+		// Download and apply checkpoint
+		checkpointHash := core.HashFromBytes(bestCheckpoint.CheckpointHash)
+		if err := checkpointMgr.LoadCheckpoint(bestCheckpoint.Cid, checkpointHash); err != nil {
+			log.Printf("[Blockchain] Failed to load checkpoint: %v", err)
+		} else {
+			log.Printf("[Blockchain] Successfully loaded checkpoint state from block %d", bestCheckpoint.StateBlock)
+
+			// After loading checkpoint state, we need to download blocks 0 through checkpoint block
+			// WITHOUT applying state (since checkpoint already applied state up to StateBlock)
+			// Note: We save blocks up to and including the checkpoint block without applying
+			// because the checkpoint was created AFTER those blocks were already applied
+			log.Printf("[Blockchain] Downloading blocks 0 to %d to restore block chain", bestCheckpoint.BlockNumber)
+			n.syncBlocksWithoutApply(bestCheckpointPeer, 0, bestCheckpoint.BlockNumber)
+			ourLatestBlock = bestCheckpoint.BlockNumber
+		}
+	}
+
+	// Find the peer with the highest block number
+	var highestBlockNumber uint64
+	var bestPeer *Peer
+
+	for _, peer := range peers {
+		client := peer.GetClient()
+		if client == nil {
+			continue
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), n.config.Connection.ConnectionTimeout)
+		resp, err := client.GetLatestBlock(ctx, &pb.GetLatestBlockRequest{
+			Token: peer.Token,
+		})
+		cancel()
+
+		if err != nil {
+			log.Printf("[Blockchain] Failed to get latest block from %s: %v", peer.NodeID, err)
+			continue
+		}
+
+		if resp.Number > highestBlockNumber {
+			highestBlockNumber = resp.Number
+			bestPeer = peer
+		}
+	}
+
+	// Sync remaining blocks from the best peer
+	if bestPeer != nil && highestBlockNumber >= ourLatestBlock {
+		// If we have no blocks, start from 0 (genesis)
+		startBlock := ourLatestBlock
+		if ourLatestBlock == 0 {
+			_, err := n.blockchainHandler.storage.GetLatestBlock()
+			if err == storage.ErrNotFound {
+				// No blocks at all, sync from genesis
+				startBlock = 0
+			} else {
+				// Have genesis, start from next
+				startBlock = 1
+			}
+		} else {
+			// Have blocks, continue from next
+			startBlock = ourLatestBlock + 1
+		}
+
+		if startBlock <= highestBlockNumber {
+			log.Printf("[Blockchain] Syncing blocks %d to %d from %s",
+				startBlock, highestBlockNumber, bestPeer.NodeID)
+			n.syncBlocksFromPeer(bestPeer, startBlock, highestBlockNumber)
+		}
+	}
+
+	// Get final state
+	finalBlock, err := n.blockchainHandler.storage.GetLatestBlock()
+	if err == nil {
+		log.Printf("[Blockchain] Sync complete. Current block: %d", finalBlock.Header.Number)
+	}
+
+	return nil
 }

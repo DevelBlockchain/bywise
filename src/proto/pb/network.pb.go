@@ -1502,6 +1502,128 @@ func (x *BroadcastTransactionResponse) GetTxId() string {
 	return ""
 }
 
+// GetLatestCheckpointRequest requests the latest checkpoint
+type GetLatestCheckpointRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetLatestCheckpointRequest) Reset() {
+	*x = GetLatestCheckpointRequest{}
+	mi := &file_src_proto_network_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetLatestCheckpointRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLatestCheckpointRequest) ProtoMessage() {}
+
+func (x *GetLatestCheckpointRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_src_proto_network_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLatestCheckpointRequest.ProtoReflect.Descriptor instead.
+func (*GetLatestCheckpointRequest) Descriptor() ([]byte, []int) {
+	return file_src_proto_network_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetLatestCheckpointRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+// GetLatestCheckpointResponse returns the latest checkpoint info
+type GetLatestCheckpointResponse struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	HasCheckpoint  bool                   `protobuf:"varint,1,opt,name=has_checkpoint,json=hasCheckpoint,proto3" json:"has_checkpoint,omitempty"`
+	BlockNumber    uint64                 `protobuf:"varint,2,opt,name=block_number,json=blockNumber,proto3" json:"block_number,omitempty"`         // Block number where checkpoint was created
+	StateBlock     uint64                 `protobuf:"varint,3,opt,name=state_block,json=stateBlock,proto3" json:"state_block,omitempty"`            // Block number of the state in checkpoint
+	Cid            string                 `protobuf:"bytes,4,opt,name=cid,proto3" json:"cid,omitempty"`                                             // IPFS CID of checkpoint
+	CheckpointHash []byte                 `protobuf:"bytes,5,opt,name=checkpoint_hash,json=checkpointHash,proto3" json:"checkpoint_hash,omitempty"` // Hash of checkpoint for validation
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetLatestCheckpointResponse) Reset() {
+	*x = GetLatestCheckpointResponse{}
+	mi := &file_src_proto_network_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetLatestCheckpointResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLatestCheckpointResponse) ProtoMessage() {}
+
+func (x *GetLatestCheckpointResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_src_proto_network_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLatestCheckpointResponse.ProtoReflect.Descriptor instead.
+func (*GetLatestCheckpointResponse) Descriptor() ([]byte, []int) {
+	return file_src_proto_network_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *GetLatestCheckpointResponse) GetHasCheckpoint() bool {
+	if x != nil {
+		return x.HasCheckpoint
+	}
+	return false
+}
+
+func (x *GetLatestCheckpointResponse) GetBlockNumber() uint64 {
+	if x != nil {
+		return x.BlockNumber
+	}
+	return 0
+}
+
+func (x *GetLatestCheckpointResponse) GetStateBlock() uint64 {
+	if x != nil {
+		return x.StateBlock
+	}
+	return 0
+}
+
+func (x *GetLatestCheckpointResponse) GetCid() string {
+	if x != nil {
+		return x.Cid
+	}
+	return ""
+}
+
+func (x *GetLatestCheckpointResponse) GetCheckpointHash() []byte {
+	if x != nil {
+		return x.CheckpointHash
+	}
+	return nil
+}
+
 var File_src_proto_network_proto protoreflect.FileDescriptor
 
 const file_src_proto_network_proto_rawDesc = "" +
@@ -1621,7 +1743,16 @@ const file_src_proto_network_proto_rawDesc = "" +
 	"\x1cBroadcastTransactionResponse\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x13\n" +
-	"\x05tx_id\x18\x03 \x01(\tR\x04txId2\xe8\x05\n" +
+	"\x05tx_id\x18\x03 \x01(\tR\x04txId\"2\n" +
+	"\x1aGetLatestCheckpointRequest\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\xc3\x01\n" +
+	"\x1bGetLatestCheckpointResponse\x12%\n" +
+	"\x0ehas_checkpoint\x18\x01 \x01(\bR\rhasCheckpoint\x12!\n" +
+	"\fblock_number\x18\x02 \x01(\x04R\vblockNumber\x12\x1f\n" +
+	"\vstate_block\x18\x03 \x01(\x04R\n" +
+	"stateBlock\x12\x10\n" +
+	"\x03cid\x18\x04 \x01(\tR\x03cid\x12'\n" +
+	"\x0fcheckpoint_hash\x18\x05 \x01(\fR\x0echeckpointHash2\xca\x06\n" +
 	"\vNodeService\x12B\n" +
 	"\tHandshake\x12\x19.network.HandshakeRequest\x1a\x1a.network.HandshakeResponse\x12?\n" +
 	"\bGetPeers\x12\x18.network.GetPeersRequest\x1a\x19.network.GetPeersResponse\x123\n" +
@@ -1633,7 +1764,8 @@ const file_src_proto_network_proto_rawDesc = "" +
 	"\bGetBlock\x12\x18.network.GetBlockRequest\x1a\x19.network.GetBlockResponse\x12B\n" +
 	"\tGetBlocks\x12\x19.network.GetBlocksRequest\x1a\x1a.network.GetBlocksResponse\x12Q\n" +
 	"\x0eGetLatestBlock\x12\x1e.network.GetLatestBlockRequest\x1a\x1f.network.GetLatestBlockResponse\x12c\n" +
-	"\x14BroadcastTransaction\x12$.network.BroadcastTransactionRequest\x1a%.network.BroadcastTransactionResponseB*Z(github.com/bywise/go-bywise/src/proto/pbb\x06proto3"
+	"\x14BroadcastTransaction\x12$.network.BroadcastTransactionRequest\x1a%.network.BroadcastTransactionResponse\x12`\n" +
+	"\x13GetLatestCheckpoint\x12#.network.GetLatestCheckpointRequest\x1a$.network.GetLatestCheckpointResponseB*Z(github.com/bywise/go-bywise/src/proto/pbb\x06proto3"
 
 var (
 	file_src_proto_network_proto_rawDescOnce sync.Once
@@ -1647,7 +1779,7 @@ func file_src_proto_network_proto_rawDescGZIP() []byte {
 	return file_src_proto_network_proto_rawDescData
 }
 
-var file_src_proto_network_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_src_proto_network_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_src_proto_network_proto_goTypes = []any{
 	(*PeerInfo)(nil),                     // 0: network.PeerInfo
 	(*HandshakeRequest)(nil),             // 1: network.HandshakeRequest
@@ -1672,14 +1804,16 @@ var file_src_proto_network_proto_goTypes = []any{
 	(*GetLatestBlockResponse)(nil),       // 20: network.GetLatestBlockResponse
 	(*BroadcastTransactionRequest)(nil),  // 21: network.BroadcastTransactionRequest
 	(*BroadcastTransactionResponse)(nil), // 22: network.BroadcastTransactionResponse
-	nil,                                  // 23: network.Transaction.ReadSetEntry
-	nil,                                  // 24: network.Transaction.WriteSetEntry
+	(*GetLatestCheckpointRequest)(nil),   // 23: network.GetLatestCheckpointRequest
+	(*GetLatestCheckpointResponse)(nil),  // 24: network.GetLatestCheckpointResponse
+	nil,                                  // 25: network.Transaction.ReadSetEntry
+	nil,                                  // 26: network.Transaction.WriteSetEntry
 }
 var file_src_proto_network_proto_depIdxs = []int32{
 	0,  // 0: network.GetPeersResponse.peers:type_name -> network.PeerInfo
 	12, // 1: network.Block.transactions:type_name -> network.Transaction
-	23, // 2: network.Transaction.read_set:type_name -> network.Transaction.ReadSetEntry
-	24, // 3: network.Transaction.write_set:type_name -> network.Transaction.WriteSetEntry
+	25, // 2: network.Transaction.read_set:type_name -> network.Transaction.ReadSetEntry
+	26, // 3: network.Transaction.write_set:type_name -> network.Transaction.WriteSetEntry
 	11, // 4: network.BroadcastBlockRequest.block:type_name -> network.Block
 	11, // 5: network.GetBlockResponse.block:type_name -> network.Block
 	11, // 6: network.GetBlocksResponse.blocks:type_name -> network.Block
@@ -1694,18 +1828,20 @@ var file_src_proto_network_proto_depIdxs = []int32{
 	17, // 15: network.NodeService.GetBlocks:input_type -> network.GetBlocksRequest
 	19, // 16: network.NodeService.GetLatestBlock:input_type -> network.GetLatestBlockRequest
 	21, // 17: network.NodeService.BroadcastTransaction:input_type -> network.BroadcastTransactionRequest
-	2,  // 18: network.NodeService.Handshake:output_type -> network.HandshakeResponse
-	4,  // 19: network.NodeService.GetPeers:output_type -> network.GetPeersResponse
-	6,  // 20: network.NodeService.Ping:output_type -> network.PingResponse
-	8,  // 21: network.NodeService.Disconnect:output_type -> network.DisconnectResponse
-	10, // 22: network.NodeService.Request:output_type -> network.AuthenticatedResponse
-	14, // 23: network.NodeService.BroadcastBlock:output_type -> network.BroadcastBlockResponse
-	16, // 24: network.NodeService.GetBlock:output_type -> network.GetBlockResponse
-	18, // 25: network.NodeService.GetBlocks:output_type -> network.GetBlocksResponse
-	20, // 26: network.NodeService.GetLatestBlock:output_type -> network.GetLatestBlockResponse
-	22, // 27: network.NodeService.BroadcastTransaction:output_type -> network.BroadcastTransactionResponse
-	18, // [18:28] is the sub-list for method output_type
-	8,  // [8:18] is the sub-list for method input_type
+	23, // 18: network.NodeService.GetLatestCheckpoint:input_type -> network.GetLatestCheckpointRequest
+	2,  // 19: network.NodeService.Handshake:output_type -> network.HandshakeResponse
+	4,  // 20: network.NodeService.GetPeers:output_type -> network.GetPeersResponse
+	6,  // 21: network.NodeService.Ping:output_type -> network.PingResponse
+	8,  // 22: network.NodeService.Disconnect:output_type -> network.DisconnectResponse
+	10, // 23: network.NodeService.Request:output_type -> network.AuthenticatedResponse
+	14, // 24: network.NodeService.BroadcastBlock:output_type -> network.BroadcastBlockResponse
+	16, // 25: network.NodeService.GetBlock:output_type -> network.GetBlockResponse
+	18, // 26: network.NodeService.GetBlocks:output_type -> network.GetBlocksResponse
+	20, // 27: network.NodeService.GetLatestBlock:output_type -> network.GetLatestBlockResponse
+	22, // 28: network.NodeService.BroadcastTransaction:output_type -> network.BroadcastTransactionResponse
+	24, // 29: network.NodeService.GetLatestCheckpoint:output_type -> network.GetLatestCheckpointResponse
+	19, // [19:30] is the sub-list for method output_type
+	8,  // [8:19] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -1722,7 +1858,7 @@ func file_src_proto_network_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_src_proto_network_proto_rawDesc), len(file_src_proto_network_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

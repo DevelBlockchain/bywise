@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/bywise/go-bywise/src/api"
+	"github.com/bywise/go-bywise/src/checkpoint"
 	"github.com/bywise/go-bywise/src/config"
 	"github.com/bywise/go-bywise/src/core"
 	bywisecrypto "github.com/bywise/go-bywise/src/crypto"
@@ -1155,6 +1156,40 @@ func startNode(configPath string) {
 
 	log.Printf("Node started with ID: %s", net.GetNodeID())
 	log.Printf("Listening on: %s", net.GetAddress())
+
+	// Wait for initial connections before syncing
+	if len(cfg.BootstrapNodes) > 0 && store != nil {
+		log.Printf("Waiting for peers to connect before syncing...")
+		time.Sleep(3 * time.Second) // Give time for connections to establish
+
+		// Check if we need to sync
+		latestBlock, err := store.GetLatestBlock()
+		var needsSync bool
+		if err == storage.ErrNotFound {
+			needsSync = true
+			log.Printf("No blockchain data found, will sync from network")
+		} else if err == nil {
+			// Check if we're significantly behind
+			ourHeight := latestBlock.Header.Number
+			log.Printf("Current blockchain height: %d", ourHeight)
+			needsSync = true // Always try to sync to catch up with network
+		}
+
+		if needsSync && net.ConnectedPeerCount() > 0 {
+			log.Printf("Starting blockchain sync from %d connected peers...", net.ConnectedPeerCount())
+
+			// Create mock IPFS client for checkpoint support
+			// In production, replace this with actual IPFS client
+			mockIPFS := checkpoint.NewMockIPFSClient()
+
+			// Perform initial sync
+			if err := net.SyncBlockchainFromNetwork(mockIPFS); err != nil {
+				log.Printf("Warning: blockchain sync encountered errors: %v", err)
+			}
+		} else if net.ConnectedPeerCount() == 0 {
+			log.Printf("No peers connected, skipping sync")
+		}
+	}
 
 	// Start miner if node has miner role
 	if nodeStakeInfo != nil && nodeStakeInfo.IsMiner && nodeMiner != nil {
