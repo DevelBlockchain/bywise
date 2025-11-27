@@ -1090,7 +1090,7 @@
             resultEl.classList.add('hidden');
 
             try {
-                // Use the simplified /validator/send endpoint
+                // Use the /validator/send endpoint
                 // This executes, signs with node's wallet, and broadcasts in one call
                 const response = await api('/validator/send', {
                     method: 'POST',

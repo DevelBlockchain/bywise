@@ -1216,8 +1216,9 @@ func startNode(configPath string) {
 			apiServer.RegisterBlockchainAPI(blockchainAPI)
 		}
 
-		// Register validator routes if node has validator role
-		if nodeStakeInfo != nil && nodeStakeInfo.IsValidator && store != nil {
+		// Register validator routes (available on all nodes for wallet operations)
+		// Even nodes without stake can use validator endpoints for sending transactions
+		if store != nil {
 			// ChainID 1 is the default (mainnet). This can be made configurable in the future.
 			validator, err := executor.NewValidator(store, nodeWallet, 1)
 			if err != nil {

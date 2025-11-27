@@ -699,7 +699,7 @@ func (v *ValidatorAPI) handleSendTransaction(w http.ResponseWriter, r *http.Requ
 	if v.validator == nil {
 		v.jsonResponse(w, SendTransactionResponse{
 			Success: false,
-			Error:   "validator not enabled",
+			Error:   "this node doesn't have validator capabilities (no stake) - to send transactions, you need to either: 1) Add stake to this node to enable validator role, or 2) Use a node that has validator stake enabled",
 		})
 		return
 	}
