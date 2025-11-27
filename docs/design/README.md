@@ -1,1 +1,0 @@
-# Bywise design
