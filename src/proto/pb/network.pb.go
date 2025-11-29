@@ -818,19 +818,20 @@ type Transaction struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    []byte                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	// User Proposal (signed by user before sending to validator)
-	Validator  []byte `protobuf:"bytes,2,opt,name=validator,proto3" json:"validator,omitempty"` // Validator chosen to process this transaction
-	From       []byte `protobuf:"bytes,3,opt,name=from,proto3" json:"from,omitempty"`
-	To         []byte `protobuf:"bytes,4,opt,name=to,proto3" json:"to,omitempty"`
-	Value      []byte `protobuf:"bytes,5,opt,name=value,proto3" json:"value,omitempty"`
-	Nonce      []byte `protobuf:"bytes,6,opt,name=nonce,proto3" json:"nonce,omitempty"`                              // Replay protection - unique per (From, Nonce) pair
-	BlockLimit uint64 `protobuf:"varint,7,opt,name=block_limit,json=blockLimit,proto3" json:"block_limit,omitempty"` // Transaction expires after this block (0 = no limit)
-	Data       []byte `protobuf:"bytes,8,opt,name=data,proto3" json:"data,omitempty"`
-	UserSig    []byte `protobuf:"bytes,9,opt,name=user_sig,json=userSig,proto3" json:"user_sig,omitempty"` // User signature (authorizes the proposal)
+	TxType     uint32 `protobuf:"varint,2,opt,name=tx_type,json=txType,proto3" json:"tx_type,omitempty"` // Transaction type (0 = transfer, 1 = contract call, etc)
+	Validator  []byte `protobuf:"bytes,3,opt,name=validator,proto3" json:"validator,omitempty"`          // Validator chosen to process this transaction
+	From       []byte `protobuf:"bytes,4,opt,name=from,proto3" json:"from,omitempty"`
+	To         []byte `protobuf:"bytes,5,opt,name=to,proto3" json:"to,omitempty"`
+	Value      []byte `protobuf:"bytes,6,opt,name=value,proto3" json:"value,omitempty"`
+	Nonce      []byte `protobuf:"bytes,7,opt,name=nonce,proto3" json:"nonce,omitempty"`                              // Replay protection - unique per (From, Nonce) pair
+	BlockLimit uint64 `protobuf:"varint,8,opt,name=block_limit,json=blockLimit,proto3" json:"block_limit,omitempty"` // Transaction expires after this block (0 = no limit)
+	Data       []byte `protobuf:"bytes,9,opt,name=data,proto3" json:"data,omitempty"`
+	UserSig    []byte `protobuf:"bytes,10,opt,name=user_sig,json=userSig,proto3" json:"user_sig,omitempty"` // User signature (authorizes the proposal)
 	// Execution Evidence (filled by Validator after execution)
-	SequenceId    uint64            `protobuf:"varint,10,opt,name=sequence_id,json=sequenceId,proto3" json:"sequence_id,omitempty"`
-	ReadSet       map[string][]byte `protobuf:"bytes,11,rep,name=read_set,json=readSet,proto3" json:"read_set,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`    // Dependencies: keys AND values read
-	WriteSet      map[string][]byte `protobuf:"bytes,12,rep,name=write_set,json=writeSet,proto3" json:"write_set,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // State changes (key -> new value)
-	ValidatorSig  []byte            `protobuf:"bytes,13,opt,name=validator_sig,json=validatorSig,proto3" json:"validator_sig,omitempty"`                                                               // Validator signature (confirms execution)
+	SequenceId    uint64            `protobuf:"varint,11,opt,name=sequence_id,json=sequenceId,proto3" json:"sequence_id,omitempty"`
+	ReadSet       map[string][]byte `protobuf:"bytes,12,rep,name=read_set,json=readSet,proto3" json:"read_set,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`    // Dependencies: keys AND values read
+	WriteSet      map[string][]byte `protobuf:"bytes,13,rep,name=write_set,json=writeSet,proto3" json:"write_set,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // State changes (key -> new value)
+	ValidatorSig  []byte            `protobuf:"bytes,14,opt,name=validator_sig,json=validatorSig,proto3" json:"validator_sig,omitempty"`                                                               // Validator signature (confirms execution)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -870,6 +871,13 @@ func (x *Transaction) GetId() []byte {
 		return x.Id
 	}
 	return nil
+}
+
+func (x *Transaction) GetTxType() uint32 {
+	if x != nil {
+		return x.TxType
+	}
+	return 0
 }
 
 func (x *Transaction) GetValidator() []byte {
@@ -1687,24 +1695,25 @@ const file_src_proto_network_proto_rawDesc = "" +
 	"\x0fcheckpoint_hash\x18\b \x01(\fR\x0echeckpointHash\x128\n" +
 	"\ftransactions\x18\t \x03(\v2\x14.network.TransactionR\ftransactions\x12\x1b\n" +
 	"\tminer_sig\x18\n" +
-	" \x01(\fR\bminerSig\"\x99\x04\n" +
+	" \x01(\fR\bminerSig\"\xb2\x04\n" +
 	"\vTransaction\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\fR\x02id\x12\x1c\n" +
-	"\tvalidator\x18\x02 \x01(\fR\tvalidator\x12\x12\n" +
-	"\x04from\x18\x03 \x01(\fR\x04from\x12\x0e\n" +
-	"\x02to\x18\x04 \x01(\fR\x02to\x12\x14\n" +
-	"\x05value\x18\x05 \x01(\fR\x05value\x12\x14\n" +
-	"\x05nonce\x18\x06 \x01(\fR\x05nonce\x12\x1f\n" +
-	"\vblock_limit\x18\a \x01(\x04R\n" +
+	"\x02id\x18\x01 \x01(\fR\x02id\x12\x17\n" +
+	"\atx_type\x18\x02 \x01(\rR\x06txType\x12\x1c\n" +
+	"\tvalidator\x18\x03 \x01(\fR\tvalidator\x12\x12\n" +
+	"\x04from\x18\x04 \x01(\fR\x04from\x12\x0e\n" +
+	"\x02to\x18\x05 \x01(\fR\x02to\x12\x14\n" +
+	"\x05value\x18\x06 \x01(\fR\x05value\x12\x14\n" +
+	"\x05nonce\x18\a \x01(\fR\x05nonce\x12\x1f\n" +
+	"\vblock_limit\x18\b \x01(\x04R\n" +
 	"blockLimit\x12\x12\n" +
-	"\x04data\x18\b \x01(\fR\x04data\x12\x19\n" +
-	"\buser_sig\x18\t \x01(\fR\auserSig\x12\x1f\n" +
-	"\vsequence_id\x18\n" +
-	" \x01(\x04R\n" +
+	"\x04data\x18\t \x01(\fR\x04data\x12\x19\n" +
+	"\buser_sig\x18\n" +
+	" \x01(\fR\auserSig\x12\x1f\n" +
+	"\vsequence_id\x18\v \x01(\x04R\n" +
 	"sequenceId\x12<\n" +
-	"\bread_set\x18\v \x03(\v2!.network.Transaction.ReadSetEntryR\areadSet\x12?\n" +
-	"\twrite_set\x18\f \x03(\v2\".network.Transaction.WriteSetEntryR\bwriteSet\x12#\n" +
-	"\rvalidator_sig\x18\r \x01(\fR\fvalidatorSig\x1a:\n" +
+	"\bread_set\x18\f \x03(\v2!.network.Transaction.ReadSetEntryR\areadSet\x12?\n" +
+	"\twrite_set\x18\r \x03(\v2\".network.Transaction.WriteSetEntryR\bwriteSet\x12#\n" +
+	"\rvalidator_sig\x18\x0e \x01(\fR\fvalidatorSig\x1a:\n" +
 	"\fReadSetEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\x1a;\n" +

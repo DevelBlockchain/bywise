@@ -27,6 +27,7 @@ func TestTransactionConversion(t *testing.T) {
 
 	// Create transaction
 	tx := core.NewTransactionProposal(
+		0,
 		validatorAddr,
 		userAddr,
 		recipientAddr,
@@ -136,7 +137,7 @@ func TestTransactionConversion_BackwardCompatibility(t *testing.T) {
 
 	// Create transaction
 	tx := core.NewTransactionProposal(
-		validatorAddr, userAddr, core.Address{0x02},
+		0, validatorAddr, userAddr, core.Address{0x02},
 		core.NewBigInt(100), core.NewBigInt(1), 0,
 		[]byte("test"),
 	)

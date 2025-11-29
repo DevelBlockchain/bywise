@@ -26,11 +26,12 @@ type Transaction struct {
 	ID Hash
 
 	// User Proposal (signed by user before sending to validator)
+	TxType     uint8   // Transaction type (0 = transfer, 1 = contract call, etc)
 	Validator  Address // Validator chosen to process this transaction
 	From       Address // Sender address
 	To         Address // Recipient address (can be empty for contract creation)
-	Value      *BigInt // Amount to transfer
-	Nonce      *BigInt // Replay protection - unique per (From, Nonce) pair
+	Value      *BigInt // Amount to transfer (uint256)
+	Nonce      *BigInt // Replay protection - unique per (From, Nonce) pair (uint256)
 	BlockLimit uint64  // Transaction expires after this block number (0 = no limit)
 	Data       []byte  // EVM CallData
 	UserSig    []byte  // User signature (authorizes the proposal)
@@ -45,7 +46,7 @@ type Transaction struct {
 // NewTransactionProposal creates a new transaction proposal to be signed by the user.
 // This is the first step in the 2-step transaction flow.
 // blockLimit specifies the maximum block number for inclusion (0 = no limit).
-func NewTransactionProposal(validator, from, to Address, value, nonce *BigInt, blockLimit uint64, data []byte) *Transaction {
+func NewTransactionProposal(txType uint8, validator, from, to Address, value, nonce *BigInt, blockLimit uint64, data []byte) *Transaction {
 	if value == nil {
 		value = NewBigInt(0)
 	}
@@ -53,6 +54,7 @@ func NewTransactionProposal(validator, from, to Address, value, nonce *BigInt, b
 		nonce = NewBigInt(0)
 	}
 	return &Transaction{
+		TxType:     txType,
 		Validator:  validator,
 		From:       from,
 		To:         to,
@@ -93,10 +95,11 @@ func (tx *Transaction) SetExecutionEvidence(sequenceID uint64, readSet map[strin
 // HashForUserSigning returns the hash that the user signs (the proposal).
 // This is signed FIRST by the user before sending to the validator.
 // This is also the "ProposalHash" - used to detect duplicate nonces.
-// Includes: Validator, From, To, Value, Nonce, BlockLimit, Data
+// Includes: TxType, Validator, From, To, Value, Nonce, BlockLimit, Data
 func (tx *Transaction) HashForUserSigning() []byte {
 	var buf bytes.Buffer
 
+	buf.WriteByte(tx.TxType)
 	buf.Write(tx.Validator[:])
 	buf.Write(tx.From[:])
 	buf.Write(tx.To[:])
@@ -415,6 +418,7 @@ func sortMapKeys(m map[string][]byte) []string {
 // transactionJSON is used for JSON marshaling with hex-encoded keys
 type transactionJSON struct {
 	ID           Hash              `json:"id"`
+	TxType       uint8             `json:"txType"`
 	Validator    Address           `json:"validator"`
 	From         Address           `json:"from"`
 	To           Address           `json:"to"`
@@ -448,6 +452,7 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 
 	return json.Marshal(&transactionJSON{
 		ID:           tx.ID,
+		TxType:       tx.TxType,
 		Validator:    tx.Validator,
 		From:         tx.From,
 		To:           tx.To,
@@ -508,6 +513,7 @@ func (tx *Transaction) UnmarshalJSON(data []byte) error {
 
 	// Populate transaction
 	tx.ID = txJSON.ID
+	tx.TxType = txJSON.TxType
 	tx.Validator = txJSON.Validator
 	tx.From = txJSON.From
 	tx.To = txJSON.To

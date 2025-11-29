@@ -128,7 +128,7 @@ func TestAddPendingTransaction(t *testing.T) {
 	toAddr := core.Address{0x02}
 
 	// Create transaction proposal
-	tx := core.NewTransactionProposal(validatorAddr, fromAddr, toAddr, core.NewBigInt(100), core.NewBigInt(1), 0, nil)
+	tx := core.NewTransactionProposal(0, validatorAddr, fromAddr, toAddr, core.NewBigInt(100), core.NewBigInt(1), 0, nil)
 	// User signs first
 	tx.SignAsUser(userWallet)
 	// Validator executes and sets evidence
@@ -167,7 +167,7 @@ func TestAddConflictingTransaction(t *testing.T) {
 	store.SetState(conflictKey, initialState)
 
 	// First transaction using 2-step flow
-	tx1 := core.NewTransactionProposal(validatorAddr, fromAddr, toAddr, core.NewBigInt(100), core.NewBigInt(1), 0, nil)
+	tx1 := core.NewTransactionProposal(0, validatorAddr, fromAddr, toAddr, core.NewBigInt(100), core.NewBigInt(1), 0, nil)
 	tx1.SignAsUser(userWallet)
 	tx1.SetExecutionEvidence(1, map[string][]byte{
 		string(conflictKey): initialState, // Must match DB state
@@ -177,7 +177,7 @@ func TestAddConflictingTransaction(t *testing.T) {
 	tx1.SignAsValidator(validatorWallet)
 
 	// Second transaction with same write key using 2-step flow
-	tx2 := core.NewTransactionProposal(validatorAddr, fromAddr, toAddr, core.NewBigInt(50), core.NewBigInt(2), 0, nil)
+	tx2 := core.NewTransactionProposal(0, validatorAddr, fromAddr, toAddr, core.NewBigInt(50), core.NewBigInt(2), 0, nil)
 	tx2.SignAsUser(userWallet)
 	tx2.SetExecutionEvidence(2, map[string][]byte{
 		string(conflictKey): initialState, // Must match DB state
@@ -330,7 +330,7 @@ func TestRemoveTransactions(t *testing.T) {
 	txs := make([]*core.Transaction, 3)
 	for i := 0; i < 3; i++ {
 		toAddr := core.Address{byte(i + 1)}
-		tx := core.NewTransactionProposal(validatorAddr, fromAddr, toAddr, core.NewBigInt(int64(i*100)), core.NewBigInt(int64(i+1)), 0, nil)
+		tx := core.NewTransactionProposal(0, validatorAddr, fromAddr, toAddr, core.NewBigInt(int64(i*100)), core.NewBigInt(int64(i+1)), 0, nil)
 		tx.SignAsUser(userWallet)
 		tx.SetExecutionEvidence(uint64(i), map[string][]byte{}, map[string][]byte{})
 		tx.SignAsValidator(validatorWallet)

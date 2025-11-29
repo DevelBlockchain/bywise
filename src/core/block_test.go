@@ -22,7 +22,7 @@ func createSignedTransaction(t *testing.T, from, to Address, value int64) *Trans
 	validatorAddr, _ := AddressFromHex(validatorWallet.Address())
 
 	// Create transaction proposal with new flow (blockLimit=0 means no expiration)
-	tx := NewTransactionProposal(validatorAddr, fromAddr, to, NewBigInt(value), NewBigInt(1), 0, nil)
+	tx := NewTransactionProposal(0, validatorAddr, fromAddr, to, NewBigInt(value), NewBigInt(1), 0, nil)
 
 	// User signs first (new 2-step flow)
 	if err := tx.SignAsUser(userWallet); err != nil {

@@ -784,6 +784,7 @@ func (v *ValidatorAPI) handleSendTransaction(w http.ResponseWriter, r *http.Requ
 
 	// Create transaction proposal
 	tx := core.NewTransactionProposal(
+		0,         // TxType (0 = transfer)
 		from,      // Validator
 		from,      // From (same as validator for self-send)
 		to,        // To

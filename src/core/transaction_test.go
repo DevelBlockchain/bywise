@@ -36,7 +36,7 @@ func TestNewTransactionProposal(t *testing.T) {
 	nonce := NewBigInt(5)
 	data := []byte("test data")
 
-	tx := NewTransactionProposal(validator, from, to, value, nonce, 0, data)
+	tx := NewTransactionProposal(0, validator, from, to, value, nonce, 0, data)
 
 	if tx.Validator != validator {
 		t.Error("Validator address mismatch")
@@ -76,7 +76,7 @@ func TestTransactionSigningFlow(t *testing.T) {
 	toAddr := Address{0x02, 0x03, 0x04}
 
 	// Create transaction proposal
-	tx := NewTransactionProposal(validatorAddr, fromAddr, toAddr, NewBigInt(1000), NewBigInt(1), 0, []byte("transfer"))
+	tx := NewTransactionProposal(0, validatorAddr, fromAddr, toAddr, NewBigInt(1000), NewBigInt(1), 0, []byte("transfer"))
 
 	// User signs the proposal first (new flow)
 	err = tx.SignAsUser(userWallet)
@@ -131,7 +131,7 @@ func TestTransactionWrongUserAddress(t *testing.T) {
 	validatorAddr := Address{0x99}
 	toAddr := Address{0x02}
 
-	tx := NewTransactionProposal(validatorAddr, fromAddr, toAddr, NewBigInt(100), NewBigInt(0), 0, nil)
+	tx := NewTransactionProposal(0, validatorAddr, fromAddr, toAddr, NewBigInt(100), NewBigInt(0), 0, nil)
 
 	// Try to sign with wrong wallet
 	err := tx.SignAsUser(otherWallet)
@@ -149,7 +149,7 @@ func TestTransactionWrongValidatorAddress(t *testing.T) {
 	validatorAddr, _ := AddressFromHex(validatorWallet.Address())
 	toAddr := Address{0x02}
 
-	tx := NewTransactionProposal(validatorAddr, fromAddr, toAddr, NewBigInt(100), NewBigInt(0), 0, nil)
+	tx := NewTransactionProposal(0, validatorAddr, fromAddr, toAddr, NewBigInt(100), NewBigInt(0), 0, nil)
 
 	// User signs first
 	tx.SignAsUser(userWallet)
@@ -228,8 +228,8 @@ func TestTransactionHashDeterminism(t *testing.T) {
 	to := Address{0x02}
 
 	// Create two identical transactions
-	tx1 := NewTransactionProposal(validator, from, to, NewBigInt(1000), NewBigInt(1), 0, []byte("data"))
-	tx2 := NewTransactionProposal(validator, from, to, NewBigInt(1000), NewBigInt(1), 0, []byte("data"))
+	tx1 := NewTransactionProposal(0, validator, from, to, NewBigInt(1000), NewBigInt(1), 0, []byte("data"))
+	tx2 := NewTransactionProposal(0, validator, from, to, NewBigInt(1000), NewBigInt(1), 0, []byte("data"))
 
 	tx1.SetExecutionEvidence(1, map[string][]byte{
 		string(MakeAccountKey(from)): []byte("balance"),
@@ -251,7 +251,7 @@ func TestTransactionHashDeterminism(t *testing.T) {
 	}
 
 	// Different data should produce different hashes
-	tx3 := NewTransactionProposal(validator, from, to, NewBigInt(1001), NewBigInt(1), 0, []byte("data"))
+	tx3 := NewTransactionProposal(0, validator, from, to, NewBigInt(1001), NewBigInt(1), 0, []byte("data"))
 	tx3.SetExecutionEvidence(1, map[string][]byte{
 		string(MakeAccountKey(from)): []byte("balance"),
 	}, map[string][]byte{

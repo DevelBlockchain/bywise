@@ -46,6 +46,7 @@ func NewValidator(store *storage.Storage, w *wallet.Wallet, chainID uint64) (*Va
 // TransactionProposal contains the user's signed transaction proposal
 // This is the input for the new 2-step flow where user signs first
 type TransactionProposal struct {
+	TxType     uint8        // Transaction type (0 = transfer, 1 = contract call, etc)
 	Validator  core.Address // Validator chosen to process
 	From       core.Address
 	To         core.Address // Empty for contract creation
@@ -247,6 +248,7 @@ func (v *Validator) executeCallWithEVM(evm *EVM, stateDB *StateDB, from, to core
 func (v *Validator) ProcessProposal(proposal *TransactionProposal, sequenceID uint64) (*core.Transaction, error) {
 	// Create transaction from proposal
 	tx := core.NewTransactionProposal(
+		proposal.TxType,
 		proposal.Validator,
 		proposal.From,
 		proposal.To,
