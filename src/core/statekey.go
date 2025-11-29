@@ -9,7 +9,6 @@ const (
 	KeyTypeAccount      byte = 0x01 // Balance and Nonce
 	KeyTypeStorage      byte = 0x02 // EVM memory slots
 	KeyTypeCode         byte = 0x03 // Compiled contract code
-	KeyTypeStake        byte = 0x04 // Stake value, status, rewards
 	KeyTypeWalletConfig byte = 0x05 // Arbitrary wallet configurations
 )
 
@@ -88,15 +87,6 @@ func MakeCodeKey(contractAddress Address) StateKey {
 	return k
 }
 
-// MakeStakeKey creates a key for staking data
-// Format: 0x04 + Address (21 bytes total)
-func MakeStakeKey(address Address) StateKey {
-	k := make([]byte, 21)
-	k[0] = KeyTypeStake
-	copy(k[1:], address[:])
-	return k
-}
-
 // MakeWalletConfigKey creates a key for wallet configuration
 // Format: 0x05 + Address (21 bytes total)
 func MakeWalletConfigKey(address Address) StateKey {
@@ -125,14 +115,6 @@ func ParseStorageKey(k StateKey) (Address, Hash, bool) {
 // ParseCodeKey extracts the address from a code key
 func ParseCodeKey(k StateKey) (Address, bool) {
 	if len(k) != 21 || k[0] != KeyTypeCode {
-		return Address{}, false
-	}
-	return AddressFromBytes(k[1:21]), true
-}
-
-// ParseStakeKey extracts the address from a stake key
-func ParseStakeKey(k StateKey) (Address, bool) {
-	if len(k) != 21 || k[0] != KeyTypeStake {
 		return Address{}, false
 	}
 	return AddressFromBytes(k[1:21]), true

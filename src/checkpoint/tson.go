@@ -17,7 +17,7 @@ import (
 
 // TSONEntry represents a single state entry in the snapshot
 type TSONEntry struct {
-	Type  string `json:"type"`  // account, storage, code, stake, walletConfig
+	Type  string `json:"type"`  // account, storage, code, walletConfig
 	Key   string `json:"key"`   // Hex-encoded key
 	Value string `json:"value"` // Hex-encoded or JSON value depending on type
 }
@@ -50,8 +50,6 @@ func keyTypeToString(keyType byte) string {
 		return "storage"
 	case core.KeyTypeCode:
 		return "code"
-	case core.KeyTypeStake:
-		return "stake"
 	case core.KeyTypeWalletConfig:
 		return "walletConfig"
 	default:
@@ -68,8 +66,6 @@ func stringToKeyType(s string) byte {
 		return core.KeyTypeStorage
 	case "code":
 		return core.KeyTypeCode
-	case "stake":
-		return core.KeyTypeStake
 	case "walletConfig":
 		return core.KeyTypeWalletConfig
 	default:

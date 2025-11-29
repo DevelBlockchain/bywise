@@ -465,8 +465,6 @@ func initBlockchain(configPath string, nonInteractive bool) {
 		fmt.Println()
 		fmt.Println("Using default chain parameters:")
 		fmt.Printf("  Initial Supply:          %s\n", chainParams.InitialSupply.String())
-		fmt.Printf("  Min Miner Stake:         %s\n", chainParams.MinMinerStake.String())
-		fmt.Printf("  Min Validator Stake:     %s\n", chainParams.MinValidatorStake.String())
 		fmt.Println()
 	} else {
 		// Interactive mode
@@ -493,48 +491,14 @@ func initBlockchain(configPath string, nonInteractive bool) {
 			}
 		}
 
-		// Minimum miner stake
-		fmt.Printf("Minimum stake for miners [%s]: ", defaults.MinMinerStake.String())
-		minMinerStakeStr, _ := reader.ReadString('\n')
-		minMinerStakeStr = strings.TrimSpace(minMinerStakeStr)
-		var minMinerStake *core.BigInt
-		if minMinerStakeStr == "" {
-			minMinerStake = defaults.MinMinerStake
-		} else {
-			var ok bool
-			minMinerStake, ok = core.NewBigIntFromString(minMinerStakeStr, 10)
-			if !ok {
-				log.Fatalf("Invalid minimum miner stake: %s", minMinerStakeStr)
-			}
-		}
-
-		// Minimum validator stake
-		fmt.Printf("Minimum stake for validators [%s]: ", defaults.MinValidatorStake.String())
-		minValidatorStakeStr, _ := reader.ReadString('\n')
-		minValidatorStakeStr = strings.TrimSpace(minValidatorStakeStr)
-		var minValidatorStake *core.BigInt
-		if minValidatorStakeStr == "" {
-			minValidatorStake = defaults.MinValidatorStake
-		} else {
-			var ok bool
-			minValidatorStake, ok = core.NewBigIntFromString(minValidatorStakeStr, 10)
-			if !ok {
-				log.Fatalf("Invalid minimum validator stake: %s", minValidatorStakeStr)
-			}
-		}
-
 		// Create chain params
 		chainParams = &core.ChainParams{
-			InitialSupply:     initialSupply,
-			MinMinerStake:     minMinerStake,
-			MinValidatorStake: minValidatorStake,
+			InitialSupply: initialSupply,
 		}
 
 		fmt.Println()
 		fmt.Println("Chain Parameters:")
 		fmt.Printf("  Initial Supply:          %s\n", chainParams.InitialSupply.String())
-		fmt.Printf("  Min Miner Stake:         %s\n", chainParams.MinMinerStake.String())
-		fmt.Printf("  Min Validator Stake:     %s\n", chainParams.MinValidatorStake.String())
 		fmt.Println()
 
 		// Confirm
@@ -593,20 +557,6 @@ func initBlockchain(configPath string, nonInteractive bool) {
 		log.Fatalf("Failed to set genesis account balance: %v", err)
 	}
 
-	// Set initial stake for genesis address to enable mining and validation
-	stakeInfo, err := store.GetStakeInfo(minerAddr)
-	if err != nil {
-		log.Fatalf("Failed to get stake info: %v", err)
-	}
-	stakeInfo.MinerStake = chainParams.MinMinerStake
-	stakeInfo.ValidatorStake = chainParams.MinValidatorStake
-	stakeInfo.IsMiner = true
-	stakeInfo.IsValidator = true
-	stakeInfo.IsActive = true
-	if err := store.SetStakeInfo(stakeInfo); err != nil {
-		log.Fatalf("Failed to set stake info: %v", err)
-	}
-
 	fmt.Println()
 	fmt.Println("Blockchain initialized successfully!")
 	fmt.Println()
@@ -618,10 +568,6 @@ func initBlockchain(configPath string, nonInteractive bool) {
 	fmt.Println("Genesis Account:")
 	fmt.Printf("  Address:   %s\n", nodeWallet.Address())
 	fmt.Printf("  Balance:   %s\n", chainParams.InitialSupply.String())
-	fmt.Println()
-	fmt.Println("Initial Stake (auto-registered):")
-	fmt.Printf("  Miner Stake:     %s\n", chainParams.MinMinerStake.String())
-	fmt.Printf("  Validator Stake: %s\n", chainParams.MinValidatorStake.String())
 	fmt.Println()
 	fmt.Printf("Data directory: %s\n", dataDir)
 	fmt.Println()
@@ -667,10 +613,6 @@ func showBlockchainInfo(configPath string) {
 	// Get genesis block
 	genesisBlock, _ := store.GetBlockByNumber(0)
 
-	// Get active miners and validators
-	miners, _ := store.GetAllActiveMiners()
-	validators, _ := store.GetAllActiveValidators()
-
 	// Get chain params
 	chainParams, _ := store.GetChainParams()
 
@@ -680,8 +622,6 @@ func showBlockchainInfo(configPath string) {
 	fmt.Println("[Chain Parameters]")
 	if chainParams != nil {
 		fmt.Printf("  Initial Supply:      %s\n", chainParams.InitialSupply.String())
-		fmt.Printf("  Min Miner Stake:     %s\n", chainParams.MinMinerStake.String())
-		fmt.Printf("  Min Validator Stake: %s\n", chainParams.MinValidatorStake.String())
 	} else {
 		fmt.Println("  (legacy chain - no params stored)")
 	}
@@ -698,10 +638,6 @@ func showBlockchainInfo(configPath string) {
 		fmt.Printf("  Miner:             %s\n", genesisBlock.Header.MinerAddress.Hex())
 		fmt.Printf("  Timestamp:         %d\n", genesisBlock.Header.Timestamp)
 	}
-	fmt.Println()
-	fmt.Println("[Network]")
-	fmt.Printf("  Active Miners:     %d\n", len(miners))
-	fmt.Printf("  Active Validators: %d\n", len(validators))
 	fmt.Println()
 	fmt.Printf("Data directory: %s\n", dataDir)
 }
@@ -849,7 +785,6 @@ func showConfig(path string) {
 	fmt.Printf("  Data Directory:    %s\n", cfg.Blockchain.DataDir)
 	fmt.Printf("  Block Time:        %s\n", cfg.Blockchain.BlockTime)
 	fmt.Printf("  Checkpoint Every:  %d blocks\n", cfg.Blockchain.CheckpointInterval)
-	fmt.Println("  (Miner/Validator roles are auto-detected based on stake)")
 	fmt.Println()
 	fmt.Println("[Wallet]")
 	fmt.Printf("  Wallet Path:       %s\n", cfg.Wallet)
@@ -1021,7 +956,6 @@ func startNode(configPath string) {
 	// Initialize storage if data directory is configured
 	var store *storage.Storage
 	var nodeMiner *miner.Miner
-	var nodeStakeInfo *core.StakeInfo
 	if cfg.Blockchain.DataDir != "" {
 		// Create data directory with node ID to avoid conflicts
 		dataDir := cfg.Blockchain.DataDir
@@ -1046,70 +980,13 @@ func startNode(configPath string) {
 			log.Fatalf("Failed to create miner: %v", err)
 		}
 
-		// Get chain params and stake info to determine roles
-		chainParams, _ := store.GetChainParams()
+		// Log node is ready for mining
+		log.Printf("Mining enabled")
+
+		// Check if genesis block exists, create if not
 		minerAddr, _ := core.AddressFromHex(nodeWallet.Address())
-		nodeStakeInfo, err = store.GetStakeInfo(minerAddr)
-		if err != nil {
-			log.Fatalf("Failed to get stake info: %v", err)
-		}
-
-		// Determine minimum stakes (use defaults if chain params not set)
-		minMinerStake := core.NewBigInt(1000000)
-		minValidatorStake := core.NewBigInt(1000000)
-		if chainParams != nil {
-			minMinerStake = chainParams.MinMinerStake
-			minValidatorStake = chainParams.MinValidatorStake
-		}
-
-		// Check if node has sufficient stake to be a miner
-		minerStake := nodeStakeInfo.GetMinerStake()
-		canBeMiner := minerStake.Cmp(minMinerStake) >= 0
-
-		// Check if node has sufficient stake to be a validator
-		validatorStake := nodeStakeInfo.GetValidatorStake()
-		canBeValidator := validatorStake.Cmp(minValidatorStake) >= 0
-
-		// Auto-enable mining if has sufficient stake
-		if canBeMiner {
-			nodeStakeInfo.IsMiner = true
-			log.Printf("Miner role auto-enabled with stake: %s (min: %s)", minerStake.String(), minMinerStake.String())
-		} else {
-			nodeStakeInfo.IsMiner = false
-			log.Printf("Miner role disabled: insufficient stake (%s < %s)", minerStake.String(), minMinerStake.String())
-		}
-
-		// Auto-enable validator if has sufficient stake
-		if canBeValidator {
-			nodeStakeInfo.IsValidator = true
-			log.Printf("Validator role auto-enabled with stake: %s (min: %s)", validatorStake.String(), minValidatorStake.String())
-		} else {
-			nodeStakeInfo.IsValidator = false
-			log.Printf("Validator role disabled: insufficient stake (%s < %s)", validatorStake.String(), minValidatorStake.String())
-		}
-
-		// Update active status based on roles
-		nodeStakeInfo.UpdateActiveStatus()
-
-		// Save updated stake info
-		if err := store.SetStakeInfo(nodeStakeInfo); err != nil {
-			log.Fatalf("Failed to set stake info: %v", err)
-		}
-
-		// Log summary of roles
-		if nodeStakeInfo.IsMiner && nodeStakeInfo.IsValidator {
-			log.Printf("Node running as MINER and VALIDATOR")
-		} else if nodeStakeInfo.IsMiner {
-			log.Printf("Node running as MINER only")
-		} else if nodeStakeInfo.IsValidator {
-			log.Printf("Node running as VALIDATOR only")
-		} else {
-			log.Printf("Node running as observer (no mining/validation)")
-		}
-
-		// Check if genesis block exists, create if not (only for mining nodes)
 		_, err = store.GetLatestBlock()
-		if err == storage.ErrNotFound && nodeStakeInfo.IsMiner {
+		if err == storage.ErrNotFound {
 			log.Printf("Creating genesis block...")
 			genesisBlock := core.NewGenesisBlock(minerAddr)
 			if err := genesisBlock.Sign(nodeWallet); err != nil {
@@ -1122,8 +999,6 @@ func startNode(configPath string) {
 				log.Fatalf("Failed to set latest block number: %v", err)
 			}
 			log.Printf("Genesis block created with hash: %s", genesisBlock.Hash().Hex())
-		} else if err == storage.ErrNotFound {
-			log.Printf("Waiting for blocks to sync from network...")
 		}
 	}
 
@@ -1191,8 +1066,8 @@ func startNode(configPath string) {
 		}
 	}
 
-	// Start miner if node has miner role
-	if nodeStakeInfo != nil && nodeStakeInfo.IsMiner && nodeMiner != nil {
+	// Start miner if available
+	if nodeMiner != nil {
 		nodeMiner.Start()
 		log.Printf("Mining started")
 
@@ -1217,7 +1092,6 @@ func startNode(configPath string) {
 		}
 
 		// Register validator routes (available on all nodes for wallet operations)
-		// Even nodes without stake can use validator endpoints for sending transactions
 		if store != nil {
 			// ChainID 1 is the default (mainnet). This can be made configurable in the future.
 			validator, err := executor.NewValidator(store, nodeWallet, 1)

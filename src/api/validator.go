@@ -59,13 +59,7 @@ func (v *ValidatorAPI) RegisterRoutesWithAuth(mux *http.ServeMux, withAuth AuthW
 
 // ValidatorInfoResponse contains validator information
 type ValidatorInfoResponse struct {
-	Address        string `json:"address"`
-	IsValidator    bool   `json:"isValidator"`
-	IsMiner        bool   `json:"isMiner"`
-	ValidatorStake string `json:"validatorStake"`
-	MinerStake     string `json:"minerStake"`
-	TotalStake     string `json:"totalStake"`
-	IsActive       bool   `json:"isActive"`
+	Address string `json:"address"`
 }
 
 // handleValidatorInfo returns validator information
@@ -75,20 +69,8 @@ func (v *ValidatorAPI) handleValidatorInfo(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	info, err := v.validator.GetStakeInfo()
-	if err != nil {
-		http.Error(w, "Failed to get validator info", http.StatusInternalServerError)
-		return
-	}
-
 	response := ValidatorInfoResponse{
-		Address:        v.validator.GetAddress().Hex(),
-		IsValidator:    info.IsValidator,
-		IsMiner:        info.IsMiner,
-		ValidatorStake: info.GetValidatorStake().String(),
-		MinerStake:     info.GetMinerStake().String(),
-		TotalStake:     info.TotalStake().String(),
-		IsActive:       info.IsActive,
+		Address: v.validator.GetAddress().Hex(),
 	}
 
 	v.jsonResponse(w, response)
@@ -699,7 +681,7 @@ func (v *ValidatorAPI) handleSendTransaction(w http.ResponseWriter, r *http.Requ
 	if v.validator == nil {
 		v.jsonResponse(w, SendTransactionResponse{
 			Success: false,
-			Error:   "this node doesn't have validator capabilities (no stake) - to send transactions, you need to either: 1) Add stake to this node to enable validator role, or 2) Use a node that has validator stake enabled",
+			Error:   "this node doesn't have validator capabilities - validator is not enabled on this node",
 		})
 		return
 	}

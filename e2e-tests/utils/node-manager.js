@@ -48,9 +48,6 @@ class NodeManager {
       blockTime = '5s',
       checkpointInterval = 50000,
       dataDir = null,
-      // Stake amounts (defaults to minimum required)
-      minerStake = '1000000',
-      validatorStake = '1000000',
     } = options;
 
     const grpcPort = this.baseGrpcPort + index;
@@ -110,7 +107,6 @@ class NodeManager {
         dataDir: nodeDataDir,
         blockTime: blockTime,
         checkpointInterval: checkpointInterval,
-        // Note: Mining/validator roles are now auto-detected based on stake
       },
     };
 
@@ -118,7 +114,6 @@ class NodeManager {
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
     // Initialize blockchain if this node needs mining/validation capability
-    // This sets up the genesis block with initial stake
     if (miningEnabled || validatorEnabled) {
       await this.initializeBlockchain(configPath);
     }
@@ -156,7 +151,7 @@ class NodeManager {
     return node;
   }
 
-  // Initialize blockchain with genesis block and initial stake
+  // Initialize blockchain with genesis block
   async initializeBlockchain(configPath) {
     return new Promise((resolve, reject) => {
       const init = spawn(this.binaryPath, ['blockchain', 'init', configPath, '--yes'], {
@@ -797,79 +792,6 @@ class NodeManager {
     return BigInt('0x' + hex).toString();
   }
 
-  // Staking API methods
-
-  // Register stake for an address (as miner, validator, or both)
-  // Uses new API fields: minerStake and validatorStake
-  async registerStake(node, address, options = {}) {
-    const { minerStake = '0', validatorStake = '0' } = options;
-    try {
-      const response = await axios.post(`${node.apiUrl}/blockchain/stake/register`, {
-        address: address,
-        minerStake: minerStake.toString(),
-        validatorStake: validatorStake.toString(),
-        isMiner: minerStake !== '0' && minerStake !== 0,
-        isValidator: validatorStake !== '0' && validatorStake !== 0,
-      });
-      return response.data;
-    } catch (e) {
-      if (e.response) {
-        return e.response.data;
-      }
-      throw e;
-    }
-  }
-
-  // Get stake info for an address
-  async getStakeInfo(node, address) {
-    try {
-      const response = await axios.get(`${node.apiUrl}/blockchain/stake?address=${address}`);
-      return response.data;
-    } catch (e) {
-      if (e.response && e.response.status === 404) {
-        return null;
-      }
-      throw e;
-    }
-  }
-
-  // Register as miner with stake
-  async registerAsMiner(node, address, stakeAmount) {
-    return this.registerStake(node, address, { minerStake: stakeAmount });
-  }
-
-  // Register as validator with stake
-  async registerAsValidator(node, address, stakeAmount) {
-    return this.registerStake(node, address, { validatorStake: stakeAmount });
-  }
-
-  // Register as both miner and validator with combined stake
-  // The stake is split between miner and validator roles
-  async registerAsMinerAndValidator(node, address, totalStake) {
-    // Split stake equally between miner and validator roles
-    const halfStake = (BigInt(totalStake) / 2n).toString();
-    return this.registerStake(node, address, { minerStake: halfStake, validatorStake: halfStake });
-  }
-
-  // Get all active miners
-  async getActiveMiners(node) {
-    try {
-      const info = await this.getBlockchainInfo(node);
-      return info ? info.activeMiners : 0;
-    } catch (e) {
-      return 0;
-    }
-  }
-
-  // Get all active validators
-  async getActiveValidators(node) {
-    try {
-      const info = await this.getBlockchainInfo(node);
-      return info ? info.activeValidators : 0;
-    } catch (e) {
-      return 0;
-    }
-  }
 }
 
 module.exports = NodeManager;

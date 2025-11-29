@@ -64,29 +64,14 @@ func NewMiner(store *storage.Storage, w *wallet.Wallet) (*Miner, error) {
 }
 
 // CalculateMinerPriority calculates the priority for a miner based on:
-// Hash(LastBlockHash + MinerAddress + Stake)
-// Higher stake = higher probability of being selected
-func CalculateMinerPriority(lastBlockHash core.Hash, minerAddress core.Address, stake *core.BigInt) *big.Int {
+// Hash(LastBlockHash + MinerAddress)
+func CalculateMinerPriority(lastBlockHash core.Hash, minerAddress core.Address) *big.Int {
 	var buf bytes.Buffer
 	buf.Write(lastBlockHash[:])
 	buf.Write(minerAddress[:])
 
-	// Include stake amount in calculation
-	stakeBytes := stake.Bytes()
-	buf.Write(stakeBytes)
-
 	hash := wallet.Keccak256(buf.Bytes())
-
-	// Convert hash to big int and multiply by stake for weighted selection
 	hashInt := new(big.Int).SetBytes(hash)
-
-	// Weight by stake: priority = hash * (1 + log2(stake))
-	// This gives advantage to higher stake while not being purely stake-based
-	if stake.Int != nil && stake.Int.Sign() > 0 {
-		// Simple weighting: multiply by stake
-		weight := new(big.Int).Set(stake.Int)
-		hashInt.Mul(hashInt, weight)
-	}
 
 	return hashInt
 }
@@ -94,30 +79,19 @@ func CalculateMinerPriority(lastBlockHash core.Hash, minerAddress core.Address, 
 // MinerPriority holds a miner's address and calculated priority
 type MinerPriority struct {
 	Address  core.Address
-	Stake    *core.BigInt
 	Priority *big.Int
 }
 
 // GetMinerQueue returns the ordered list of miners for the next block
-// based on Weighted Sortition algorithm
+// based on hash-based sortition algorithm
 func (m *Miner) GetMinerQueue(lastBlockHash core.Hash) ([]MinerPriority, error) {
-	miners, err := m.Storage.GetAllActiveMiners()
-	if err != nil {
-		return nil, err
-	}
-
-	if len(miners) == 0 {
-		return nil, ErrNoActiveMiners
-	}
-
-	priorities := make([]MinerPriority, len(miners))
-	for i, miner := range miners {
-		minerStake := miner.GetMinerStake()
-		priorities[i] = MinerPriority{
-			Address:  miner.Address,
-			Stake:    minerStake,
-			Priority: CalculateMinerPriority(lastBlockHash, miner.Address, minerStake),
-		}
+	// For now, return a simple list with just this miner
+	// In a full implementation, this would query a list of registered miners
+	priorities := []MinerPriority{
+		{
+			Address:  m.Address,
+			Priority: CalculateMinerPriority(lastBlockHash, m.Address),
+		},
 	}
 
 	// Sort by priority (descending)
@@ -386,20 +360,13 @@ func (m *Miner) ValidateBlock(block *core.Block) error {
 		return err
 	}
 
-	// Verify it's from the expected miner (skip if we have no miners registered - sync mode)
+	// Verify it's from the expected miner
 	if block.Header.Number > 0 {
 		expectedMiner, err := m.GetExpectedMiner(block.Header.PreviousHash)
-		if err == ErrNoActiveMiners {
-			// We're in sync mode - accept the block but register the miner
-			// so subsequent blocks can be validated
-			minerStake := core.NewStakeInfo(block.Header.MinerAddress)
-			minerStake.IsMiner = true
-			minerStake.IsActive = true
-			minerStake.StakeAmount = core.NewBigInt(1000000) // Minimum stake
-			m.Storage.SetStakeInfo(minerStake)
-		} else if err != nil {
+		if err != nil && err != ErrNoActiveMiners {
 			return err
-		} else if block.Header.MinerAddress != expectedMiner {
+		}
+		if err == nil && block.Header.MinerAddress != expectedMiner {
 			return ErrInvalidMiner
 		}
 	}
@@ -442,19 +409,6 @@ func (m *Miner) ValidateBlockForSync(block *core.Block) error {
 	// Basic block verification (hash, signatures, merkle roots)
 	if err := block.Verify(prevBlock); err != nil {
 		return err
-	}
-
-	// Register miner if not already registered
-	// This allows syncing from bootstrap nodes without pre-configured miner list
-	if block.Header.Number > 0 {
-		_, err := m.GetExpectedMiner(block.Header.PreviousHash)
-		if err == ErrNoActiveMiners {
-			minerStake := core.NewStakeInfo(block.Header.MinerAddress)
-			minerStake.IsMiner = true
-			minerStake.IsActive = true
-			minerStake.StakeAmount = core.NewBigInt(1000000) // Minimum stake
-			m.Storage.SetStakeInfo(minerStake)
-		}
 	}
 
 	// Skip timestamp validation - historical blocks are trusted
@@ -600,7 +554,6 @@ type MinerStats struct {
 	TotalMiners      int
 	PendingTxCount   int
 	LatestBlock      uint64
-	Stake            string
 }
 
 // GetStats returns current miner statistics
@@ -628,26 +581,17 @@ func (m *Miner) GetStats() (*MinerStats, error) {
 		}
 	}
 
-	stakeInfo, _ := m.Storage.GetStakeInfo(m.Address)
-	stakeStr := "0"
-	isActive := false
-	if stakeInfo != nil {
-		stakeStr = stakeInfo.StakeAmount.String()
-		isActive = stakeInfo.IsActive && stakeInfo.IsMiner
-	}
-
 	m.txMu.RLock()
 	pendingCount := len(m.pendingTxs)
 	m.txMu.RUnlock()
 
 	return &MinerStats{
 		Address:        m.Address.Hex(),
-		IsActive:       isActive,
+		IsActive:       true,
 		Position:       position,
 		TotalMiners:    len(queue),
 		PendingTxCount: pendingCount,
 		LatestBlock:    blockNum,
-		Stake:          stakeStr,
 	}, nil
 }
 

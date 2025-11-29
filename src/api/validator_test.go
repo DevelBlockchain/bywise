@@ -67,17 +67,6 @@ func setupTestValidatorAPI(t *testing.T) (*ValidatorAPI, *storage.Storage, *wall
 		t.Fatalf("Failed to set account balance: %v", err)
 	}
 
-	// Set stake info for the wallet (as validator)
-	stakeInfo, _ := store.GetStakeInfo(minerAddr)
-	stakeInfo.ValidatorStake = core.NewBigInt(1000000)
-	stakeInfo.IsValidator = true
-	stakeInfo.IsActive = true
-	if err := store.SetStakeInfo(stakeInfo); err != nil {
-		store.Close()
-		os.RemoveAll(tempDir)
-		t.Fatalf("Failed to set stake info: %v", err)
-	}
-
 	// Create validator with chainID 1 for testing
 	validator, err := executor.NewValidator(store, w, 1)
 	if err != nil {

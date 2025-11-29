@@ -47,16 +47,6 @@ func setupTestMiner(t *testing.T) (*Miner, *storage.Storage, func()) {
 	return miner, store, cleanup
 }
 
-func setupMinerAsActive(t *testing.T, store *storage.Storage, address core.Address, stake int64) {
-	info := core.NewStakeInfo(address)
-	info.AddStake(core.NewBigInt(stake))
-	info.IsMiner = true
-	info.IsActive = true
-	if err := store.SetStakeInfo(info); err != nil {
-		t.Fatalf("Failed to set stake info: %v", err)
-	}
-}
-
 func TestNewMiner(t *testing.T) {
 	miner, _, cleanup := setupTestMiner(t)
 	defer cleanup()
@@ -76,15 +66,9 @@ func TestCalculateMinerPriority(t *testing.T) {
 	addr1 := core.Address{0x01}
 	addr2 := core.Address{0x02}
 
-	stake1 := core.NewBigInt(1000)
-	stake2 := core.NewBigInt(2000)
+	priority1 := CalculateMinerPriority(lastBlockHash, addr1)
+	priority3 := CalculateMinerPriority(lastBlockHash, addr2)
 
-	priority1 := CalculateMinerPriority(lastBlockHash, addr1, stake1)
-	priority2 := CalculateMinerPriority(lastBlockHash, addr1, stake2)
-	priority3 := CalculateMinerPriority(lastBlockHash, addr2, stake1)
-
-	// Same address, higher stake should generally have higher priority
-	// (though randomization from hash means this isn't guaranteed)
 	if priority1.Sign() <= 0 {
 		t.Error("Priority should be positive")
 	}
@@ -93,22 +77,11 @@ func TestCalculateMinerPriority(t *testing.T) {
 	if priority1.Cmp(priority3) == 0 {
 		t.Error("Different addresses should have different priorities")
 	}
-
-	// Higher stake should affect priority
-	if priority2.Cmp(priority1) <= 0 {
-		t.Error("Higher stake should result in higher priority")
-	}
 }
 
 func TestGetMinerQueue(t *testing.T) {
-	miner, store, cleanup := setupTestMiner(t)
+	miner, _, cleanup := setupTestMiner(t)
 	defer cleanup()
-
-	// Setup multiple miners
-	for i := 0; i < 5; i++ {
-		addr := core.Address{byte(i + 1)}
-		setupMinerAsActive(t, store, addr, int64((i+1)*1000))
-	}
 
 	lastBlockHash := core.Hash{0x01}
 	queue, err := miner.GetMinerQueue(lastBlockHash)
@@ -116,36 +89,15 @@ func TestGetMinerQueue(t *testing.T) {
 		t.Fatalf("Failed to get miner queue: %v", err)
 	}
 
-	if len(queue) != 5 {
-		t.Errorf("Expected 5 miners in queue, got %d", len(queue))
-	}
-
-	// Verify queue is sorted by priority (descending)
-	for i := 0; i < len(queue)-1; i++ {
-		if queue[i].Priority.Cmp(queue[i+1].Priority) < 0 {
-			t.Error("Queue should be sorted by priority descending")
-		}
-	}
-}
-
-func TestGetMinerQueueNoMiners(t *testing.T) {
-	miner, _, cleanup := setupTestMiner(t)
-	defer cleanup()
-
-	lastBlockHash := core.Hash{0x01}
-	_, err := miner.GetMinerQueue(lastBlockHash)
-
-	if err != ErrNoActiveMiners {
-		t.Errorf("Expected ErrNoActiveMiners, got %v", err)
+	// Should return at least the current miner
+	if len(queue) < 1 {
+		t.Errorf("Expected at least 1 miner in queue, got %d", len(queue))
 	}
 }
 
 func TestIsMyTurn(t *testing.T) {
-	miner, store, cleanup := setupTestMiner(t)
+	miner, _, cleanup := setupTestMiner(t)
 	defer cleanup()
-
-	// Setup this miner as active with high stake
-	setupMinerAsActive(t, store, miner.Address, 10000000)
 
 	lastBlockHash := core.Hash{0x01}
 	isMyTurn, position, err := miner.IsMyTurn(lastBlockHash)
@@ -248,11 +200,10 @@ func TestAddConflictingTransaction(t *testing.T) {
 }
 
 func TestCreateGenesisBlock(t *testing.T) {
-	miner, store, cleanup := setupTestMiner(t)
+	miner, _, cleanup := setupTestMiner(t)
 	defer cleanup()
 
 	// Setup miner as active
-	setupMinerAsActive(t, store, miner.Address, 10000)
 
 	block, err := miner.CreateBlock()
 	if err != nil {
@@ -277,11 +228,10 @@ func TestCreateGenesisBlock(t *testing.T) {
 }
 
 func TestCreateSubsequentBlock(t *testing.T) {
-	miner, store, cleanup := setupTestMiner(t)
+	miner, _, cleanup := setupTestMiner(t)
 	defer cleanup()
 
 	// Setup miner as active
-	setupMinerAsActive(t, store, miner.Address, 10000)
 
 	// Create and apply genesis block
 	genesis, err := miner.CreateBlock()
@@ -310,11 +260,10 @@ func TestCreateSubsequentBlock(t *testing.T) {
 }
 
 func TestValidateBlock(t *testing.T) {
-	miner, store, cleanup := setupTestMiner(t)
+	miner, _, cleanup := setupTestMiner(t)
 	defer cleanup()
 
 	// Setup miner as active
-	setupMinerAsActive(t, store, miner.Address, 10000)
 
 	// Create genesis block
 	block, err := miner.CreateBlock()
@@ -334,7 +283,6 @@ func TestApplyBlock(t *testing.T) {
 	defer cleanup()
 
 	// Setup miner as active
-	setupMinerAsActive(t, store, miner.Address, 10000)
 
 	// Create genesis block
 	block, err := miner.CreateBlock()
@@ -404,11 +352,10 @@ func TestRemoveTransactions(t *testing.T) {
 }
 
 func TestGetStats(t *testing.T) {
-	miner, store, cleanup := setupTestMiner(t)
+	miner, _, cleanup := setupTestMiner(t)
 	defer cleanup()
 
 	// Setup miner as active
-	setupMinerAsActive(t, store, miner.Address, 5000)
 
 	stats, err := miner.GetStats()
 	if err != nil {
@@ -422,21 +369,16 @@ func TestGetStats(t *testing.T) {
 	if !stats.IsActive {
 		t.Error("Miner should be active")
 	}
-
-	if stats.Stake != "5000" {
-		t.Errorf("Stake should be 5000, got %s", stats.Stake)
-	}
 }
 
 func TestMinerPriorityDeterminism(t *testing.T) {
 	lastBlockHash := core.Hash{0x01, 0x02, 0x03}
 	addr := core.Address{0x01}
-	stake := core.NewBigInt(1000)
 
 	// Calculate priority multiple times
 	priorities := make([]*big.Int, 10)
 	for i := 0; i < 10; i++ {
-		priorities[i] = CalculateMinerPriority(lastBlockHash, addr, stake)
+		priorities[i] = CalculateMinerPriority(lastBlockHash, addr)
 	}
 
 	// All should be equal
@@ -448,13 +390,12 @@ func TestMinerPriorityDeterminism(t *testing.T) {
 }
 
 func TestMinerQueueDeterminism(t *testing.T) {
-	miner, store, cleanup := setupTestMiner(t)
+	miner, _, cleanup := setupTestMiner(t)
 	defer cleanup()
 
 	// Setup multiple miners
 	for i := 0; i < 5; i++ {
-		addr := core.Address{byte(i + 1)}
-		setupMinerAsActive(t, store, addr, int64((i+1)*1000))
+		_ = core.Address{byte(i + 1)}
 	}
 
 	lastBlockHash := core.Hash{0x01}

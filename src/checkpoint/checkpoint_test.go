@@ -39,10 +39,9 @@ func TestTSONEncodeDecode(t *testing.T) {
 
 	// Create some test state
 	state := map[string][]byte{
-		"s:" + string(core.MakeAccountKey(core.Address{0x01})):           []byte(`{"balance":"1000"}`),
-		"s:" + string(core.MakeAccountKey(core.Address{0x02})):           []byte(`{"balance":"2000"}`),
-		"s:" + string(core.MakeStakeKey(core.Address{0x01})):             []byte(`{"stake":"5000"}`),
-		"s:" + string(core.MakeCodeKey(core.Address{0xCA})):              []byte{0x60, 0x80, 0x60, 0x40},
+		"s:" + string(core.MakeAccountKey(core.Address{0x01})):                  []byte(`{"balance":"1000"}`),
+		"s:" + string(core.MakeAccountKey(core.Address{0x02})):                  []byte(`{"balance":"2000"}`),
+		"s:" + string(core.MakeCodeKey(core.Address{0xCA})):                     []byte{0x60, 0x80, 0x60, 0x40},
 		"s:" + string(core.MakeStorageKey(core.Address{0xCA}, core.Hash{0x01})): []byte("slot_value"),
 	}
 

@@ -116,47 +116,6 @@ func TestAccountOperations(t *testing.T) {
 	}
 }
 
-func TestStakeInfoOperations(t *testing.T) {
-	storage, cleanup := setupTestStorage(t)
-	defer cleanup()
-
-	addr := core.Address{0x01}
-
-	// Get non-existent stake info
-	info, err := storage.GetStakeInfo(addr)
-	if err != nil {
-		t.Fatalf("Failed to get stake info: %v", err)
-	}
-
-	if info.IsActive {
-		t.Error("New stake info should not be active")
-	}
-
-	// Modify and save
-	info.AddStake(core.NewBigInt(100000))
-	info.IsValidator = true
-	info.IsActive = true
-
-	err = storage.SetStakeInfo(info)
-	if err != nil {
-		t.Fatalf("Failed to save stake info: %v", err)
-	}
-
-	// Retrieve and verify
-	retrieved, err := storage.GetStakeInfo(addr)
-	if err != nil {
-		t.Fatalf("Failed to get stake info: %v", err)
-	}
-
-	if !retrieved.IsValidator {
-		t.Error("Should be validator")
-	}
-
-	if !retrieved.IsActive {
-		t.Error("Should be active")
-	}
-}
-
 func TestContractCodeOperations(t *testing.T) {
 	storage, cleanup := setupTestStorage(t)
 	defer cleanup()
@@ -346,36 +305,6 @@ func TestIterateState(t *testing.T) {
 
 	if count != 5 {
 		t.Errorf("Should iterate 5 accounts, got %d", count)
-	}
-}
-
-func TestGetAllActiveValidators(t *testing.T) {
-	storage, cleanup := setupTestStorage(t)
-	defer cleanup()
-
-	// Create some stake infos
-	for i := 0; i < 5; i++ {
-		addr := core.Address{byte(i)}
-		info := core.NewStakeInfo(addr)
-		info.AddStake(core.NewBigInt(int64((i + 1) * 1000)))
-
-		// Make some validators
-		if i < 3 {
-			info.IsValidator = true
-			info.IsActive = true
-		}
-
-		storage.SetStakeInfo(info)
-	}
-
-	// Get active validators
-	validators, err := storage.GetAllActiveValidators()
-	if err != nil {
-		t.Fatalf("Failed to get validators: %v", err)
-	}
-
-	if len(validators) != 3 {
-		t.Errorf("Should have 3 active validators, got %d", len(validators))
 	}
 }
 

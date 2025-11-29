@@ -449,8 +449,3 @@ func (v *Validator) GetStorage() *storage.Storage {
 func (v *Validator) GetWallet() *wallet.Wallet {
 	return v.wallet
 }
-
-// GetStakeInfo returns the validator's stake information
-func (v *Validator) GetStakeInfo() (*core.StakeInfo, error) {
-	return v.storage.GetStakeInfo(v.address)
-}

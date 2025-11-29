@@ -539,26 +539,6 @@
                         <div class="wallet-balance" id="myBalance">-</div>
                         <div class="wallet-balance-label">Balance</div>
 
-                        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #2a2a40;">
-                            <div class="stats-grid">
-                                <div class="stat-card" style="background: #2a2a40;">
-                                    <div class="value" id="myMinerStake" style="color: #7b2cbf;">-</div>
-                                    <div class="label">Miner Stake</div>
-                                </div>
-                                <div class="stat-card" style="background: #2a2a40;">
-                                    <div class="value" id="myValidatorStake" style="color: #00d4ff;">-</div>
-                                    <div class="label">Validator Stake</div>
-                                </div>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">Total Staked</span>
-                                <span class="value" id="myTotalStake">-</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="label">Rewards</span>
-                                <span class="value" id="myRewards">-</span>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Node Status -->
@@ -589,7 +569,6 @@
                     <!-- Tabs -->
                     <div class="tabs">
                         <button class="tab active" data-tab="transfer">Transfer</button>
-                        <button class="tab" data-tab="staking">Staking</button>
                         <button class="tab" data-tab="deploy">Deploy Contract</button>
                         <button class="tab" data-tab="interact">Call Contract</button>
                         <button class="tab" data-tab="explorer">Explorer</button>
@@ -615,55 +594,6 @@
                         </div>
                     </div>
 
-                    <!-- Staking Tab -->
-                    <div id="stakingTab" class="tab-content">
-                        <div class="card">
-                            <h3><span class="icon">&#11088;</span> Manage Staking</h3>
-                            <div id="stakingAlert" class="alert hidden"></div>
-
-                            <div style="margin-bottom: 30px;">
-                                <h4 style="color: #00d4ff; margin-bottom: 15px;">Add Stake</h4>
-                                <form id="addStakeForm">
-                                    <div class="form-group">
-                                        <label>Stake Type</label>
-                                        <select id="addStakeType">
-                                            <option value="miner">Miner Stake</option>
-                                            <option value="validator">Validator Stake</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="addStakeAmount">Amount to Stake</label>
-                                        <input type="text" id="addStakeAmount" placeholder="1000000" required>
-                                        <small style="color: #888; display: block; margin-top: 5px;">Minimum: 1,000,000</small>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary btn-full" id="addStakeBtn">Add Stake</button>
-                                </form>
-                            </div>
-
-                            <div style="margin-bottom: 30px; padding-top: 30px; border-top: 1px solid #2a2a40;">
-                                <h4 style="color: #ff4d4d; margin-bottom: 15px;">Remove Stake</h4>
-                                <form id="removeStakeForm">
-                                    <div class="form-group">
-                                        <label>Stake Type</label>
-                                        <select id="removeStakeType">
-                                            <option value="miner">Miner Stake</option>
-                                            <option value="validator">Validator Stake</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="removeStakeAmount">Amount to Remove</label>
-                                        <input type="text" id="removeStakeAmount" placeholder="1000000" required>
-                                    </div>
-                                    <button type="submit" class="btn btn-danger btn-full" id="removeStakeBtn">Remove Stake</button>
-                                </form>
-                            </div>
-
-                            <div class="alert info">
-                                <strong>Note:</strong> Staking requires tokens to be locked. Removing stake may require a waiting period. Make sure you have sufficient balance before adding stake.
-                            </div>
-                            <div id="stakingResult" class="result-box hidden"></div>
-                        </div>
-                    </div>
 
                     <!-- Deploy Contract Tab -->
                     <div id="deployTab" class="tab-content">
@@ -740,9 +670,6 @@
                             <div class="info-row">
                                 <span class="label">Nonce</span>
                                 <span class="value" id="accNonce">-</span>
-                            </div>
-                            <div id="accStakeInfo" class="hidden" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #2a2a40;">
-                                <!-- Stake info will be inserted here -->
                             </div>
                         </div>
 
@@ -882,15 +809,11 @@
                 loadRecentBlocks()
             ]);
 
-            // Load stake info
-            await loadMyStake();
-
             // Refresh data periodically
             setInterval(() => {
                 loadNodeInfo();
                 loadBlockchainInfo();
                 loadMyBalance();
-                loadMyStake();
             }, 10000);
         }
 
@@ -930,34 +853,6 @@
             }
         }
 
-        // Load stake information
-        async function loadMyStake() {
-            if (!walletAddress) return;
-
-            try {
-                const response = await api(`/blockchain/stake?address=${walletAddress}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById('myMinerStake').textContent = formatBalance(data.minerStake);
-                    document.getElementById('myValidatorStake').textContent = formatBalance(data.validatorStake);
-                    document.getElementById('myTotalStake').textContent = formatBalance(data.totalStake);
-                    document.getElementById('myRewards').textContent = formatBalance(data.rewards);
-                } else {
-                    // No stake info yet - show zeros
-                    document.getElementById('myMinerStake').textContent = '0';
-                    document.getElementById('myValidatorStake').textContent = '0';
-                    document.getElementById('myTotalStake').textContent = '0';
-                    document.getElementById('myRewards').textContent = '0';
-                }
-            } catch (error) {
-                console.error('Failed to load stake:', error);
-                // Set to 0 on error
-                document.getElementById('myMinerStake').textContent = '0';
-                document.getElementById('myValidatorStake').textContent = '0';
-                document.getElementById('myTotalStake').textContent = '0';
-                document.getElementById('myRewards').textContent = '0';
-            }
-        }
 
         // Format balance for display
         function formatBalance(balance) {
@@ -1030,44 +925,8 @@
                     document.getElementById('accNonce').textContent = accData.nonce;
                     document.getElementById('accountInfo').classList.remove('hidden');
 
-                    // Try to load stake info for this account
-                    try {
-                        const stakeResponse = await api(`/blockchain/stake?address=${address}`);
-                        if (stakeResponse.ok) {
-                            const stakeData = await stakeResponse.json();
-                            // Update account info with stake data if element exists
-                            const stakeInfoEl = document.getElementById('accStakeInfo');
-                            if (stakeInfoEl) {
-                                stakeInfoEl.innerHTML = `
-                                    <div class="info-row">
-                                        <span class="label">Miner Stake</span>
-                                        <span class="value">${formatBalance(stakeData.minerStake)}</span>
-                                    </div>
-                                    <div class="info-row">
-                                        <span class="label">Validator Stake</span>
-                                        <span class="value">${formatBalance(stakeData.validatorStake)}</span>
-                                    </div>
-                                    <div class="info-row">
-                                        <span class="label">Rewards</span>
-                                        <span class="value">${formatBalance(stakeData.rewards)}</span>
-                                    </div>
-                                `;
-                                stakeInfoEl.classList.remove('hidden');
-                            }
-                        }
-                    } catch (stakeError) {
-                        // Stake info not available - not an error
-                        const stakeInfoEl = document.getElementById('accStakeInfo');
-                        if (stakeInfoEl) {
-                            stakeInfoEl.classList.add('hidden');
-                        }
-                    }
                 } else {
                     document.getElementById('accountInfo').classList.add('hidden');
-                    const stakeInfoEl = document.getElementById('accStakeInfo');
-                    if (stakeInfoEl) {
-                        stakeInfoEl.classList.add('hidden');
-                    }
                 }
             } catch (error) {
                 console.error('Failed to lookup account:', error);
@@ -1304,172 +1163,6 @@
             }
         });
 
-        // Add stake form
-        document.getElementById('addStakeForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const stakeType = document.getElementById('addStakeType').value;
-            const amount = document.getElementById('addStakeAmount').value.trim();
-            const btn = document.getElementById('addStakeBtn');
-            const alertEl = document.getElementById('stakingAlert');
-            const resultEl = document.getElementById('stakingResult');
-
-            btn.disabled = true;
-            btn.textContent = 'Processing...';
-            alertEl.classList.add('hidden');
-            resultEl.classList.add('hidden');
-
-            try {
-                // Get current stake first
-                const currentStakeResponse = await api(`/blockchain/stake?address=${walletAddress}`);
-                if (!currentStakeResponse.ok) {
-                    showAlert('stakingAlert', 'error', 'Failed to get current stake');
-                    btn.disabled = false;
-                    btn.textContent = 'Add Stake';
-                    return;
-                }
-                const currentStake = await currentStakeResponse.json();
-
-                // Calculate new stake (current + amount to add)
-                const amountNum = parseInt(amount);
-                if (isNaN(amountNum) || amountNum <= 0) {
-                    showAlert('stakingAlert', 'error', 'Invalid amount');
-                    btn.disabled = false;
-                    btn.textContent = 'Add Stake';
-                    return;
-                }
-
-                let newStakeAmount;
-                if (stakeType === 'miner') {
-                    const currentMiner = parseInt(currentStake.minerStake) || 0;
-                    newStakeAmount = currentMiner + amountNum;
-                } else {
-                    const currentValidator = parseInt(currentStake.validatorStake) || 0;
-                    newStakeAmount = currentValidator + amountNum;
-                }
-
-                const requestBody = {
-                    address: walletAddress
-                };
-
-                if (stakeType === 'miner') {
-                    requestBody.minerStake = newStakeAmount.toString();
-                } else {
-                    requestBody.validatorStake = newStakeAmount.toString();
-                }
-
-                const response = await api('/blockchain/stake/register', {
-                    method: 'POST',
-                    body: JSON.stringify(requestBody)
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    showAlert('stakingAlert', 'success', 'Stake added successfully!');
-                    resultEl.innerHTML = `<pre>Address: ${data.address}\nMiner Stake: ${formatBalance(data.minerStake)}\nValidator Stake: ${formatBalance(data.validatorStake)}\nTotal Stake: ${formatBalance(data.totalStake)}\nIs Active: ${data.isActive ? 'Yes' : 'No'}</pre>`;
-                    resultEl.classList.remove('hidden');
-
-                    // Clear form
-                    document.getElementById('addStakeAmount').value = '';
-
-                    // Refresh stake info
-                    setTimeout(() => {
-                        loadMyStake();
-                        loadMyBalance();
-                    }, 2000);
-                } else {
-                    showAlert('stakingAlert', 'error', data.error || 'Failed to add stake');
-                }
-            } catch (error) {
-                showAlert('stakingAlert', 'error', 'Failed to add stake: ' + error.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Add Stake';
-            }
-        });
-
-        // Remove stake form
-        document.getElementById('removeStakeForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const stakeType = document.getElementById('removeStakeType').value;
-            const amount = document.getElementById('removeStakeAmount').value.trim();
-            const btn = document.getElementById('removeStakeBtn');
-            const alertEl = document.getElementById('stakingAlert');
-            const resultEl = document.getElementById('stakingResult');
-
-            btn.disabled = true;
-            btn.textContent = 'Processing...';
-            alertEl.classList.add('hidden');
-            resultEl.classList.add('hidden');
-
-            try {
-                // Get current stake
-                const currentStakeResponse = await api(`/blockchain/stake?address=${walletAddress}`);
-                if (!currentStakeResponse.ok) {
-                    showAlert('stakingAlert', 'error', 'Failed to get current stake');
-                    return;
-                }
-                const currentStake = await currentStakeResponse.json();
-
-                // Calculate new stake (current - amount to remove)
-                let currentAmount = stakeType === 'miner' ? currentStake.minerStake : currentStake.validatorStake;
-                let amountNum = parseInt(amount);
-                let currentNum = parseInt(currentAmount);
-
-                if (isNaN(amountNum) || isNaN(currentNum)) {
-                    showAlert('stakingAlert', 'error', 'Invalid stake amounts');
-                    return;
-                }
-
-                let newAmount = currentNum - amountNum;
-                if (newAmount < 0) {
-                    showAlert('stakingAlert', 'error', 'Cannot remove more than current stake');
-                    return;
-                }
-
-                // Send request to update stake to new amount
-                const requestBody = {
-                    address: walletAddress
-                };
-
-                if (stakeType === 'miner') {
-                    requestBody.minerStake = newAmount.toString();
-                } else {
-                    requestBody.validatorStake = newAmount.toString();
-                }
-
-                const response = await api('/blockchain/stake/register', {
-                    method: 'POST',
-                    body: JSON.stringify(requestBody)
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    showAlert('stakingAlert', 'success', 'Stake removed successfully!');
-                    resultEl.innerHTML = `<pre>Address: ${data.address}\nMiner Stake: ${formatBalance(data.minerStake)}\nValidator Stake: ${formatBalance(data.validatorStake)}\nTotal Stake: ${formatBalance(data.totalStake)}\nIs Active: ${data.isActive ? 'Yes' : 'No'}</pre>`;
-                    resultEl.classList.remove('hidden');
-
-                    // Clear form
-                    document.getElementById('removeStakeAmount').value = '';
-
-                    // Refresh stake info
-                    setTimeout(() => {
-                        loadMyStake();
-                        loadMyBalance();
-                    }, 2000);
-                } else {
-                    showAlert('stakingAlert', 'error', data.error || 'Failed to remove stake');
-                }
-            } catch (error) {
-                showAlert('stakingAlert', 'error', 'Failed to remove stake: ' + error.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Remove Stake';
-            }
-        });
 
         // Show alert helper
         function showAlert(id, type, message) {

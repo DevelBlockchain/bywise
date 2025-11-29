@@ -472,51 +472,6 @@ func TestHandleGetAccount(t *testing.T) {
 	}
 }
 
-// TestHandleGetStake tests the /blockchain/stake endpoint
-func TestHandleGetStake(t *testing.T) {
-	api, store, w, cleanup := setupTestAPI(t)
-	defer cleanup()
-
-	// First, create stake info for the wallet with separate miner stake
-	addr, _ := core.AddressFromHex(w.Address())
-	stakeInfo, _ := store.GetStakeInfo(addr)
-	stakeInfo.MinerStake = core.NewBigInt(1000000)
-	stakeInfo.IsMiner = true
-	stakeInfo.IsActive = true
-	store.SetStakeInfo(stakeInfo)
-
-	// Test getting stake info
-	rr := makeRequest(t, api, "GET", "/blockchain/stake?address="+w.Address(), "")
-
-	if rr.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", rr.Code)
-	}
-
-	var response StakeResponse
-	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
-		t.Fatalf("Failed to parse JSON response: %v", err)
-	}
-
-	if response.MinerStake != "1000000" {
-		t.Errorf("Expected miner stake 1000000, got %s", response.MinerStake)
-	}
-
-	if response.TotalStake != "1000000" {
-		t.Errorf("Expected total stake 1000000, got %s", response.TotalStake)
-	}
-
-	if !response.IsMiner {
-		t.Error("Expected IsMiner to be true")
-	}
-
-	// Test without address parameter
-	rr = makeRequest(t, api, "GET", "/blockchain/stake", "")
-
-	if rr.Code != http.StatusBadRequest {
-		t.Errorf("Expected status 400 without address, got %d", rr.Code)
-	}
-}
-
 // TestHandleNotFound tests 404 handling
 func TestHandleNotFound(t *testing.T) {
 	api, _, _, cleanup := setupTestAPI(t)

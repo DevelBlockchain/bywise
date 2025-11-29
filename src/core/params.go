@@ -6,20 +6,12 @@ import "encoding/json"
 type ChainParams struct {
 	// Initial coin supply minted to the genesis address
 	InitialSupply *BigInt `json:"initialSupply"`
-
-	// Minimum stake required for miners
-	MinMinerStake *BigInt `json:"minMinerStake"`
-
-	// Minimum stake required for validators
-	MinValidatorStake *BigInt `json:"minValidatorStake"`
 }
 
 // DefaultChainParams returns the default chain parameters
 func DefaultChainParams() *ChainParams {
 	return &ChainParams{
-		InitialSupply:     NewBigInt(1000000000000), // 1 trillion
-		MinMinerStake:     NewBigInt(1000000),       // 1 million
-		MinValidatorStake: NewBigInt(1000000),       // 1 million
+		InitialSupply: NewBigInt(1000000000000), // 1 trillion
 	}
 }
 

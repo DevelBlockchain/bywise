@@ -68,19 +68,6 @@ func TestMakeCodeKey(t *testing.T) {
 	}
 }
 
-func TestMakeStakeKey(t *testing.T) {
-	addr := Address{0x01}
-	key := MakeStakeKey(addr)
-
-	if len(key) != 21 {
-		t.Errorf("Stake key should be 21 bytes, got %d", len(key))
-	}
-
-	if key[0] != KeyTypeStake {
-		t.Errorf("Stake key should start with KeyTypeStake (0x04), got 0x%02x", key[0])
-	}
-}
-
 func TestMakeWalletConfigKey(t *testing.T) {
 	addr := Address{0x01}
 	key := MakeWalletConfigKey(addr)
@@ -148,7 +135,7 @@ func TestStateKeyEqual(t *testing.T) {
 	addr := Address{0x01}
 	key1 := MakeAccountKey(addr)
 	key2 := MakeAccountKey(addr)
-	key3 := MakeStakeKey(addr)
+	key3 := MakeCodeKey(addr)
 
 	if !key1.Equal(key2) {
 		t.Error("Same keys should be equal")
@@ -188,10 +175,6 @@ func TestStateKeyType(t *testing.T) {
 
 	if MakeCodeKey(addr).Type() != KeyTypeCode {
 		t.Error("Code key type should be KeyTypeCode")
-	}
-
-	if MakeStakeKey(addr).Type() != KeyTypeStake {
-		t.Error("Stake key type should be KeyTypeStake")
 	}
 
 	if MakeWalletConfigKey(addr).Type() != KeyTypeWalletConfig {

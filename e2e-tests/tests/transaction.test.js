@@ -143,7 +143,6 @@ describe('Transaction E2E Tests', () => {
       console.log('Node 1 (miner) started');
 
       // Start second node (connected to first, not mining)
-      // IMPORTANT: Set minerStake and validatorStake to '0' to prevent auto-mining
       const node2 = await manager.startNode(1, {
         bootstrapNodes: [node1.grpcAddress],
         miningEnabled: false, // Not mining, just receiving
@@ -151,8 +150,6 @@ describe('Transaction E2E Tests', () => {
         checkpointInterval: CHECKPOINT_INTERVAL,
         maxConnections: 10,
         minConnections: 1,
-        minerStake: '0', // Zero stake to prevent auto-genesis creation
-        validatorStake: '0', // Zero stake
       });
       console.log('Node 2 (follower) started');
 

@@ -43,8 +43,6 @@ func (b *BlockchainAPI) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/blockchain/tx", b.handleGetTransaction)
 	mux.HandleFunc("/blockchain/tx/submit", b.handleSubmitTransaction)
 	mux.HandleFunc("/blockchain/account", b.handleGetAccount)
-	mux.HandleFunc("/blockchain/stake", b.handleGetStake)
-	mux.HandleFunc("/blockchain/stake/register", b.handleRegisterStake)
 	mux.HandleFunc("/miner/info", b.handleMinerInfo)
 	mux.HandleFunc("/miner/pending", b.handlePendingTransactions)
 }
@@ -57,18 +55,13 @@ func (b *BlockchainAPI) RegisterRoutesWithAuth(mux *http.ServeMux, withAuth Auth
 	mux.HandleFunc("/blockchain/tx", withAuth(b.handleGetTransaction))
 	mux.HandleFunc("/blockchain/tx/submit", withAuth(b.handleSubmitTransaction))
 	mux.HandleFunc("/blockchain/account", withAuth(b.handleGetAccount))
-	mux.HandleFunc("/blockchain/stake", withAuth(b.handleGetStake))
-	mux.HandleFunc("/blockchain/stake/register", withAuth(b.handleRegisterStake))
 	mux.HandleFunc("/miner/info", withAuth(b.handleMinerInfo))
 	mux.HandleFunc("/miner/pending", withAuth(b.handlePendingTransactions))
 }
 
 // BlockchainInfoResponse contains blockchain status information
 type BlockchainInfoResponse struct {
-	LatestBlock      uint64 `json:"latestBlock"`
-	TotalTransactions int   `json:"totalTransactions"`
-	ActiveValidators int    `json:"activeValidators"`
-	ActiveMiners     int    `json:"activeMiners"`
+	LatestBlock uint64 `json:"latestBlock"`
 }
 
 // handleBlockchainInfo returns blockchain status
@@ -78,13 +71,8 @@ func (b *BlockchainAPI) handleBlockchainInfo(w http.ResponseWriter, r *http.Requ
 		latestBlock = 0
 	}
 
-	validators, _ := b.storage.GetAllActiveValidators()
-	miners, _ := b.storage.GetAllActiveMiners()
-
 	response := BlockchainInfoResponse{
-		LatestBlock:      latestBlock,
-		ActiveValidators: len(validators),
-		ActiveMiners:     len(miners),
+		LatestBlock: latestBlock,
 	}
 
 	b.jsonResponse(w, response)
@@ -328,56 +316,6 @@ func (b *BlockchainAPI) handleGetAccount(w http.ResponseWriter, r *http.Request)
 		Address: account.Address.Hex(),
 		Balance: account.Balance.String(),
 		Nonce:   account.Nonce,
-	}
-
-	b.jsonResponse(w, response)
-}
-
-// StakeResponse contains stake information
-type StakeResponse struct {
-	Address        string `json:"address"`
-	MinerStake     string `json:"minerStake"`
-	ValidatorStake string `json:"validatorStake"`
-	TotalStake     string `json:"totalStake"`
-	IsValidator    bool   `json:"isValidator"`
-	IsMiner        bool   `json:"isMiner"`
-	Rewards        string `json:"rewards"`
-	SlashCount     uint64 `json:"slashCount"`
-	IsActive       bool   `json:"isActive"`
-	// Deprecated: use MinerStake or ValidatorStake
-	StakeAmount string `json:"stakeAmount,omitempty"`
-}
-
-// handleGetStake returns stake information
-func (b *BlockchainAPI) handleGetStake(w http.ResponseWriter, r *http.Request) {
-	addressStr := r.URL.Query().Get("address")
-	if addressStr == "" {
-		http.Error(w, "Address required", http.StatusBadRequest)
-		return
-	}
-
-	address, err := core.AddressFromHex(addressStr)
-	if err != nil {
-		http.Error(w, "Invalid address", http.StatusBadRequest)
-		return
-	}
-
-	stake, err := b.storage.GetStakeInfo(address)
-	if err != nil {
-		http.Error(w, "Stake info not found", http.StatusNotFound)
-		return
-	}
-
-	response := StakeResponse{
-		Address:        stake.Address.Hex(),
-		MinerStake:     stake.GetMinerStake().String(),
-		ValidatorStake: stake.GetValidatorStake().String(),
-		TotalStake:     stake.TotalStake().String(),
-		IsValidator:    stake.IsValidator,
-		IsMiner:        stake.IsMiner,
-		Rewards:        stake.Rewards.String(),
-		SlashCount:     stake.SlashCount,
-		IsActive:       stake.IsActive,
 	}
 
 	b.jsonResponse(w, response)
@@ -671,240 +609,6 @@ func (b *BlockchainAPI) handleSubmitTransaction(w http.ResponseWriter, r *http.R
 	b.jsonResponse(w, SubmitTransactionResponse{
 		Success: true,
 		TxID:    tx.ID.Hex(),
-	})
-}
-
-// RegisterStakeRequest represents a stake registration request
-// Allows registering stake for miner, validator, or both
-type RegisterStakeRequest struct {
-	Address        string `json:"address"`
-	MinerStake     string `json:"minerStake,omitempty"`     // Stake amount for mining
-	ValidatorStake string `json:"validatorStake,omitempty"` // Stake amount for validation
-	// Deprecated: use MinerStake and/or ValidatorStake
-	StakeAmount string `json:"stakeAmount,omitempty"`
-	IsMiner     bool   `json:"isMiner,omitempty"`
-	IsValidator bool   `json:"isValidator,omitempty"`
-}
-
-// RegisterStakeResponse represents the response to a stake registration
-type RegisterStakeResponse struct {
-	Success        bool   `json:"success"`
-	Address        string `json:"address,omitempty"`
-	MinerStake     string `json:"minerStake,omitempty"`
-	ValidatorStake string `json:"validatorStake,omitempty"`
-	TotalStake     string `json:"totalStake,omitempty"`
-	IsMiner        bool   `json:"isMiner,omitempty"`
-	IsValidator    bool   `json:"isValidator,omitempty"`
-	IsActive       bool   `json:"isActive,omitempty"`
-	Error          string `json:"error,omitempty"`
-}
-
-// handleRegisterStake handles stake registration for miners and validators
-// Supports separate stakes for miner and validator roles
-func (b *BlockchainAPI) handleRegisterStake(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Read request body
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		b.jsonResponse(w, RegisterStakeResponse{
-			Success: false,
-			Error:   "failed to read request body",
-		})
-		return
-	}
-	defer r.Body.Close()
-
-	var req RegisterStakeRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		b.jsonResponse(w, RegisterStakeResponse{
-			Success: false,
-			Error:   "invalid JSON: " + err.Error(),
-		})
-		return
-	}
-
-	// Parse address
-	address, err := core.AddressFromHex(req.Address)
-	if err != nil {
-		b.jsonResponse(w, RegisterStakeResponse{
-			Success: false,
-			Error:   "invalid address: " + err.Error(),
-		})
-		return
-	}
-
-	// Get chain params for minimum stake requirements
-	chainParams, _ := b.storage.GetChainParams()
-	minMinerStake := core.NewBigInt(1000000)
-	minValidatorStake := core.NewBigInt(1000000)
-	if chainParams != nil {
-		minMinerStake = chainParams.MinMinerStake
-		minValidatorStake = chainParams.MinValidatorStake
-	}
-
-	// Parse miner stake
-	minerStake := core.NewBigInt(0)
-	if req.MinerStake != "" {
-		var ok bool
-		minerStake, ok = core.NewBigIntFromString(req.MinerStake, 10)
-		if !ok {
-			b.jsonResponse(w, RegisterStakeResponse{
-				Success: false,
-				Error:   "invalid miner stake amount",
-			})
-			return
-		}
-	}
-
-	// Parse validator stake
-	validatorStake := core.NewBigInt(0)
-	if req.ValidatorStake != "" {
-		var ok bool
-		validatorStake, ok = core.NewBigIntFromString(req.ValidatorStake, 10)
-		if !ok {
-			b.jsonResponse(w, RegisterStakeResponse{
-				Success: false,
-				Error:   "invalid validator stake amount",
-			})
-			return
-		}
-	}
-
-	// Handle legacy StakeAmount field (backwards compatibility)
-	if req.StakeAmount != "" && minerStake.IsZero() && validatorStake.IsZero() {
-		legacyStake, ok := core.NewBigIntFromString(req.StakeAmount, 10)
-		if !ok {
-			b.jsonResponse(w, RegisterStakeResponse{
-				Success: false,
-				Error:   "invalid stake amount",
-			})
-			return
-		}
-		// Assign legacy stake based on requested roles
-		if req.IsMiner {
-			minerStake = legacyStake
-		}
-		if req.IsValidator {
-			validatorStake = legacyStake
-		}
-	}
-
-	// Get or create stake info
-	stakeInfo, err := b.storage.GetStakeInfo(address)
-	if err != nil {
-		b.jsonResponse(w, RegisterStakeResponse{
-			Success: false,
-			Error:   "failed to get stake info: " + err.Error(),
-		})
-		return
-	}
-
-	// Get account to check/update balance
-	account, err := b.storage.GetAccount(address)
-	if err != nil {
-		// Account might not exist yet
-		account = &core.Account{
-			Address: address,
-			Balance: core.NewBigInt(0),
-			Nonce:   0,
-		}
-	}
-
-	// Calculate stake changes and update balance accordingly
-	totalStakeChange := core.NewBigInt(0)
-
-	// Update miner stake if provided
-	if !minerStake.IsZero() {
-		// Calculate change in miner stake
-		oldMinerStake := stakeInfo.GetMinerStake()
-		stakeChange := core.NewBigInt(0).Sub(minerStake, oldMinerStake)
-		totalStakeChange = totalStakeChange.Add(totalStakeChange, stakeChange)
-
-		// Validate final stake amount is at least minimum (or zero to disable)
-		if !minerStake.IsZero() && minerStake.Cmp(minMinerStake) < 0 {
-			b.jsonResponse(w, RegisterStakeResponse{
-				Success: false,
-				Error:   "final miner stake must be at least " + minMinerStake.String() + " or 0 to disable",
-			})
-			return
-		}
-
-		stakeInfo.MinerStake = minerStake
-		stakeInfo.IsMiner = minerStake.Cmp(core.NewBigInt(0)) > 0
-	}
-
-	// Update validator stake if provided
-	if !validatorStake.IsZero() {
-		// Calculate change in validator stake
-		oldValidatorStake := stakeInfo.GetValidatorStake()
-		stakeChange := core.NewBigInt(0).Sub(validatorStake, oldValidatorStake)
-		totalStakeChange = totalStakeChange.Add(totalStakeChange, stakeChange)
-
-		// Validate final stake amount is at least minimum (or zero to disable)
-		if !validatorStake.IsZero() && validatorStake.Cmp(minValidatorStake) < 0 {
-			b.jsonResponse(w, RegisterStakeResponse{
-				Success: false,
-				Error:   "final validator stake must be at least " + minValidatorStake.String() + " or 0 to disable",
-			})
-			return
-		}
-
-		stakeInfo.ValidatorStake = validatorStake
-		stakeInfo.IsValidator = validatorStake.Cmp(core.NewBigInt(0)) > 0
-	}
-
-	// Update account balance based on stake change
-	// If stake increased (positive change), deduct from balance
-	// If stake decreased (negative change), add to balance
-	if !totalStakeChange.IsZero() {
-		newBalance := core.NewBigInt(0).Sub(account.Balance, totalStakeChange)
-
-		// Check if account has sufficient balance for stake increase
-		if newBalance.Cmp(core.NewBigInt(0)) < 0 {
-			b.jsonResponse(w, RegisterStakeResponse{
-				Success: false,
-				Error:   "insufficient balance to stake. Available: " + account.Balance.String() + ", Required: " + totalStakeChange.String(),
-			})
-			return
-		}
-
-		account.Balance = newBalance
-
-		// Save updated account balance
-		if err := b.storage.SetAccount(account); err != nil {
-			b.jsonResponse(w, RegisterStakeResponse{
-				Success: false,
-				Error:   "failed to update account balance: " + err.Error(),
-			})
-			return
-		}
-	}
-
-	// Update active status
-	stakeInfo.UpdateActiveStatus()
-
-	// Save stake info
-	if err := b.storage.SetStakeInfo(stakeInfo); err != nil {
-		b.jsonResponse(w, RegisterStakeResponse{
-			Success: false,
-			Error:   "failed to save stake info: " + err.Error(),
-		})
-		return
-	}
-
-	b.jsonResponse(w, RegisterStakeResponse{
-		Success:        true,
-		Address:        stakeInfo.Address.Hex(),
-		MinerStake:     stakeInfo.GetMinerStake().String(),
-		ValidatorStake: stakeInfo.GetValidatorStake().String(),
-		TotalStake:     stakeInfo.TotalStake().String(),
-		IsMiner:        stakeInfo.IsMiner,
-		IsValidator:    stakeInfo.IsValidator,
-		IsActive:       stakeInfo.IsActive,
 	})
 }
 

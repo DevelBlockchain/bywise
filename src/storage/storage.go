@@ -17,7 +17,7 @@ var (
 
 // Database prefixes for different data types
 const (
-	prefixState       = "s:" // State data (accounts, storage, code, stakes)
+	prefixState       = "s:" // State data (accounts, storage, code)
 	prefixBlock       = "b:" // Blocks by hash
 	prefixBlockNumber = "n:" // Block hash by number
 	prefixTx          = "t:" // Transactions by ID
@@ -106,29 +106,6 @@ func (s *Storage) GetAccount(address core.Address) (*core.Account, error) {
 func (s *Storage) SetAccount(account *core.Account) error {
 	key := core.MakeAccountKey(account.Address)
 	data, err := account.Serialize()
-	if err != nil {
-		return err
-	}
-	return s.SetState(key, data)
-}
-
-// GetStakeInfo retrieves stake info from storage
-func (s *Storage) GetStakeInfo(address core.Address) (*core.StakeInfo, error) {
-	key := core.MakeStakeKey(address)
-	data, err := s.GetState(key)
-	if err != nil {
-		if err == ErrNotFound {
-			return core.NewStakeInfo(address), nil
-		}
-		return nil, err
-	}
-	return core.DeserializeStakeInfo(data)
-}
-
-// SetStakeInfo stores stake info
-func (s *Storage) SetStakeInfo(info *core.StakeInfo) error {
-	key := core.MakeStakeKey(info.Address)
-	data, err := info.Serialize()
 	if err != nil {
 		return err
 	}
@@ -318,42 +295,6 @@ func (s *Storage) IterateState(prefix byte, fn func(key core.StateKey, value []b
 	}
 
 	return iter.Error()
-}
-
-// GetAllActiveValidators returns all active validators
-func (s *Storage) GetAllActiveValidators() ([]*core.StakeInfo, error) {
-	var validators []*core.StakeInfo
-
-	err := s.IterateState(core.KeyTypeStake, func(key core.StateKey, value []byte) error {
-		info, err := core.DeserializeStakeInfo(value)
-		if err != nil {
-			return err
-		}
-		if info.IsActive && info.IsValidator {
-			validators = append(validators, info)
-		}
-		return nil
-	})
-
-	return validators, err
-}
-
-// GetAllActiveMiners returns all active miners
-func (s *Storage) GetAllActiveMiners() ([]*core.StakeInfo, error) {
-	var miners []*core.StakeInfo
-
-	err := s.IterateState(core.KeyTypeStake, func(key core.StateKey, value []byte) error {
-		info, err := core.DeserializeStakeInfo(value)
-		if err != nil {
-			return err
-		}
-		if info.IsActive && info.IsMiner {
-			miners = append(miners, info)
-		}
-		return nil
-	})
-
-	return miners, err
 }
 
 // --- Batch Operations ---

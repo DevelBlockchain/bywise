@@ -73,7 +73,6 @@ type BlockchainConfig struct {
 	DataDir            string        `json:"dataDir"`            // Directory for blockchain data (LevelDB)
 	BlockTime          time.Duration `json:"blockTime"`          // Target block time (default 5s)
 	CheckpointInterval uint64        `json:"checkpointInterval"` // Blocks between checkpoints (default 50000)
-	// Note: Mining and validator roles are auto-detected based on stake
 }
 
 // NetworkConfig is the main configuration structure
