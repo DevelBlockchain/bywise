@@ -3,8 +3,10 @@ package network
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/bywise/go-bywise/src/checkpoint"
 	"github.com/bywise/go-bywise/src/core"
@@ -22,11 +24,61 @@ type BlockchainHandler struct {
 
 // NewBlockchainHandler creates a new blockchain handler
 func NewBlockchainHandler(network *Network, store *storage.Storage, m *miner.Miner) *BlockchainHandler {
-	return &BlockchainHandler{
+	handler := &BlockchainHandler{
 		network: network,
 		storage: store,
 		miner:   m,
 	}
+
+	// Register network handlers for proposals and transactions
+	network.RegisterRequestHandler("proposal", handler.handleProposalBroadcast)
+	network.RegisterRequestHandler("transaction", handler.handleTransactionBroadcast)
+
+	return handler
+}
+
+// handleProposalBroadcast handles incoming proposal broadcasts
+func (h *BlockchainHandler) handleProposalBroadcast(ctx context.Context, peer *Peer, payload []byte) ([]byte, error) {
+	// Decode proposal from JSON
+	var proposal core.TransactionProposal
+	if err := json.Unmarshal(payload, &proposal); err != nil {
+		return nil, fmt.Errorf("invalid proposal format: %w", err)
+	}
+
+	// Add to proposals mempool
+	if err := h.miner.AddPendingProposal(&proposal); err != nil {
+		log.Printf("[Network] Rejected proposal from %s: %v", peer.NodeID, err)
+		return []byte(`{"accepted":false}`), nil
+	}
+
+	log.Printf("[Network] Received proposal from %s (from: %s, nonce: %s)", peer.NodeID, proposal.From.Hex(), proposal.Nonce.String())
+
+	// Propagate to other peers (except sender)
+	go h.broadcastProposalExcept(&proposal, peer.NodeID)
+
+	return []byte(`{"accepted":true}`), nil
+}
+
+// handleTransactionBroadcast handles incoming transaction broadcasts
+func (h *BlockchainHandler) handleTransactionBroadcast(ctx context.Context, peer *Peer, payload []byte) ([]byte, error) {
+	// Decode transaction from JSON
+	var tx core.Transaction
+	if err := json.Unmarshal(payload, &tx); err != nil {
+		return nil, fmt.Errorf("invalid transaction format: %w", err)
+	}
+
+	// Add to transactions mempool
+	if err := h.miner.AddPendingTransaction(&tx); err != nil {
+		log.Printf("[Network] Rejected transaction from %s: %v", peer.NodeID, err)
+		return []byte(`{"accepted":false}`), nil
+	}
+
+	log.Printf("[Network] Received transaction %s from %s", tx.ID.Hex(), peer.NodeID)
+
+	// Propagate to other peers (except sender)
+	go h.broadcastTransactionExcept(&tx, peer.NodeID)
+
+	return []byte(`{"accepted":true}`), nil
 }
 
 // SetBlockchainHandler sets the blockchain handler on the network
@@ -855,4 +907,66 @@ func (n *Network) SyncBlockchainFromNetwork(ipfsClient checkpoint.IPFSClient) er
 	}
 
 	return nil
+}
+
+// broadcastProposalExcept broadcasts a proposal to all peers except the specified one
+func (h *BlockchainHandler) broadcastProposalExcept(proposal *core.TransactionProposal, exceptNodeID string) {
+	payload, err := json.Marshal(proposal)
+	if err != nil {
+		log.Printf("[Network] Failed to marshal proposal: %v", err)
+		return
+	}
+
+	peers := h.network.GetConnectedPeers()
+	for _, peer := range peers {
+		if peer.NodeID == exceptNodeID {
+			continue
+		}
+
+		go func(p *Peer) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			_, err := h.network.SendRequest(ctx, p, "proposal", payload)
+			if err != nil {
+				log.Printf("[Network] Failed to broadcast proposal to %s: %v", p.NodeID, err)
+			}
+		}(peer)
+	}
+}
+
+// broadcastTransactionExcept broadcasts a transaction to all peers except the specified one
+func (h *BlockchainHandler) broadcastTransactionExcept(tx *core.Transaction, exceptNodeID string) {
+	payload, err := json.Marshal(tx)
+	if err != nil {
+		log.Printf("[Network] Failed to marshal transaction: %v", err)
+		return
+	}
+
+	peers := h.network.GetConnectedPeers()
+	for _, peer := range peers {
+		if peer.NodeID == exceptNodeID {
+			continue
+		}
+
+		go func(p *Peer) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			_, err := h.network.SendRequest(ctx, p, "transaction", payload)
+			if err != nil {
+				log.Printf("[Network] Failed to broadcast transaction to %s: %v", p.NodeID, err)
+			}
+		}(peer)
+	}
+}
+
+// BroadcastProposal broadcasts a proposal to all connected peers
+func (h *BlockchainHandler) BroadcastProposal(proposal *core.TransactionProposal) {
+	h.broadcastProposalExcept(proposal, "")
+}
+
+// BroadcastTransaction broadcasts a transaction to all connected peers
+func (h *BlockchainHandler) BroadcastTransaction(tx *core.Transaction) {
+	h.broadcastTransactionExcept(tx, "")
 }

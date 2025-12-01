@@ -41,10 +41,12 @@ func (b *BlockchainAPI) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/blockchain/block", b.handleGetBlock)
 	mux.HandleFunc("/blockchain/blocks", b.handleGetBlocks)
 	mux.HandleFunc("/blockchain/tx", b.handleGetTransaction)
+	mux.HandleFunc("/blockchain/tx/proposal", b.handleSubmitProposal)
 	mux.HandleFunc("/blockchain/tx/submit", b.handleSubmitTransaction)
 	mux.HandleFunc("/blockchain/account", b.handleGetAccount)
 	mux.HandleFunc("/miner/info", b.handleMinerInfo)
 	mux.HandleFunc("/miner/pending", b.handlePendingTransactions)
+	mux.HandleFunc("/miner/proposals", b.handlePendingProposals)
 }
 
 // RegisterRoutesWithAuth registers blockchain routes with authentication wrapper
@@ -53,10 +55,12 @@ func (b *BlockchainAPI) RegisterRoutesWithAuth(mux *http.ServeMux, withAuth Auth
 	mux.HandleFunc("/blockchain/block", withAuth(b.handleGetBlock))
 	mux.HandleFunc("/blockchain/blocks", withAuth(b.handleGetBlocks))
 	mux.HandleFunc("/blockchain/tx", withAuth(b.handleGetTransaction))
+	mux.HandleFunc("/blockchain/tx/proposal", withAuth(b.handleSubmitProposal))
 	mux.HandleFunc("/blockchain/tx/submit", withAuth(b.handleSubmitTransaction))
 	mux.HandleFunc("/blockchain/account", withAuth(b.handleGetAccount))
 	mux.HandleFunc("/miner/info", withAuth(b.handleMinerInfo))
 	mux.HandleFunc("/miner/pending", withAuth(b.handlePendingTransactions))
+	mux.HandleFunc("/miner/proposals", withAuth(b.handlePendingProposals))
 }
 
 // BlockchainInfoResponse contains blockchain status information
@@ -368,6 +372,25 @@ func (b *BlockchainAPI) handlePendingTransactions(w http.ResponseWriter, r *http
 	})
 }
 
+// SubmitProposalRequest represents a proposal submission request
+type SubmitProposalRequest struct {
+	TxType     uint8  `json:"txType"`
+	Validator  string `json:"validator"`
+	From       string `json:"from"`
+	To         string `json:"to"`
+	Value      string `json:"value"`
+	Nonce      string `json:"nonce"`
+	BlockLimit uint64 `json:"blockLimit"`
+	Data       string `json:"data"`    // hex encoded
+	UserSig    string `json:"userSig"` // hex encoded
+}
+
+// SubmitProposalResponse represents the response to a proposal submission
+type SubmitProposalResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
 // SubmitTransactionRequest represents a transaction submission request
 type SubmitTransactionRequest struct {
 	Validator    string            `json:"validator"`
@@ -389,6 +412,183 @@ type SubmitTransactionResponse struct {
 	Success bool   `json:"success"`
 	TxID    string `json:"txId,omitempty"`
 	Error   string `json:"error,omitempty"`
+}
+
+// handleSubmitProposal handles proposal submission
+func (b *BlockchainAPI) handleSubmitProposal(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if b.miner == nil {
+		b.jsonResponse(w, SubmitProposalResponse{
+			Success: false,
+			Error:   "mining not enabled",
+		})
+		return
+	}
+
+	// Read request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		b.jsonResponse(w, SubmitProposalResponse{
+			Success: false,
+			Error:   "failed to read request body",
+		})
+		return
+	}
+	defer r.Body.Close()
+
+	var req SubmitProposalRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		b.jsonResponse(w, SubmitProposalResponse{
+			Success: false,
+			Error:   "invalid JSON: " + err.Error(),
+		})
+		return
+	}
+
+	// Parse addresses
+	validator, err := core.AddressFromHex(req.Validator)
+	if err != nil {
+		b.jsonResponse(w, SubmitProposalResponse{
+			Success: false,
+			Error:   "invalid validator address: " + err.Error(),
+		})
+		return
+	}
+
+	from, err := core.AddressFromHex(req.From)
+	if err != nil {
+		b.jsonResponse(w, SubmitProposalResponse{
+			Success: false,
+			Error:   "invalid from address: " + err.Error(),
+		})
+		return
+	}
+
+	// Parse 'to' address - empty for contract creation
+	var to core.Address
+	if req.To != "" {
+		to, err = core.AddressFromHex(req.To)
+		if err != nil {
+			b.jsonResponse(w, SubmitProposalResponse{
+				Success: false,
+				Error:   "invalid to address: " + err.Error(),
+			})
+			return
+		}
+	}
+
+	// Parse value
+	value := core.NewBigInt(0)
+	if req.Value != "" {
+		var ok bool
+		value, ok = core.NewBigIntFromString(req.Value, 10)
+		if !ok {
+			b.jsonResponse(w, SubmitProposalResponse{
+				Success: false,
+				Error:   "invalid value",
+			})
+			return
+		}
+	}
+
+	// Parse nonce
+	nonce := core.NewBigInt(0)
+	if req.Nonce != "" {
+		var ok bool
+		nonce, ok = core.NewBigIntFromString(req.Nonce, 10)
+		if !ok {
+			b.jsonResponse(w, SubmitProposalResponse{
+				Success: false,
+				Error:   "invalid nonce",
+			})
+			return
+		}
+	}
+
+	// Parse data
+	var data []byte
+	if req.Data != "" {
+		data, err = hex.DecodeString(req.Data)
+		if err != nil {
+			b.jsonResponse(w, SubmitProposalResponse{
+				Success: false,
+				Error:   "invalid data hex: " + err.Error(),
+			})
+			return
+		}
+	}
+
+	// Parse user signature
+	userSig, err := hex.DecodeString(req.UserSig)
+	if err != nil {
+		b.jsonResponse(w, SubmitProposalResponse{
+			Success: false,
+			Error:   "invalid user signature hex: " + err.Error(),
+		})
+		return
+	}
+
+	// Create proposal
+	proposal := &core.TransactionProposal{
+		TxType:     req.TxType,
+		Validator:  validator,
+		From:       from,
+		To:         to,
+		Value:      value,
+		Nonce:      nonce,
+		BlockLimit: req.BlockLimit,
+		Data:       data,
+		UserSig:    userSig,
+	}
+
+	// Add to proposals mempool
+	if err := b.miner.AddPendingProposal(proposal); err != nil {
+		b.jsonResponse(w, SubmitProposalResponse{
+			Success: false,
+			Error:   "failed to add proposal: " + err.Error(),
+		})
+		return
+	}
+
+	// Proposal will be automatically broadcasted via callback
+
+	b.jsonResponse(w, SubmitProposalResponse{
+		Success: true,
+	})
+}
+
+// handlePendingProposals returns pending proposals
+func (b *BlockchainAPI) handlePendingProposals(w http.ResponseWriter, r *http.Request) {
+	if b.miner == nil {
+		b.jsonResponse(w, map[string]interface{}{
+			"count":     0,
+			"proposals": []interface{}{},
+		})
+		return
+	}
+
+	proposals := b.miner.GetPendingProposals()
+
+	proposalInfos := make([]map[string]interface{}, len(proposals))
+	for i, p := range proposals {
+		proposalInfos[i] = map[string]interface{}{
+			"validator":  p.Validator.Hex(),
+			"from":       p.From.Hex(),
+			"to":         p.To.Hex(),
+			"value":      p.Value.String(),
+			"nonce":      p.Nonce.String(),
+			"blockLimit": p.BlockLimit,
+		}
+	}
+
+	b.jsonResponse(w, map[string]interface{}{
+		"count":     len(proposals),
+		"proposals": proposalInfos,
+	})
 }
 
 // handleSubmitTransaction handles transaction submission

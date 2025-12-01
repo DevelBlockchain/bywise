@@ -245,15 +245,16 @@ func (v *Validator) executeCallWithEVM(evm *EVM, stateDB *StateDB, from, to core
 // This is the new 2-step flow:
 // 1. User signs proposal and sends to validator
 // 2. Validator executes, fills ReadSet/WriteSet, signs, and propagates
-func (v *Validator) ProcessProposal(proposal *TransactionProposal, sequenceID uint64) (*core.Transaction, error) {
+// If the transaction fails execution, it returns an error and the proposal is discarded.
+func (v *Validator) ProcessProposal(proposal *core.TransactionProposal, sequenceID uint64) (*core.Transaction, error) {
 	// Create transaction from proposal
 	tx := core.NewTransactionProposal(
 		proposal.TxType,
 		proposal.Validator,
 		proposal.From,
 		proposal.To,
-		core.BigIntFromBytes(proposal.Value.Bytes()),
-		core.BigIntFromBytes(proposal.Nonce.Bytes()),
+		proposal.Value,
+		proposal.Nonce,
 		proposal.BlockLimit,
 		proposal.Data,
 	)
@@ -273,13 +274,20 @@ func (v *Validator) ProcessProposal(proposal *TransactionProposal, sequenceID ui
 	req := &ExecutionRequest{
 		From:  proposal.From,
 		To:    proposal.To,
-		Value: proposal.Value,
+		Value: proposal.Value.Int,
 		Data:  proposal.Data,
 	}
 
 	resp := v.Execute(req)
+
+	// If execution fails, discard the proposal by returning an error
 	if resp.Error != nil {
 		return nil, resp.Error
+	}
+
+	// If transaction was reverted, discard it
+	if resp.Reverted {
+		return nil, errors.New("transaction reverted")
 	}
 
 	// Set execution evidence
@@ -450,4 +458,39 @@ func (v *Validator) GetStorage() *storage.Storage {
 // GetWallet returns the validator's wallet instance
 func (v *Validator) GetWallet() *wallet.Wallet {
 	return v.wallet
+}
+
+// ProcessProposalsFromMempool processes proposals addressed to this validator from the mempool.
+// Returns successfully processed transactions and a list of proposals to remove.
+// This should be called periodically by validators to process pending proposals.
+func (v *Validator) ProcessProposalsFromMempool(
+	proposals []*core.TransactionProposal,
+	onTransactionSigned func(*core.Transaction),
+) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	sequenceID := uint64(0) // TODO: implement proper sequence tracking
+
+	for _, proposal := range proposals {
+		// Only process proposals addressed to this validator
+		if proposal.Validator != v.address {
+			continue
+		}
+
+		// Process the proposal
+		tx, err := v.ProcessProposal(proposal, sequenceID)
+		if err != nil {
+			// Proposal failed execution - it will be discarded
+			// Log but don't propagate failed transactions
+			continue
+		}
+
+		// Successfully signed transaction - call callback to broadcast it
+		if onTransactionSigned != nil {
+			onTransactionSigned(tx)
+		}
+
+		sequenceID++
+	}
 }

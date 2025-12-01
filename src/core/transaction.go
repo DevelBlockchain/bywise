@@ -12,6 +12,21 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// TransactionProposal represents a user-signed transaction proposal.
+// This is what users create and sign before sending to validators.
+// It gets propagated in the proposals mempool.
+type TransactionProposal struct {
+	TxType     uint8   // Transaction type (0 = transfer, 1 = contract call, etc)
+	Validator  Address // Validator chosen to process
+	From       Address // Sender address
+	To         Address // Recipient address (empty for contract creation)
+	Value      *BigInt // Amount to transfer (uint256)
+	Nonce      *BigInt // Replay protection (uint256)
+	BlockLimit uint64  // Transaction expires after this block (0 = no limit)
+	Data       []byte  // EVM CallData or contract init code
+	UserSig    []byte  // User's signature on the proposal
+}
+
 // Transaction represents a complete, self-contained and stateless transaction.
 // Can be validated in isolation without external state access.
 // Contains all input data (ReadSet with values) and output data (WriteSet) for verification.
